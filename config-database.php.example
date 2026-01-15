@@ -1,0 +1,22 @@
+<?php
+/**
+ * Arquivo de configuração do banco de dados
+ * 
+ * INSTRUÇÕES:
+ * 1. Copie este arquivo para config-database.php
+ * 2. Ajuste as configurações se necessário
+ * 3. NUNCA commite o arquivo config-database.php no Git!
+ */
+
+return [
+    'host' => 'localhost', // ou IP do servidor
+    'dbname' => 'supernerds3',
+    'username' => 'supernerds3',
+    'password' => '*.BDnovaedu2026!',
+    'charset' => 'utf8mb4',
+    'options' => [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]
+];
