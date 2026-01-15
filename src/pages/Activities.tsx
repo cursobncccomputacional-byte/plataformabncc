@@ -101,7 +101,7 @@ export const Activities = () => {
   };
 
   const handleDownloadPDF = (activity: Activity) => {
-    if (activity.document_url && user?.role === 'admin') {
+    if (activity.document_url && (user?.role === 'admin' || user?.role === 'professor')) {
       const link = document.createElement('a');
       link.href = activity.document_url;
       link.download = activity.title;
@@ -493,7 +493,7 @@ export const Activities = () => {
                           <Eye className="w-4 h-4" />
                           Visualizar
                         </button>
-                        {user?.role === 'admin' && (
+                        {(user?.role === 'admin' || user?.role === 'professor') && (
                           <button 
                             onClick={() => handleDownloadPDF(activity)}
                             className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
@@ -534,7 +534,7 @@ export const Activities = () => {
           pdfUrl={selectedPDF.url}
           title={selectedPDF.title}
           onClose={() => setSelectedPDF(null)}
-          allowDownload={user?.role === 'admin'}
+          allowDownload={user?.role === 'admin' || user?.role === 'professor'}
         />
       )}
 

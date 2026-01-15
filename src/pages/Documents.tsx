@@ -71,8 +71,8 @@ export const Documents = () => {
   };
 
   const handleDownload = (doc: Document) => {
-    // Apenas administradores podem baixar
-    if (user?.role === 'admin') {
+    // Professores e administradores podem baixar
+    if (user?.role === 'admin' || user?.role === 'professor') {
       const link = document.createElement('a');
       link.href = doc.file_url;
       link.download = doc.title;
@@ -220,7 +220,7 @@ export const Documents = () => {
                             <Eye className="w-3 h-3" />
                             {fileType === 'pdf' ? 'Ver' : 'Abrir'}
                           </button>
-                          {user?.role === 'admin' && activity.document_url && (
+                          {(user?.role === 'admin' || user?.role === 'professor') && activity.document_url && (
                             <button 
                               onClick={() => {
                                 const link = document.createElement('a');
@@ -299,7 +299,7 @@ export const Documents = () => {
                         <Eye className="w-4 h-4" />
                         {doc.file_type === 'pdf' ? 'Visualizar' : 'Abrir'}
                       </button>
-                      {user?.role === 'admin' && (
+                      {(user?.role === 'admin' || user?.role === 'professor') && (
                         <button 
                           onClick={() => handleDownload(doc)}
                           className="flex items-center gap-1 text-sky-600 hover:text-sky-700 text-sm font-medium"
@@ -339,7 +339,7 @@ export const Documents = () => {
           pdfUrl={selectedPDF.url}
           title={selectedPDF.title}
           onClose={() => setSelectedPDF(null)}
-          allowDownload={user?.role === 'admin'}
+          allowDownload={user?.role === 'admin' || user?.role === 'professor'}
         />
       )}
     </div>

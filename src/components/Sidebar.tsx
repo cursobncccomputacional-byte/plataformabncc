@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
-import { BookOpen, Video, FileText, User, LogOut, Activity, MessageCircle } from 'lucide-react';
+import { BookOpen, Video, FileText, User, LogOut, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
 interface SidebarProps {
-  currentPage: 'activities' | 'videos' | 'documents' | 'profile' | 'community';
-  onNavigate: (page: 'activities' | 'videos' | 'documents' | 'profile' | 'community') => void;
+  currentPage: 'activities' | 'videos' | 'documents' | 'profile';
+  onNavigate: (page: 'activities' | 'videos' | 'documents' | 'profile') => void;
 }
 
 export const Sidebar = ({ currentPage, onNavigate }: SidebarProps) => {
@@ -14,7 +14,6 @@ export const Sidebar = ({ currentPage, onNavigate }: SidebarProps) => {
     { id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' },
     { id: 'videos' as const, icon: Video, label: 'Vídeo Aulas' },
     { id: 'documents' as const, icon: FileText, label: 'Documentos' },
-    { id: 'community' as const, icon: MessageCircle, label: 'Comunidade' },
     { id: 'profile' as const, icon: User, label: 'Perfil' },
   ];
 
@@ -36,7 +35,7 @@ export const Sidebar = ({ currentPage, onNavigate }: SidebarProps) => {
 
         <div className="mb-8 p-4 rounded-lg" style={{ backgroundColor: '#e6f2ff' }}>
           <p className="text-sm text-gray-600 mb-1">Bem-vindo(a),</p>
-          <p className="font-semibold text-gray-900">{profile?.full_name || 'Professor(a)'}</p>
+          <p className="font-semibold text-gray-900">{profile?.name || 'Professor(a)'}</p>
         </div>
 
         <nav className="space-y-2">

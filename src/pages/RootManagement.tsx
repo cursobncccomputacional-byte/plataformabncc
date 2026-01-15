@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { User, CreateUserData } from '../types/bncc';
-import { Plus, Edit, Trash2, UserCheck, UserX, Search, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, UserCheck, UserX, Search, Filter, Shield, Users } from 'lucide-react';
+import { DashboardHeader } from '../components/DashboardHeader';
 
-interface UserManagementProps {
-  onBackToDashboard: () => void;
-}
-
-export default function UserManagement({ onBackToDashboard }: UserManagementProps) {
+export const RootManagement = () => {
   const { user, getAllUsers, createUser, updateUser, deleteUser, toggleUserStatus } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'professor' | 'aluno'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'root' | 'admin' | 'professor' | 'aluno'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -31,7 +28,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
   });
 
   useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'root') {
+    if (user?.role === 'root') {
       loadUsers();
     }
   }, [user]);
@@ -107,6 +104,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
     const result = await updateUser(editingUser.id, {
       name: formData.name,
       email: formData.email,
+      role: formData.role,
       school: formData.school,
       subjects: formData.subjects
     });
@@ -155,7 +153,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
     setFormData({
       name: userToEdit.name,
       email: userToEdit.email,
-      password: '', // Don't pre-fill password
+      password: '',
       role: userToEdit.role,
       school: userToEdit.school || '',
       subjects: userToEdit.subjects || []
@@ -172,12 +170,32 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  if (user?.role !== 'admin' && user?.role !== 'root') {
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      'root': 'Root',
+      'admin': 'Administrador',
+      'professor': 'Professor',
+      'aluno': 'Aluno'
+    };
+    return labels[role] || role;
+  };
+
+  const getRoleColor = (role: string) => {
+    const colors: Record<string, string> = {
+      'root': 'bg-purple-100 text-purple-800',
+      'admin': 'bg-blue-100 text-blue-800',
+      'professor': 'bg-green-100 text-green-800',
+      'aluno': 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[role] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (user?.role !== 'root') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Acesso Negado</h1>
-          <p className="text-gray-600">Apenas administradores podem acessar esta página.</p>
+          <p className="text-gray-600">Apenas usuários root podem acessar esta página.</p>
         </div>
       </div>
     );
@@ -185,22 +203,19 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <DashboardHeader />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={onBackToDashboard}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Voltar ao Dashboard
-            </button>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Shield className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Gerenciamento de Usuários</h1>
+              <p className="mt-2 text-gray-600">Gerencie todos os usuários do sistema, defina níveis de acesso e configure permissões</p>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Gerenciamento de Usuários</h1>
-          <p className="mt-2 text-gray-600">Gerencie usuários, permissões e configurações do sistema</p>
         </div>
 
         {/* Error Message */}
@@ -221,7 +236,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                 placeholder="Buscar usuários..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
 
@@ -230,9 +245,11 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="all">Todos os níveis</option>
+                <option value="root">Root</option>
+                <option value="admin">Administradores</option>
                 <option value="professor">Professores</option>
                 <option value="aluno">Alunos</option>
               </select>
@@ -240,7 +257,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="all">Todos os status</option>
                 <option value="active">Ativos</option>
@@ -251,11 +268,51 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
             {/* Create Button */}
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Novo Usuário
             </button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
+                <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+              </div>
+              <Users className="h-8 w-8 text-purple-600" />
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
+                <p className="text-2xl font-bold text-green-600">{users.filter(u => u.is_active).length}</p>
+              </div>
+              <UserCheck className="h-8 w-8 text-green-600" />
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Professores</p>
+                <p className="text-2xl font-bold text-blue-600">{users.filter(u => u.role === 'professor').length}</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-600" />
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Alunos</p>
+                <p className="text-2xl font-bold text-yellow-600">{users.filter(u => u.role === 'aluno').length}</p>
+              </div>
+              <Users className="h-8 w-8 text-yellow-600" />
+            </div>
           </div>
         </div>
 
@@ -269,7 +326,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                     Usuário
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
+                    Nível de Acesso
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Escola
@@ -286,59 +343,53 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                {filteredUsers.map((usr) => (
+                  <tr key={usr.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
+                        <div className="text-sm font-medium text-gray-900">{usr.name}</div>
+                        <div className="text-sm text-gray-500">{usr.email}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.role === 'admin' 
-                          ? 'bg-blue-100 text-blue-800'
-                          : user.role === 'professor'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {user.role === 'admin' ? 'Administrador' : user.role === 'professor' ? 'Professor' : 'Aluno'}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(usr.role)}`}>
+                        {getRoleLabel(usr.role)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.school || '-'}
+                      {usr.school || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.is_active 
+                        usr.is_active 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {user.is_active ? 'Ativo' : 'Inativo'}
+                        {usr.is_active ? 'Ativo' : 'Inativo'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatLastLogin(user.last_login || null)}
+                      {formatLastLogin(usr.last_login || null)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => openEditModal(user)}
+                          onClick={() => openEditModal(usr)}
                           className="text-blue-600 hover:text-blue-900"
                           title="Editar usuário"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleToggleStatus(user.id)}
-                          className={user.is_active ? "text-orange-600 hover:text-orange-900" : "text-green-600 hover:text-green-900"}
-                          title={user.is_active ? "Desativar usuário" : "Ativar usuário"}
+                          onClick={() => handleToggleStatus(usr.id)}
+                          className={usr.is_active ? "text-orange-600 hover:text-orange-900" : "text-green-600 hover:text-green-900"}
+                          title={usr.is_active ? "Desativar usuário" : "Ativar usuário"}
                         >
-                          {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          {usr.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                         </button>
-                        {user.id !== user?.id && (
+                        {usr.id !== user?.id && (
                           <button
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => handleDeleteUser(usr.id)}
                             className="text-red-600 hover:text-red-900"
                             title="Deletar usuário"
                           >
@@ -376,7 +427,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
 
@@ -389,7 +440,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
 
@@ -402,7 +453,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       required
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
 
@@ -412,13 +463,14 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                     </label>
                     <select
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'professor' | 'aluno' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
+                      <option value="root">Root</option>
+                      <option value="admin">Administrador</option>
                       <option value="professor">Professor</option>
                       <option value="aluno">Aluno</option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">Admin pode criar apenas professores e alunos</p>
                   </div>
 
                   <div>
@@ -429,7 +481,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       type="text"
                       value={formData.school}
                       onChange={(e) => setFormData({ ...formData, school: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -445,7 +497,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50"
                   >
                     {loading ? 'Criando...' : 'Criar Usuário'}
                   </button>
@@ -471,7 +523,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
 
@@ -484,7 +536,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
 
@@ -494,13 +546,14 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                     </label>
                     <select
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'professor' | 'aluno' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
+                      <option value="root">Root</option>
+                      <option value="admin">Administrador</option>
                       <option value="professor">Professor</option>
                       <option value="aluno">Aluno</option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">Admin pode editar apenas professores e alunos</p>
                   </div>
 
                   <div>
@@ -511,7 +564,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       type="text"
                       value={formData.school}
                       onChange={(e) => setFormData({ ...formData, school: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -527,7 +580,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50"
                   >
                     {loading ? 'Salvando...' : 'Salvar Alterações'}
                   </button>
@@ -539,4 +592,4 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
       </div>
     </div>
   );
-}
+};

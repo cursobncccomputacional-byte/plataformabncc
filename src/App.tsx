@@ -9,6 +9,7 @@ import { Reports } from './pages/Reports';
 import { LoadingScreen } from './components/LoadingScreen';
 import StudentHome from './pages/StudentHome';
 import { WelcomeLoadingScreen } from './components/WelcomeLoadingScreen';
+import { RootManagement } from './pages/RootManagement';
 
 function AppContent() {
   const [showLogin, setShowLogin] = useState(false);
@@ -43,6 +44,12 @@ function AppContent() {
     if (user.role === 'aluno') {
       return <StudentHome />;
     }
+    
+    // Root: Apenas gerenciamento de usuários
+    if (user.role === 'root') {
+      return <RootManagement />;
+    }
+    
     if (user.role === 'admin' && currentPage === 'user-management') {
       return (
         <UserManagement 

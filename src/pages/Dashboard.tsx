@@ -5,7 +5,6 @@ import { VideoCourses } from './VideoCourses';
 import { Documents } from './Documents';
 import { Profile } from './Profile';
 import { Activities } from './Activities';
-import { Community } from './Community';
 import { Users, Settings, BarChart3 } from 'lucide-react';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
 import { WhatsAppButton } from '../components/WhatsAppButton';
@@ -17,7 +16,7 @@ interface DashboardProps {
 }
 
 export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, userRole }: DashboardProps) => {
-  const [currentPage, setCurrentPage] = useState<'activities' | 'videos' | 'documents' | 'profile' | 'community'>('activities');
+  const [currentPage, setCurrentPage] = useState<'activities' | 'videos' | 'documents' | 'profile'>('activities');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -26,7 +25,7 @@ export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, use
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
 
         <main className="ml-64 flex-1 p-8 pt-24">
-        {/* Admin Controls */}
+        {/* Admin Controls - Admin pode gerenciar professor e aluno */}
         {userRole === 'admin' && (
           <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
@@ -63,7 +62,6 @@ export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, use
         {currentPage === 'activities' && <Activities />}
         {currentPage === 'videos' && <VideoCourses />}
         {currentPage === 'documents' && <Documents />}
-        {currentPage === 'community' && <Community />}
         {currentPage === 'profile' && <Profile />}
       </main>
       </div>

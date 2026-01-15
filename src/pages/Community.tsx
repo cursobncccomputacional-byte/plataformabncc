@@ -21,23 +21,24 @@ import {
   Tag
 } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
-import { CommunityPost, CommunityComment } from '../types/bncc';
-import { communityPosts, communityComments } from '../data/communityData';
+// Comunidade removida - tipos não existem mais
+// import { CommunityPost, CommunityComment } from '../types/bncc';
+// import { communityPosts, communityComments } from '../data/communityData';
 import { CreatePostModal } from '../components/CreatePostModal';
 
 export const Community = () => {
-  const { user } = useAuth();
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [filteredPosts, setFilteredPosts] = useState<CommunityPost[]>([]);
+  // const { user } = useAuth();
+  const [posts, setPosts] = useState<any[]>([]);
+  const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [showCreatePost, setShowCreatePost] = useState(false);
 
   useEffect(() => {
-    // Simular carregamento dos posts
-    setPosts(communityPosts);
-    setFilteredPosts(communityPosts);
+    // Comunidade removida - não carrega mais posts
+    setPosts([]);
+    setFilteredPosts([]);
   }, []);
 
   useEffect(() => {
@@ -125,7 +126,7 @@ export const Community = () => {
     ));
   };
 
-  const handleCreatePost = (newPost: CommunityPost) => {
+  const handleCreatePost = (newPost: any) => {
     setPosts(prev => [newPost, ...prev]);
   };
 

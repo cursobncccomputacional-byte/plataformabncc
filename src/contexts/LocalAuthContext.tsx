@@ -227,11 +227,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const newUser: Profile = {
         id: Date.now().toString(),
-        full_name: fullName,
+        name: fullName,
         email: email,
         bio: '',
         school: '',
+        role: 'professor', // Default role
+        subjects: [],
         created_at: new Date().toISOString(),
+        last_login: null,
+        is_active: true,
         updated_at: new Date().toISOString(),
       };
 
@@ -294,8 +298,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const createUser = async (userData: CreateUserData) => {
-    if (!user || user.role !== 'admin') {
-      return { error: new Error('Apenas administradores podem criar usuários') };
+    if (!user || (user.role !== 'admin' && user.role !== 'root')) {
+      return { error: new Error('Apenas administradores e root podem criar usuários') };
+    }
+    
+    // Admin só pode criar professor e aluno
+    if (user.role === 'admin' && (userData.role === 'root' || userData.role === 'admin')) {
+      return { error: new Error('Administradores só podem criar professores e alunos') };
     }
 
     try {
@@ -331,8 +340,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateUser = async (userId: string, updates: Partial<User>) => {
-    if (!user || user.role !== 'admin') {
-      return { error: new Error('Apenas administradores podem editar usuários') };
+    if (!user || (user.role !== 'admin' && user.role !== 'root')) {
+      return { error: new Error('Apenas administradores e root podem editar usuários') };
+    }
+    
+    // Admin só pode editar professor e aluno
+    if (user.role === 'admin' && updates.role && (updates.role === 'root' || updates.role === 'admin')) {
+      return { error: new Error('Administradores só podem editar professores e alunos') };
+    }
+    
+    // Verificar se está tentando editar um root ou admin sendo admin
+    if (user.role === 'admin') {
+      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
+      const userToEdit = users.find((u: any) => u.id === userId);
+      if (userToEdit && (userToEdit.role === 'root' || userToEdit.role === 'admin')) {
+        return { error: new Error('Administradores não podem editar root ou outros admins') };
+      }
     }
 
     try {
@@ -353,8 +376,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteUser = async (userId: string) => {
-    if (!user || user.role !== 'admin') {
-      return { error: new Error('Apenas administradores podem deletar usuários') };
+    if (!user || (user.role !== 'admin' && user.role !== 'root')) {
+      return { error: new Error('Apenas administradores e root podem deletar usuários') };
+    }
+    
+    // Admin só pode deletar professor e aluno
+    if (user.role === 'admin') {
+      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
+      const userToDelete = users.find((u: any) => u.id === userId);
+      if (userToDelete && (userToDelete.role === 'root' || userToDelete.role === 'admin')) {
+        return { error: new Error('Administradores não podem deletar root ou outros admins') };
+      }
     }
 
     if (userId === user.id) {
@@ -373,8 +405,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const toggleUserStatus = async (userId: string) => {
-    if (!user || user.role !== 'admin') {
-      return { error: new Error('Apenas administradores podem alterar status de usuários') };
+    if (!user || (user.role !== 'admin' && user.role !== 'root')) {
+      return { error: new Error('Apenas administradores e root podem alterar status de usuários') };
+    }
+    
+    // Admin só pode alterar status de professor e aluno
+    if (user.role === 'admin') {
+      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
+      const userToToggle = users.find((u: any) => u.id === userId);
+      if (userToToggle && (userToToggle.role === 'root' || userToToggle.role === 'admin')) {
+        return { error: new Error('Administradores não podem alterar status de root ou outros admins') };
+      }
     }
 
     if (userId === user.id) {

@@ -1,7 +1,8 @@
-import { CommunityPost, CommunityComment, CommunityActivity } from '../types/bncc';
+// Tipos de comunidade removidos - arquivo mantido apenas para referência
+// import { CommunityPost, CommunityComment, CommunityActivity } from '../types/bncc';
 
-// Posts da comunidade
-export const communityPosts: CommunityPost[] = [
+// Posts da comunidade - removido
+export const communityPosts: any[] = [
   {
     id: 'post001',
     authorId: 'prof001',
@@ -99,7 +100,7 @@ export const communityPosts: CommunityPost[] = [
 ];
 
 // Comentários dos posts
-export const communityComments: CommunityComment[] = [
+export const communityComments: any[] = [
   {
     id: 'comment001',
     postId: 'post001',
@@ -146,8 +147,8 @@ export const communityComments: CommunityComment[] = [
   }
 ];
 
-// Atividades compartilhadas pela comunidade
-export const communityActivities: CommunityActivity[] = [
+// Atividades compartilhadas pela comunidade - removido
+export const communityActivities: any[] = [
   {
     id: 'comm_act001',
     title: 'Robô Humano - Atividade Desplugada',

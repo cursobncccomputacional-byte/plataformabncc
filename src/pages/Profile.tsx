@@ -10,7 +10,7 @@ export const Profile = () => {
   const [message, setMessage] = useState('');
 
   const [formData, setFormData] = useState({
-    full_name: '',
+    name: '',
     email: '',
     bio: '',
     school: '',
@@ -19,7 +19,7 @@ export const Profile = () => {
   useEffect(() => {
     if (profile) {
       setFormData({
-        full_name: profile.full_name || '',
+        name: profile.name || '',
         email: profile.email || '',
         bio: profile.bio || '',
         school: profile.school || '',
@@ -71,7 +71,7 @@ export const Profile = () => {
               <User className="w-10 h-10" style={{ color: '#005a93' }} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{profile.full_name}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
               <p className="text-gray-600">{profile.email}</p>
             </div>
           </div>
@@ -107,8 +107,8 @@ export const Profile = () => {
             </label>
             <input
               type="text"
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               disabled={!isEditing}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-600"
               style={{ '--tw-ring-color': '#005a93' } as React.CSSProperties}
@@ -182,7 +182,7 @@ export const Profile = () => {
                   setIsEditing(false);
                   if (profile) {
                     setFormData({
-                      full_name: profile.full_name || '',
+                      name: profile.name || '',
                       email: profile.email || '',
                       bio: profile.bio || '',
                       school: profile.school || '',

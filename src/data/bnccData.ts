@@ -541,6 +541,17 @@ export const documents: Document[] = [
 // Usuários fictícios para teste
 export const users: User[] = [
   {
+    id: 'root001',
+    name: 'Root Administrator',
+    email: 'root@plataformabncc.com',
+    role: 'root',
+    school: 'Sistema Educacional BNCC',
+    subjects: [],
+    created_at: new Date('2024-01-01').toISOString(),
+    last_login: new Date().toISOString(),
+    is_active: true
+  },
+  {
     id: 'admin001',
     name: 'Raphael Silva de Vasconcelos',
     email: 'admin@plataformabncc.com',
@@ -610,6 +621,7 @@ export const users: User[] = [
 
 // Credenciais de login fictícias (em produção, isso seria criptografado)
 export const loginCredentials = {
+  'root@plataformabncc.com': 'root123',
   'admin@plataformabncc.com': 'admin123',
   'joao.oliveira@escola.com': 'prof123',
   'ana.costa@escola.com': 'prof123',

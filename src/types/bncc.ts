@@ -78,7 +78,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'professor' | 'aluno';
+  role: 'root' | 'admin' | 'professor' | 'aluno';
   school?: string;
   subjects?: string[];
   created_at: string;
@@ -95,7 +95,7 @@ export interface CreateUserData {
   name: string;
   email: string;
   password: string;
-  role: 'admin' | 'professor' | 'aluno';
+  role: 'root' | 'admin' | 'professor' | 'aluno';
   school?: string;
   subjects?: string[];
 }
@@ -145,58 +145,4 @@ export interface UserAnalytics {
   activityFrequency: number; // atividades por dia
 }
 
-// Tipos para sistema de comunidade
-export interface CommunityPost {
-  id: string;
-  authorId: string;
-  authorName: string;
-  authorAvatar?: string;
-  title: string;
-  content: string;
-  type: 'activity' | 'question' | 'tip' | 'experience' | 'resource';
-  tags: string[];
-  attachments?: {
-    type: 'image' | 'document' | 'link';
-    url: string;
-    name: string;
-  }[];
-  likes: number;
-  comments: number;
-  views: number;
-  isPinned: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CommunityComment {
-  id: string;
-  postId: string;
-  authorId: string;
-  authorName: string;
-  authorAvatar?: string;
-  content: string;
-  likes: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CommunityActivity {
-  id: string;
-  title: string;
-  description: string;
-  authorId: string;
-  authorName: string;
-  schoolYear: string[];
-  subjects: string[];
-  objectives: string[];
-  materials: string[];
-  instructions: string;
-  tips: string;
-  difficulty: 'facil' | 'medio' | 'dificil';
-  duration: number; // em minutos
-  tags: string[];
-  likes: number;
-  downloads: number;
-  createdAt: string;
-  updatedAt: string;
-}
+// Tipos de comunidade removidos - funcionalidade não utilizada
