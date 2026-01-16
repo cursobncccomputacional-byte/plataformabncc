@@ -1,0 +1,32 @@
+# Permitir execução de PHP
+<IfModule mod_php.c>
+  php_flag engine on
+</IfModule>
+
+# Permitir acesso aos arquivos PHP
+<FilesMatch "\.php$">
+  SetHandler application/x-httpd-php
+</FilesMatch>
+
+# Rewrite: /api/auth/login -> /api/auth/login.php
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /api/auth/
+  
+  # Se a requisição não termina com .php e o arquivo .php existe, redirecionar
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME}.php -f
+  RewriteRule ^([^/]+)/?$ $1.php [L]
+  
+  # Se a requisição é exatamente "login", "logout" ou "me", adicionar .php
+  RewriteRule ^(login|logout|me)$ $1.php [L]
+</IfModule>
+
+# Headers CORS
+<IfModule mod_headers.c>
+  Header set Access-Control-Allow-Origin "*"
+  Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID"
+  Header set Access-Control-Allow-Credentials "true"
+</IfModule>
