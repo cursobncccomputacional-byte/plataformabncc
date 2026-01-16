@@ -31,7 +31,7 @@ git push -u origin master
 
 Quando pedir credenciais:
 - **Username**: `cursobncccomputacional-byte`
-- **Password**: Cole o token: `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`
+- **Password**: Cole o token (crie um novo no GitHub Settings > Developer settings > Personal access tokens)
 
 ## 🔒 Boas Práticas
 

@@ -19,7 +19,7 @@ Já removi o token da URL do remote. Agora está seguro.
 
 Quando fizer push novamente, o Git vai pedir credenciais:
 - **Username**: `cursobncccomputacional-byte`
-- **Password**: Use o token: `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`
+- **Password**: Use o token (crie um novo no GitHub Settings > Developer settings > Personal access tokens)
 
 ### 3. Considerar Revogar e Criar Novo Token
 

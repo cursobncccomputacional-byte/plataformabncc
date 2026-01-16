@@ -31,7 +31,7 @@ git credential-manager-core erase
 git remote remove origin
 
 # Adicionar com token na URL
-git remote add origin https://cursobncccomputacional-byte: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@github.com/cursobncccomputacional-byte/plataformabncc.git
+git remote add origin https://cursobncccomputacional-byte:SEU_TOKEN_AQUI@github.com/cursobncccomputacional-byte/plataformabncc.git
 
 # Fazer push
 git push -u origin master
@@ -80,7 +80,7 @@ git remote remove origin
 
 2. **Adicionar remote com token:**
 ```bash
-git remote add origin https://cursobncccomputacional-byte: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@github.com/cursobncccomputacional-byte/plataformabncc.git
+git remote add origin https://cursobncccomputacional-byte:SEU_TOKEN_AQUI@github.com/cursobncccomputacional-byte/plataformabncc.git
 ```
 
 3. **Fazer push:**
