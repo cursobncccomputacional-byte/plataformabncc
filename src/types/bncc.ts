@@ -47,6 +47,9 @@ export interface Activity {
   thumbnail_url: string;
   video_url?: string;
   document_url?: string;
+  // PDFs: Estrutura Pedagógica (obrigatório na prática) e Material da Aula (opcional)
+  pedagogical_pdf_url?: string;
+  material_pdf_url?: string;
   created_at: string;
 }
 

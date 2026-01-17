@@ -20,6 +20,7 @@ Envie **TODOS** os arquivos da pasta `dist/` para a raiz do servidor:
 ✅ dist/images/             → /images/ (pasta completa)
 ✅ dist/logo/               → /logo/ (pasta completa)
 ✅ dist/pdf/                → /pdf/ (pasta completa)
+✅ dist/atividades.xlsx     → /atividades.xlsx
 ```
 
 **⚠️ IMPORTANTE:** 
@@ -59,6 +60,12 @@ Envie **TODA** a pasta `api/` para o servidor:
 3. **Enviar `dist/`** para raiz do servidor
 4. **Enviar `api/`** para pasta `/api/` no servidor
 5. **Limpar cache** do navegador (Ctrl+Shift+R)
+
+## 📄 Planilha de atividades (XLSX)
+
+- O arquivo deve ficar em `public/atividades.xlsx` no projeto.
+- Ao rodar `npm run build`, ele vai para `dist/atividades.xlsx`.
+- No servidor, ele precisa estar acessível em `/atividades.xlsx` (teste abrindo no navegador).
 
 ## 📝 Resumo Visual
 

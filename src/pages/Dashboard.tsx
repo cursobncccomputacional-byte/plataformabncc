@@ -7,7 +7,6 @@ import { Profile } from './Profile';
 import { Activities } from './Activities';
 import { Users, Settings, BarChart3 } from 'lucide-react';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
-import { WhatsAppButton } from '../components/WhatsAppButton';
 
 interface DashboardProps {
   onNavigateToUserManagement: () => void;
@@ -29,7 +28,7 @@ export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, use
         onSidebarToggle={setSidebarOpen}
       />
 
-        <main className={`flex-1 p-8 pt-24 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+        <main className={`flex-1 p-4 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         {/* Admin Controls - Admin pode gerenciar professor e aluno */}
         {userRole === 'admin' && (
           <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -73,9 +72,6 @@ export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, use
 
       {/* Assistente de IA Flutuante - Apenas para professores */}
       {userRole === 'professor' && <FloatingAIAssistant />}
-      
-      {/* Botão do WhatsApp */}
-      <WhatsAppButton />
     </div>
   );
 };

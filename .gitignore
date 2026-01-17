@@ -24,6 +24,9 @@ node_modules/
 dist/
 build/
 
+# Conteúdo (planilha) - não versionar links reais
+public/atividades.xlsx
+
 # Variáveis de ambiente
 .env
 .env.local

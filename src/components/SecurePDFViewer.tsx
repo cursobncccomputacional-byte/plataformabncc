@@ -4,6 +4,25 @@ import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Download, Eye, Maximize2, Minimize2 } from 'lucide-react';
 
+function extractGoogleDriveFileId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes('drive.google.com')) return null;
+
+    // /file/d/<id>/view
+    const parts = u.pathname.split('/').filter(Boolean);
+    const dIndex = parts.indexOf('d');
+    if (dIndex !== -1 && parts[dIndex + 1]) return parts[dIndex + 1];
+
+    // open?id=<id> or uc?id=<id>
+    const id = u.searchParams.get('id');
+    if (id) return id;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 interface SecurePDFViewerProps {
   pdfUrl: string;
   title: string;
@@ -19,21 +38,30 @@ export const SecurePDFViewer = ({ pdfUrl, title, onClose, allowDownload = false 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const driveId = extractGoogleDriveFileId(pdfUrl);
+  const isGoogleDrive = Boolean(driveId);
+  const viewUrl = isGoogleDrive ? `https://drive.google.com/file/d/${driveId}/preview` : pdfUrl;
+
   useEffect(() => {
     let isMounted = true;
     const detectTotalPages = async () => {
       try {
+        if (isGoogleDrive) {
+          // Google Drive geralmente não permite leitura via PDF.js (CORS/permissão).
+          if (isMounted) setTotalPages(1);
+          return;
+        }
         GlobalWorkerOptions.workerSrc = workerSrc as unknown as string;
         let loadingTask;
         try {
-          loadingTask = getDocument({ url: pdfUrl });
+          loadingTask = getDocument({ url: viewUrl });
           const pdf = await loadingTask.promise;
           if (isMounted) setTotalPages(pdf.numPages || 1);
           return;
         } catch (_e) {
           // fallback para ArrayBuffer
         }
-        const response = await fetch(pdfUrl, { cache: 'no-store', credentials: 'same-origin' });
+        const response = await fetch(viewUrl, { cache: 'no-store', credentials: 'same-origin' });
         const arrayBuffer = await response.arrayBuffer();
         loadingTask = getDocument({ data: arrayBuffer });
         const pdf = await loadingTask.promise;
@@ -44,7 +72,7 @@ export const SecurePDFViewer = ({ pdfUrl, title, onClose, allowDownload = false 
     };
     detectTotalPages();
     return () => { isMounted = false; };
-  }, [pdfUrl]);
+  }, [pdfUrl, isGoogleDrive, viewUrl]);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 25, 200));
@@ -69,7 +97,7 @@ export const SecurePDFViewer = ({ pdfUrl, title, onClose, allowDownload = false 
   const handleDownload = () => {
     if (allowDownload) {
       const link = document.createElement('a');
-      link.href = pdfUrl;
+      link.href = viewUrl;
       link.download = title;
       link.target = '_blank';
       document.body.appendChild(link);
@@ -182,13 +210,23 @@ export const SecurePDFViewer = ({ pdfUrl, title, onClose, allowDownload = false 
               msUserSelect: allowDownload ? 'auto' : 'none'
             }}
           >
-            <embed
-              src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&page=${currentPage}&zoom=${zoom}&rotate=${rotation}&disableprint=1&disablesave=1`}
-              type="application/pdf"
-              className="w-full h-full"
-              title={title}
-              onLoad={() => { /* total de páginas é definido via PDF.js acima */ }}
-            />
+            {isGoogleDrive ? (
+              <iframe
+                src={viewUrl}
+                className="w-full h-full"
+                title={title}
+                referrerPolicy="no-referrer"
+                allow="fullscreen"
+              />
+            ) : (
+              <embed
+                src={`${viewUrl}#toolbar=0&navpanes=0&scrollbar=1&page=${currentPage}&zoom=${zoom}&rotate=${rotation}&disableprint=1&disablesave=1`}
+                type="application/pdf"
+                className="w-full h-full"
+                title={title}
+                onLoad={() => { /* total de páginas é definido via PDF.js acima */ }}
+              />
+            )}
           </div>
           
           {!allowDownload && (

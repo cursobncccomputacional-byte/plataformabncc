@@ -23,6 +23,7 @@ import {
 } from '../data/bnccData';
 import { activityLogger } from '../services/ActivityLogger';
 import { apiService } from '../services/apiService';
+import { loadActivitiesFromXlsxUrl } from '../services/activitiesXlsxLoader';
 
 export interface Profile extends User {
   bio?: string;
@@ -42,6 +43,11 @@ interface AuthContextType {
   profile: Profile | null;
   session: { user: Profile } | null;
   loading: boolean;
+  activitiesSpreadsheet: {
+    loaded: boolean;
+    url: string | null;
+    error: string | null;
+  };
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -100,6 +106,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<{ user: Profile } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+  const [spreadsheetActivities, setSpreadsheetActivities] = useState<Activity[]>([]);
+  const [activitiesSpreadsheet, setActivitiesSpreadsheet] = useState<{
+    loaded: boolean;
+    url: string | null;
+    error: string | null;
+  }>({ loaded: false, url: null, error: null });
 
   // Hook de inatividade - 10 minutos (600000ms)
   const { getTimeRemaining, resetTimer } = useInactivityTimer({
@@ -177,6 +189,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     checkApiSession();
   }, []);
+
+  // Carregar atividades via planilha XLSX após login
+  useEffect(() => {
+    const loadSpreadsheet = async () => {
+      if (!user) return;
+      try {
+        // Preferência: URL configurada. Caso contrário, respeitar BASE_URL do Vite
+        const configuredUrl = import.meta.env.VITE_ACTIVITIES_XLSX_URL as string | undefined;
+
+        const candidates = configuredUrl
+          ? [configuredUrl]
+          : [
+              `${import.meta.env.BASE_URL}atividades.xlsx`,
+              '/atividades.xlsx',
+            ];
+
+        let lastError: unknown = null;
+        for (const candidate of Array.from(new Set(candidates))) {
+          try {
+            setActivitiesSpreadsheet({ loaded: false, url: candidate, error: null });
+            const loaded = await loadActivitiesFromXlsxUrl(candidate);
+            setSpreadsheetActivities(loaded);
+            setActivitiesSpreadsheet({ loaded: true, url: candidate, error: null });
+            return;
+          } catch (e) {
+            lastError = e;
+          }
+        }
+
+        const msg = lastError instanceof Error ? lastError.message : 'Erro desconhecido ao carregar XLSX';
+        setSpreadsheetActivities([]);
+        setActivitiesSpreadsheet({ loaded: false, url: candidates[0] ?? null, error: msg });
+      } catch (e) {
+        setSpreadsheetActivities([]);
+        const msg = e instanceof Error ? e.message : 'Erro desconhecido ao carregar XLSX';
+        setActivitiesSpreadsheet({ loaded: false, url: null, error: msg });
+      }
+    };
+    loadSpreadsheet();
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -506,7 +558,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getActivities = () => {
-    return activities;
+    return spreadsheetActivities.length > 0 ? spreadsheetActivities : activities;
   };
 
   const getVideoCourses = () => {
@@ -519,15 +571,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Filtered data functions
   const getActivitiesByYear = (yearId: string) => {
-    return activities.filter(activity => activity.schoolYears.includes(yearId));
+    const list = spreadsheetActivities.length > 0 ? spreadsheetActivities : activities;
+    return list.filter(activity => activity.schoolYears.includes(yearId));
   };
 
   const getActivitiesByType = (type: 'plugada' | 'desplugada') => {
-    return activities.filter(activity => activity.type === type);
+    const list = spreadsheetActivities.length > 0 ? spreadsheetActivities : activities;
+    return list.filter(activity => activity.type === type);
   };
 
   const getActivitiesByAxis = (axisId: string) => {
-    return activities.filter(activity => activity.axisId === axisId);
+    const list = spreadsheetActivities.length > 0 ? spreadsheetActivities : activities;
+    return list.filter(activity => activity.axisId === axisId);
   };
 
   const getVideoCoursesByYear = (yearId: string) => {
@@ -569,6 +624,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     profile,
     session,
     loading,
+    activitiesSpreadsheet,
     signIn,
     signUp,
     signOut,

@@ -34,6 +34,26 @@ const difficultyLabels = {
   dificil: 'Difícil',
 };
 
+const svgPlaceholderDataUri = (title: string) => {
+  const safe = (title || 'Atividade').slice(0, 40);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stop-color="#005a93"/>
+          <stop offset="1" stop-color="#4F46E5"/>
+        </linearGradient>
+      </defs>
+      <rect width="800" height="450" fill="url(#g)"/>
+      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif" font-size="42" fill="#ffffff" opacity="0.95">
+        ${safe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+      </text>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
+
 export const Activities = () => {
   const { 
     getSchoolYears, 
@@ -42,6 +62,7 @@ export const Activities = () => {
     getActivitiesByYear, 
     getActivitiesByType, 
     getActivitiesByAxis,
+    activitiesSpreadsheet,
     user
   } = useAuth();
   
@@ -55,6 +76,7 @@ export const Activities = () => {
   const schoolYears = getSchoolYears();
   const axes = getBNCCAxes();
   const allActivities = getActivities();
+  const isEmpty = allActivities.length === 0;
 
   // Filtrar atividades
   let filteredActivities = allActivities;
@@ -84,9 +106,9 @@ export const Activities = () => {
     );
   }
 
-  const handleViewPDF = (activity: Activity) => {
-    if (activity.document_url && user) {
-      setSelectedPDF({ url: activity.document_url, title: activity.title });
+  const handleViewPDF = (activity: Activity, url: string, label: string) => {
+    if (url && user) {
+      setSelectedPDF({ url, title: `${activity.title} — ${label}` });
       // Log da visualização da atividade
       activityLogger.logViewActivity(user.id, user.name, user.email, activity.id, activity.title);
     }
@@ -100,10 +122,22 @@ export const Activities = () => {
     }
   };
 
-  const handleDownloadPDF = (activity: Activity) => {
-    if (activity.document_url && (user?.role === 'admin' || user?.role === 'professor')) {
+  const getVimeoId = (url: string) => {
+    try {
+      const u = new URL(url);
+      const last = u.pathname.split('/').filter(Boolean).pop() || '';
+      return last.replace(/\D/g, '') || last;
+    } catch {
+      // fallback simples
+      const last = url.split('/').pop() || '';
+      return last.split('?')[0];
+    }
+  };
+
+  const handleDownloadPDF = (activity: Activity, url: string) => {
+    if (url && (user?.role === 'admin' || user?.role === 'professor')) {
       const link = document.createElement('a');
-      link.href = activity.document_url;
+      link.href = url;
       link.download = activity.title;
       link.target = '_blank';
       document.body.appendChild(link);
@@ -159,7 +193,7 @@ export const Activities = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="bg-transparent p-0">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -174,6 +208,23 @@ export const Activities = () => {
             Explore atividades plugadas e desplugadas organizadas por anos escolares
           </p>
         </motion.div>
+        
+        {isEmpty ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-600">
+            <div className="text-gray-700 font-medium mb-2">Nenhuma atividade/aula cadastrada ainda.</div>
+            {activitiesSpreadsheet?.error && (
+              <div className="text-sm text-gray-600">
+                Não consegui carregar o arquivo de atividades em{' '}
+                <span className="font-mono">{activitiesSpreadsheet.url || '/atividades.xlsx'}</span> (
+                {activitiesSpreadsheet.error}).
+                <br />
+                Envie o arquivo para esse caminho (ou configure{' '}
+                <span className="font-mono">VITE_ACTIVITIES_XLSX_URL</span> no build).
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
 
         {/* Filtros */}
         <motion.div
@@ -271,108 +322,6 @@ export const Activities = () => {
           </p>
         </motion.div>
 
-        {/* Atividades Reais - Destaque */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              <h2 className="text-lg font-semibold text-gray-800">Atividades Reais</h2>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Conteúdo funcional desenvolvido pela Nova Edu
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {filteredActivities.filter(activity => 
-                activity.id === 'atv006' || activity.id === 'atv007' || 
-                activity.id === 'atv008' || activity.id === 'atv009'
-              ).map((activity, index) => {
-                const TypeIcon = typeIcons[activity.type];
-                return (
-                  <motion.div
-                    key={activity.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-sm transition-all duration-300"
-                  >
-                    <div className="relative">
-                      <img
-                        src={activity.thumbnail_url}
-                        alt={activity.title}
-                        className="w-full h-32 object-cover"
-                        loading="lazy"
-                      />
-                      {/* Anos escolares sobre a miniatura */}
-                      <div className="absolute bottom-2 left-2 right-2 flex gap-1 flex-wrap">
-                        {activity.schoolYears.map((yearId) => (
-                          <span
-                            key={yearId}
-                            className="bg-white/90 text-gray-800 border border-gray-200 px-1.5 py-0.5 rounded text-[10px] font-medium shadow-sm"
-                          >
-                            {getYearName(yearId)}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="absolute top-2 left-2">
-                        <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium">
-                          Real
-                        </span>
-                      </div>
-                      <div className="absolute top-2 right-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${typeColors[activity.type]}`}>
-                          {typeLabels[activity.type]}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
-                        {activity.title}
-                      </h3>
-                      <p className="text-xs text-gray-600 line-clamp-2 mb-2">
-                        {activity.description}
-                      </p>
-                      <div className="flex items-center gap-2 mb-2">
-                        <ActivityDuration
-                          videoUrl={activity.video_url}
-                          fallbackMinutes={activity.duration}
-                          className="text-xs text-gray-500"
-                        />
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${difficultyColors[activity.difficulty]}`}>
-                          {difficultyLabels[activity.difficulty]}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {activity.video_url && (
-                          <button
-                            onClick={() => handleViewVideo(activity)}
-                            className="flex items-center gap-1 text-purple-600 hover:text-purple-700 text-xs font-medium"
-                          >
-                            <Eye className="w-3 h-3" />
-                            Ver Vídeo
-                          </button>
-                        )}
-                        {activity.document_url && (
-                          <button
-                            onClick={() => handleViewPDF(activity)}
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium"
-                          >
-                            <Eye className="w-3 h-3" />
-                            Ver PDF
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        </motion.div>
-
         {/* Lista de Atividades - Todas */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -395,14 +344,14 @@ export const Activities = () => {
               >
                 <div className="relative">
                   <img
-                    src={activity.thumbnail_url}
+                    src={activity.thumbnail_url || svgPlaceholderDataUri(activity.title)}
                     alt={activity.title}
                     className="w-full h-48 object-cover"
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      target.src = `https://via.placeholder.com/400x225/4F46E5/FFFFFF?text=${encodeURIComponent(activity.title)}`;
+                      target.src = svgPlaceholderDataUri(activity.title);
                     }}
                   />
                   {/* Anos escolares sobre a miniatura */}
@@ -484,23 +433,59 @@ export const Activities = () => {
                         Ver Vídeo
                       </button>
                     )}
-                    {activity.document_url && (
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleViewPDF(activity)}
-                          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Visualizar
-                        </button>
-                        {(user?.role === 'admin' || user?.role === 'professor') && (
-                          <button 
-                            onClick={() => handleDownloadPDF(activity)}
-                            className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
-                          >
-                            <Download className="w-4 h-4" />
-                            Baixar
-                          </button>
+                    {(activity.pedagogical_pdf_url || activity.material_pdf_url || activity.document_url) && (
+                      <div className="flex flex-col gap-2 flex-1">
+                        {(activity.pedagogical_pdf_url || activity.document_url) && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() =>
+                                handleViewPDF(
+                                  activity,
+                                  activity.pedagogical_pdf_url || activity.document_url || '',
+                                  'Estrutura Pedagógica'
+                                )
+                              }
+                              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Estrutura
+                            </button>
+                            {(user?.role === 'admin' || user?.role === 'professor') && (
+                              <button 
+                                onClick={() =>
+                                  handleDownloadPDF(
+                                    activity,
+                                    activity.pedagogical_pdf_url || activity.document_url || ''
+                                  )
+                                }
+                                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
+                              >
+                                <Download className="w-4 h-4" />
+                                Baixar
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {activity.material_pdf_url && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleViewPDF(activity, activity.material_pdf_url!, 'Material da Aula')}
+                              className="flex-1 bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors text-sm flex items-center justify-center gap-1"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Material
+                            </button>
+                            {(user?.role === 'admin' || user?.role === 'professor') && (
+                              <button 
+                                onClick={() => handleDownloadPDF(activity, activity.material_pdf_url!)}
+                                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
+                              >
+                                <Download className="w-4 h-4" />
+                                Baixar
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -525,6 +510,8 @@ export const Activities = () => {
               Tente ajustar os filtros para encontrar mais atividades.
             </p>
           </motion.div>
+        )}
+          </>
         )}
       </div>
 
@@ -559,7 +546,7 @@ export const Activities = () => {
               {selectedVideo.url.includes('vimeo.com') ? (
                 <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                   <iframe
-                    src={`https://player.vimeo.com/video/${selectedVideo.url.split('/').pop()}?autoplay=1&title=0&byline=0&portrait=0`}
+                    src={`https://player.vimeo.com/video/${getVimeoId(selectedVideo.url)}?autoplay=1&title=0&byline=0&portrait=0`}
                     className="absolute top-0 left-0 w-full h-full rounded-lg"
                     frameBorder="0"
                     allow="autoplay; fullscreen; picture-in-picture"

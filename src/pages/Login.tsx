@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
-import { WhatsAppButton } from '../components/WhatsAppButton';
 
 interface LoginProps {
   onBack: () => void;
@@ -202,9 +201,6 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
           </button>
         </div>
       </motion.div>
-      
-      {/* Botão do WhatsApp */}
-      <WhatsAppButton />
     </div>
   );
 };
