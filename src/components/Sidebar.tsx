@@ -1,126 +1,167 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Video, FileText, User, LogOut, Activity } from 'lucide-react';
+import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
 interface SidebarProps {
   currentPage: 'activities' | 'videos' | 'documents' | 'profile';
   onNavigate: (page: 'activities' | 'videos' | 'documents' | 'profile') => void;
+  onSidebarToggle?: (isOpen: boolean) => void;
 }
 
-export const Sidebar = ({ currentPage, onNavigate }: SidebarProps) => {
+export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarProps) => {
   const { signOut, profile } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
-  const menuItems = [
-    { id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' },
-    { id: 'videos' as const, icon: Video, label: 'Vídeo Aulas' },
-    { id: 'documents' as const, icon: FileText, label: 'Documentos' },
-    { id: 'profile' as const, icon: User, label: 'Perfil' },
-  ];
+  const isRoot = profile?.role === 'root';
+
+  // Notificar mudanças no estado da sidebar
+  useEffect(() => {
+    if (onSidebarToggle) {
+      onSidebarToggle(sidebarOpen);
+    }
+  }, [sidebarOpen, onSidebarToggle]);
+
+  // Detectar se é mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const menuItems = isRoot
+    ? [{ id: 'profile' as const, icon: Users, label: 'Usuários' }]
+    : [
+        { id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' },
+        { id: 'videos' as const, icon: Video, label: 'Vídeo Aulas' },
+        { id: 'documents' as const, icon: FileText, label: 'Documentos' },
+        { id: 'profile' as const, icon: User, label: 'Perfil' },
+      ];
+
+  const handleNavigate = (page: 'activities' | 'videos' | 'documents' | 'profile') => {
+    onNavigate(page);
+    // Fechar sidebar no mobile após clicar
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  };
 
   return (
-    <motion.aside
-      initial={{ x: -300 }}
-      animate={{ x: 0 }}
-      className="w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-16 overflow-y-auto"
-    >
-      <div className="p-6 flex flex-col min-h-full">
-        <div className="flex justify-center mb-8">
-          <img 
-            src="/logo/Logo Nova Edu (Oficial)-10.png" 
-            alt="Nova Edu Logo" 
-            className="h-12 w-auto"
-            style={{ backgroundColor: 'transparent' }}
-          />
-        </div>
-
-        <div className="mb-8 p-4 rounded-lg" style={{ backgroundColor: '#e6f2ff' }}>
-          <p className="text-sm text-gray-600 mb-1">Bem-vindo(a),</p>
-          <p className="font-semibold text-gray-900">{profile?.name || 'Professor(a)'}</p>
-        </div>
-
-        <nav className="space-y-2">
-          {menuItems.map((item) => (
+    <>
+      {/* Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{
+          width: sidebarOpen ? 256 : (isMobile ? 256 : 80),
+          x: sidebarOpen ? 0 : (isMobile ? -256 : 0),
+        }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        className={`
+          fixed left-0 top-0 h-screen z-40 flex flex-col overflow-hidden
+          ${isMobile && !sidebarOpen ? '-translate-x-full' : ''}
+        `}
+        style={{
+          backgroundColor: '#005a93',
+          color: 'white',
+        }}
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-opacity-20 border-white flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            {sidebarOpen && (
+              <div className="flex-1 flex justify-center">
+                <img 
+                  src="/logo/Logo Nova Edu (Oficial)-10.png" 
+                  alt="Nova Edu Logo" 
+                  className="h-10 w-auto object-contain"
+                  style={{ backgroundColor: 'transparent', filter: 'brightness(0) invert(1)' }}
+                />
+              </div>
+            )}
             <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                currentPage === item.id
-                  ? 'text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              style={currentPage === item.id ? { backgroundColor: '#005a93' } : {}}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors flex-shrink-0"
             >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
+              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-          ))}
-        </nav>
-
-        {/* Links Úteis */}
-        <div className="mt-8 mb-6">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-            Links Úteis
-          </h3>
-          <div className="space-y-2">
-            <a
-              href="https://bncc.mec.gov.br/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-            >
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span>Base Nacional Comum Curricular</span>
-            </a>
-            <a
-              href="https://www.gov.br/mec/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-            >
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Ministério da Educação</span>
-            </a>
-            <a
-              href="https://www.capes.gov.br/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-            >
-              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              <span>CAPES</span>
-            </a>
-            <a
-              href="https://www.fnde.gov.br/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-            >
-              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-              <span>FNDE</span>
-            </a>
-            <a
-              href="https://www.in.gov.br/materia/-/asset_publisher/Kujrw0TZC2Mb/content/id/51746473/do1-2020-04-17-lei-n-14-026-de-7-de-julho-de-2020-264406351"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm"
-            >
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span>Marco Legal da Primeira Infância</span>
-            </a>
           </div>
+          {sidebarOpen && (
+            <p className="text-xs text-white text-opacity-70 font-medium text-center">
+              Plataforma BNCC
+            </p>
+          )}
         </div>
 
-        {/* Botão Sair */}
-        <div className="mt-auto pt-6">
-          <button
-            onClick={signOut}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Sair</span>
-          </button>
+        {/* Scroll Area (menus + links úteis) */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* Navigation */}
+          <nav className="p-4 space-y-2">
+            {menuItems.map((item) => {
+              const IconComponent = item.icon;
+              const isActive = currentPage === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavigate(item.id)}
+                  className={`
+                    w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                    ${isActive 
+                      ? 'bg-white text-[#005a93] shadow-md' 
+                      : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
+                    }
+                  `}
+                >
+                  <IconComponent size={20} />
+                  {sidebarOpen && (
+                    <span className="font-medium">{item.label}</span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
-      </div>
-    </motion.aside>
+
+        {/* Footer - Logout Button */}
+        <div className="p-4 border-t border-opacity-20 border-white flex-shrink-0">
+          {sidebarOpen ? (
+            <button
+              onClick={signOut}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
+            >
+              <LogOut size={16} />
+              Sair
+            </button>
+          ) : (
+            <button
+              onClick={signOut}
+              className="w-full flex items-center justify-center p-2 bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+              title="Sair"
+            >
+              <LogOut size={20} className="text-white" />
+            </button>
+          )}
+        </div>
+
+      </motion.aside>
+
+      {/* Overlay para mobile */}
+      {sidebarOpen && isMobile && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+    </>
   );
 };

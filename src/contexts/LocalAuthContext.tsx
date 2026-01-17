@@ -19,11 +19,10 @@ import {
   skills, 
   activities, 
   videoCourses, 
-  documents,
-  users,
-  loginCredentials
+  documents
 } from '../data/bnccData';
 import { activityLogger } from '../services/ActivityLogger';
+import { apiService } from '../services/apiService';
 
 export interface Profile extends User {
   bio?: string;
@@ -55,11 +54,12 @@ interface AuthContextType {
   getTimeRemaining: () => number;
   
   // User Management (Admin only)
-  getAllUsers: () => User[];
+  getAllUsers: () => Promise<User[]>;
   createUser: (userData: CreateUserData) => Promise<{ error: Error | null }>;
   updateUser: (userId: string, updates: Partial<User>) => Promise<{ error: Error | null }>;
   deleteUser: (userId: string) => Promise<{ error: Error | null }>;
   toggleUserStatus: (userId: string) => Promise<{ error: Error | null }>;
+  changePassword: (userId: string, newPassword: string) => Promise<{ error: Error | null }>;
   
   // BNCC Data
   getSchoolYears: () => SchoolYear[];
@@ -122,132 +122,114 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Inicializar dados fictícios se não existirem
-    const storedUsers = localStorage.getItem('plataforma-bncc-users');
-    
-    // Sempre forçar a inicialização com todos os usuários
-    const usersWithPasswords = users.map(user => ({
-      ...user,
-      password: loginCredentials[user.email as keyof typeof loginCredentials] || 'prof123',
-      bio: `Professor de ${user.subjects?.join(', ') || 'Educação'}`,
-      updated_at: user.created_at
-    }));
-    // Adicionar usuário aluno fictício, se não existir
-    const demoStudentEmail = 'aluno.teste@plataformabncc.local';
-    const demoStudentId = 'aluno-demo-001';
-    const existing = usersWithPasswords.find(u => u.email === demoStudentEmail);
-    const finalUsers = existing
-      ? usersWithPasswords
-      : [
-          ...usersWithPasswords,
-          {
-            id: demoStudentId,
-            name: 'Aluno Teste',
-            email: demoStudentEmail,
-            password: 'Aluno123!',
-            role: 'aluno',
-            school: 'Escola Demo',
-            subjects: [],
-            created_at: new Date().toISOString(),
-            last_login: null,
-            is_active: true,
-            bio: 'Estudante de demonstração',
-            updated_at: new Date().toISOString(),
-          },
-        ];
+    // Verificar se há sessão ativa na API (apenas dados reais)
+    const checkApiSession = async () => {
+      const apiAuthenticated = localStorage.getItem('api_authenticated') === 'true';
+      const sessionId = localStorage.getItem('api_session_id');
+      
+      if (apiAuthenticated && sessionId) {
+        try {
+          const apiResponse = await apiService.getCurrentUser();
+          if (!apiResponse.error && apiResponse.user) {
+            const userData: Profile = {
+              id: apiResponse.user.id,
+              name: apiResponse.user.name,
+              email: apiResponse.user.email,
+              role: apiResponse.user.role,
+              school: apiResponse.user.school || '',
+              subjects: apiResponse.user.subjects || [],
+              created_at: apiResponse.user.created_at,
+              last_login: apiResponse.user.last_login || new Date().toISOString(),
+              is_active: apiResponse.user.is_active ?? true,
+              bio: `Usuário ${apiResponse.user.role}`,
+              updated_at: new Date().toISOString(),
+            };
+            
+            setUser(userData);
+            setProfile(userData);
+            setSession({ user: userData });
+            localStorage.setItem('plataforma-bncc-user', JSON.stringify(userData));
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.warn('Erro ao verificar sessão na API:', error);
+          // Se falhar, limpar flags da API
+          localStorage.removeItem('api_authenticated');
+          localStorage.removeItem('api_session_id');
+        }
+      }
+      
+      // Fallback: verificar se há usuário logado no localStorage
+      const savedUser = localStorage.getItem('plataforma-bncc-user');
+      if (savedUser) {
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        setProfile(userData);
+        setSession({ user: userData });
+      }
+      
+      // Simular carregamento inicial mais longo
+      setTimeout(() => {
+        setLoading(false);
+      }, 3000); // 3 segundos de carregamento inicial
+    };
 
-    localStorage.setItem('plataforma-bncc-users', JSON.stringify(finalUsers));
-
-    // Verificar se há usuário logado no localStorage
-    const savedUser = localStorage.getItem('plataforma-bncc-user');
-    if (savedUser) {
-      const userData = JSON.parse(savedUser);
-      setUser(userData);
-      setProfile(userData);
-      setSession({ user: userData });
-    }
-    // Simular carregamento inicial mais longo
-    setTimeout(() => {
-      setLoading(false);
-    }, 3000); // 3 segundos de carregamento inicial
+    checkApiSession();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Simular verificação de credenciais
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
+      // Login apenas via API PHP (dados reais)
+      const apiResponse = await apiService.login(email, password);
       
-      const foundUser = users.find((u: any) => u.email === email && u.password === password);
-      
-      if (!foundUser) {
-        return { error: new Error('Email ou senha incorretos') };
+      if (!apiResponse.error && apiResponse.user) {
+        // Login bem-sucedido via API
+        const userData: Profile = {
+          id: apiResponse.user.id,
+          name: apiResponse.user.name,
+          email: apiResponse.user.email,
+          role: apiResponse.user.role,
+          school: apiResponse.user.school || '',
+          subjects: apiResponse.user.subjects || [],
+          created_at: apiResponse.user.created_at,
+          last_login: apiResponse.user.last_login || new Date().toISOString(),
+          is_active: apiResponse.user.is_active ?? true,
+          bio: `Usuário ${apiResponse.user.role}`,
+          updated_at: new Date().toISOString(),
+        };
+        
+        setUser(userData);
+        setProfile(userData);
+        setSession({ user: userData });
+        
+        // Salvar no localStorage apenas para cache da sessão
+        localStorage.setItem('plataforma-bncc-user', JSON.stringify(userData));
+        localStorage.setItem('api_authenticated', 'true');
+        
+        // Log do login
+        activityLogger.logLogin(userData.id, userData.name, userData.email);
+        
+        return { error: null };
       }
-
-      if (!foundUser.is_active) {
-        return { error: new Error('Usuário inativo. Entre em contato com o administrador.') };
-      }
-
-      // Remover senha dos dados do usuário
-      const { password: _, ...userData } = foundUser;
       
-      // Atualizar último login
-      const updatedUser = { ...userData, last_login: new Date().toISOString() };
-      
-      setUser(updatedUser);
-      setProfile(updatedUser);
-      setSession({ user: updatedUser });
-      
-      // Salvar no localStorage
-      localStorage.setItem('plataforma-bncc-user', JSON.stringify(updatedUser));
-      
-      // Atualizar último login na lista de usuários
-      const userIndex = users.findIndex((u: any) => u.id === foundUser.id);
-      if (userIndex !== -1) {
-        users[userIndex].last_login = new Date().toISOString();
-        localStorage.setItem('plataforma-bncc-users', JSON.stringify(users));
-      }
-      
-      // Log do login
-      activityLogger.logLogin(updatedUser.id, updatedUser.name, updatedUser.email);
-      
-      return { error: null };
+      // Se a API retornou erro, retornar a mensagem de erro
+      return { 
+        error: new Error(apiResponse.message || 'Email ou senha incorretos') 
+      };
     } catch (error) {
-      return { error: error as Error };
+      return { 
+        error: new Error(error instanceof Error ? error.message : 'Erro ao fazer login. Verifique sua conexão.') 
+      };
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    try {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      
-      // Verificar se email já existe
-      if (users.find((u: any) => u.email === email)) {
-        return { error: new Error('Este email já está cadastrado') };
-      }
-
-      const newUser: Profile = {
-        id: Date.now().toString(),
-        name: fullName,
-        email: email,
-        bio: '',
-        school: '',
-        role: 'professor', // Default role
-        subjects: [],
-        created_at: new Date().toISOString(),
-        last_login: null,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      };
-
-      // Salvar usuário com senha
-      const userWithPassword = { ...newUser, password };
-      users.push(userWithPassword);
-      localStorage.setItem('plataforma-bncc-users', JSON.stringify(users));
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
+    // Cadastro de novos usuários deve ser feito apenas por administradores via API
+    // Usuários não podem se auto-cadastrar - apenas login é permitido
+    return { 
+      error: new Error('Cadastro de novos usuários deve ser feito por um administrador. Entre em contato com o suporte.') 
+    };
   };
 
   const signOut = async () => {
@@ -256,31 +238,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       activityLogger.logLogout(user.id, user.name, user.email);
     }
     
+    // Tentar fazer logout na API se estiver autenticado via API
+    const apiAuthenticated = localStorage.getItem('api_authenticated') === 'true';
+    if (apiAuthenticated) {
+      try {
+        await apiService.logout();
+      } catch (error) {
+        console.warn('Erro ao fazer logout na API:', error);
+      }
+    }
+    
     setUser(null);
     setProfile(null);
     setSession(null);
     localStorage.removeItem('plataforma-bncc-user');
+    localStorage.removeItem('api_authenticated');
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
     try {
+      // Atualizar apenas no estado local (cache)
+      // TODO: Implementar endpoint PUT /api/auth/me na API PHP para atualizar perfil
       const updatedProfile = { ...user, ...updates, updated_at: new Date().toISOString() };
       
       setUser(updatedProfile);
       setProfile(updatedProfile);
       setSession({ user: updatedProfile });
       
+      // Salvar apenas no cache local
       localStorage.setItem('plataforma-bncc-user', JSON.stringify(updatedProfile));
-      
-      // Atualizar também na lista de usuários
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const userIndex = users.findIndex((u: any) => u.id === user.id);
-      if (userIndex !== -1) {
-        users[userIndex] = { ...users[userIndex], ...updates, updated_at: new Date().toISOString() };
-        localStorage.setItem('plataforma-bncc-users', JSON.stringify(users));
-      }
       
       return { error: null };
     } catch (error) {
@@ -288,13 +276,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // User Management Functions (Admin only)
-  const getAllUsers = () => {
-    const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-    return users.map((u: any) => {
-      const { password, ...userWithoutPassword } = u;
-      return userWithoutPassword;
-    });
+  // User Management Functions (Admin only) - Usando apenas API
+  const getAllUsers = async (): Promise<User[]> => {
+    try {
+      const apiResponse = await apiService.getUsers();
+      
+      console.log('Resposta da API getUsers:', apiResponse);
+      
+      if (!apiResponse.error && apiResponse.users) {
+        // Converter dados da API para formato User[]
+        const usersList = apiResponse.users.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          school: u.school || '',
+          subjects: u.subjects || [],
+          created_at: u.created_at,
+          last_login: u.last_login,
+          is_active: u.is_active ?? true
+        }));
+        
+        console.log('Usuários convertidos:', usersList);
+        return usersList;
+      }
+      
+      // Se houver erro, retornar array vazio
+      console.warn('Erro ao buscar usuários:', apiResponse.message);
+      return [];
+    } catch (error) {
+      console.error('Erro ao buscar usuários da API:', error);
+      return [];
+    }
   };
 
   const createUser = async (userData: CreateUserData) => {
@@ -307,35 +320,82 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error('Administradores só podem criar professores e alunos') };
     }
 
-    try {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      
-      // Verificar se email já existe
-      if (users.find((u: any) => u.email === userData.email)) {
-        return { error: new Error('Este email já está cadastrado') };
-      }
+    // Validar campos obrigatórios
+    if (!userData.name || !userData.email || !userData.password || !userData.role) {
+      return { error: new Error('Todos os campos obrigatórios devem ser preenchidos') };
+    }
 
-      const newUser = {
-        id: Date.now().toString(),
+    // Validar senha
+    if (userData.password.length < 6) {
+      return { error: new Error('A senha deve ter pelo menos 6 caracteres') };
+    }
+
+    // Escola é obrigatória apenas para professor e aluno
+    if ((userData.role === 'professor' || userData.role === 'aluno') && !userData.school) {
+      return { error: new Error('Escola é obrigatória para professores e alunos') };
+    }
+
+    try {
+      console.log('LocalAuthContext: Enviando dados para API:', {
+        name: userData.name,
+        email: userData.email,
+        password: '***',
+        role: userData.role,
+        school: userData.school || undefined,
+        subjects: userData.subjects || []
+      });
+      
+      const apiResponse = await apiService.createUser({
         name: userData.name,
         email: userData.email,
         password: userData.password,
         role: userData.role,
-        school: userData.school || '',
-        subjects: userData.subjects || [],
-        created_at: new Date().toISOString(),
-        last_login: null,
-        is_active: true,
-        bio: `Professor de ${userData.subjects?.join(', ') || 'Educação'}`,
-        updated_at: new Date().toISOString()
-      };
-
-      users.push(newUser);
-      localStorage.setItem('plataforma-bncc-users', JSON.stringify(users));
+        school: userData.school || undefined,
+        subjects: userData.subjects || []
+      });
       
-      return { error: null };
+      console.log('=== LocalAuthContext: Resposta completa da API ===');
+      console.log('Objeto completo:', JSON.stringify(apiResponse, null, 2));
+      console.log('apiResponse.error:', apiResponse.error);
+      console.log('apiResponse.user:', apiResponse.user);
+      console.log('apiResponse.users:', apiResponse.users);
+      console.log('apiResponse.message:', apiResponse.message);
+      console.log('Todas as chaves:', Object.keys(apiResponse));
+      console.log('================================================');
+      
+      // Verificar se foi criado com sucesso
+      // A API retorna 'user' (singular) quando bem-sucedida
+      if (!apiResponse.error) {
+        // Se tem user (singular), sucesso
+        if (apiResponse.user) {
+          console.log('LocalAuthContext: Usuário criado com sucesso na API (user encontrado)');
+          return { error: null };
+        }
+        
+        // Se tem message de sucesso, considerar sucesso mesmo sem user (pode ser que a API não retorne user)
+        if (apiResponse.message && (apiResponse.message.includes('sucesso') || apiResponse.message.includes('criado'))) {
+          console.log('LocalAuthContext: Usuário criado (mensagem de sucesso detectada)');
+          return { error: null };
+        }
+        
+        // Se não tem erro e não tem mensagem de erro, considerar sucesso
+        if (!apiResponse.message || (!apiResponse.message.toLowerCase().includes('erro') && !apiResponse.message.toLowerCase().includes('error'))) {
+          console.log('LocalAuthContext: Considerando sucesso (sem erro e sem mensagem de erro)');
+          return { error: null };
+        }
+      }
+      
+      // Se chegou aqui, houve erro
+      const errorMessage = apiResponse.message || 'Erro desconhecido ao criar usuário';
+      console.error('LocalAuthContext: Erro na resposta da API:', errorMessage);
+      return { 
+        error: new Error(apiResponse.message || 'Erro ao criar usuário') 
+      };
     } catch (error) {
-      return { error: error as Error };
+      console.error('LocalAuthContext: Exceção ao criar usuário:', error);
+      return { 
+        error: new Error(error instanceof Error ? error.message : 'Erro ao criar usuário') 
+      };
     }
   };
 
@@ -348,95 +408,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user.role === 'admin' && updates.role && (updates.role === 'root' || updates.role === 'admin')) {
       return { error: new Error('Administradores só podem editar professores e alunos') };
     }
-    
-    // Verificar se está tentando editar um root ou admin sendo admin
-    if (user.role === 'admin') {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const userToEdit = users.find((u: any) => u.id === userId);
-      if (userToEdit && (userToEdit.role === 'root' || userToEdit.role === 'admin')) {
-        return { error: new Error('Administradores não podem editar root ou outros admins') };
-      }
-    }
 
-    try {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const userIndex = users.findIndex((u: any) => u.id === userId);
-      
-      if (userIndex === -1) {
-        return { error: new Error('Usuário não encontrado') };
-      }
-
-      users[userIndex] = { ...users[userIndex], ...updates, updated_at: new Date().toISOString() };
-      localStorage.setItem('plataforma-bncc-users', JSON.stringify(users));
-      
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
+    // TODO: Implementar endpoint PUT /api/users/:id na API PHP
+    return { 
+      error: new Error('Funcionalidade de editar usuário via API ainda não implementada. Endpoint necessário: PUT /api/users/:id') 
+    };
   };
 
   const deleteUser = async (userId: string) => {
     if (!user || (user.role !== 'admin' && user.role !== 'root')) {
       return { error: new Error('Apenas administradores e root podem deletar usuários') };
     }
-    
-    // Admin só pode deletar professor e aluno
-    if (user.role === 'admin') {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const userToDelete = users.find((u: any) => u.id === userId);
-      if (userToDelete && (userToDelete.role === 'root' || userToDelete.role === 'admin')) {
-        return { error: new Error('Administradores não podem deletar root ou outros admins') };
-      }
-    }
 
     if (userId === user.id) {
       return { error: new Error('Você não pode deletar sua própria conta') };
     }
 
-    try {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const filteredUsers = users.filter((u: any) => u.id !== userId);
-      localStorage.setItem('plataforma-bncc-users', JSON.stringify(filteredUsers));
-      
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
+    // TODO: Implementar endpoint DELETE /api/users/:id na API PHP
+    return { 
+      error: new Error('Funcionalidade de deletar usuário via API ainda não implementada. Endpoint necessário: DELETE /api/users/:id') 
+    };
   };
 
   const toggleUserStatus = async (userId: string) => {
     if (!user || (user.role !== 'admin' && user.role !== 'root')) {
       return { error: new Error('Apenas administradores e root podem alterar status de usuários') };
     }
-    
-    // Admin só pode alterar status de professor e aluno
-    if (user.role === 'admin') {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const userToToggle = users.find((u: any) => u.id === userId);
-      if (userToToggle && (userToToggle.role === 'root' || userToToggle.role === 'admin')) {
-        return { error: new Error('Administradores não podem alterar status de root ou outros admins') };
-      }
-    }
 
     if (userId === user.id) {
       return { error: new Error('Você não pode desativar sua própria conta') };
     }
 
-    try {
-      const users = JSON.parse(localStorage.getItem('plataforma-bncc-users') || '[]');
-      const userIndex = users.findIndex((u: any) => u.id === userId);
-      
-      if (userIndex === -1) {
-        return { error: new Error('Usuário não encontrado') };
-      }
+    // TODO: Implementar endpoint PATCH /api/users/:id/toggle-status na API PHP
+    return { 
+      error: new Error('Funcionalidade de alterar status de usuário via API ainda não implementada. Endpoint necessário: PATCH /api/users/:id/toggle-status') 
+    };
+  };
 
-      users[userIndex].is_active = !users[userIndex].is_active;
-      users[userIndex].updated_at = new Date().toISOString();
-      localStorage.setItem('plataforma-bncc-users', JSON.stringify(users));
+  const changePassword = async (userId: string, newPassword: string) => {
+    if (!user || (user.role !== 'admin' && user.role !== 'root')) {
+      return { error: new Error('Apenas administradores e root podem alterar senhas') };
+    }
+
+    if (newPassword.length < 6) {
+      return { error: new Error('A senha deve ter pelo menos 6 caracteres') };
+    }
+
+    try {
+      const apiResponse = await apiService.changePassword(userId, newPassword);
       
-      return { error: null };
+      if (!apiResponse.error) {
+        return { error: null };
+      }
+      
+      return { 
+        error: new Error(apiResponse.message || 'Erro ao alterar senha') 
+      };
     } catch (error) {
-      return { error: error as Error };
+      return { 
+        error: new Error(error instanceof Error ? error.message : 'Erro ao alterar senha') 
+      };
     }
   };
 
@@ -538,6 +569,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateUser,
     deleteUser,
     toggleUserStatus,
+    changePassword,
     
     // BNCC Data
     getSchoolYears,

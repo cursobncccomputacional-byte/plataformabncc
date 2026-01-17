@@ -12,6 +12,7 @@ interface ApiResponse<T = any> {
   message?: string;
   data?: T;
   user?: T;
+  users?: T[];
   session_id?: string;
 }
 
@@ -53,16 +54,29 @@ class ApiService {
 
       // Verificar se a resposta é JSON
       const contentType = response.headers.get('content-type');
+      const textResponse = await response.text();
+      
       if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('API retornou HTML em vez de JSON:', text.substring(0, 200));
+        console.error('API retornou HTML em vez de JSON. Status:', response.status);
+        console.error('Content-Type recebido:', contentType);
+        console.error('Primeiros 500 caracteres da resposta:', textResponse.substring(0, 500));
         return {
           error: true,
           message: 'API não está retornando JSON. Verifique se a API está configurada corretamente.',
         };
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = JSON.parse(textResponse);
+      } catch (parseError) {
+        console.error('Erro ao fazer parse do JSON:', parseError);
+        console.error('Resposta recebida:', textResponse.substring(0, 500));
+        return {
+          error: true,
+          message: 'Resposta da API não é um JSON válido.',
+        };
+      }
 
       if (!response.ok) {
         return {
@@ -71,6 +85,21 @@ class ApiService {
         };
       }
 
+      // Log da resposta para debug
+      if (endpoint === '/users' && options.method === 'POST') {
+        console.log('=== apiService: Resposta RAW do POST /users ===');
+        console.log('Status:', response.status);
+        console.log('Content-Type:', contentType);
+        console.log('Texto completo (primeiros 500 chars):', textResponse.substring(0, 500));
+        console.log('Data parseado:', data);
+        console.log('Data.error:', data?.error);
+        console.log('Data.user:', data?.user);
+        console.log('Data.users:', data?.users);
+        console.log('Data.message:', data?.message);
+        console.log('Todas as chaves do data:', Object.keys(data || {}));
+        console.log('==========================================');
+      }
+      
       return {
         error: false,
         ...data,
@@ -131,6 +160,33 @@ class ApiService {
    */
   async getUsers(): Promise<ApiResponse> {
     return this.request('/users');
+  }
+
+  /**
+   * Criar usuário (admin/root apenas)
+   */
+  async createUser(userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    school?: string;
+    subjects?: string[];
+  }): Promise<ApiResponse> {
+    return this.request('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  /**
+   * Trocar senha de usuário (admin/root apenas)
+   */
+  async changePassword(userId: string, newPassword: string): Promise<ApiResponse> {
+    return this.request(`/users/${userId}/change-password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ new_password: newPassword }),
+    });
   }
 
   /**
