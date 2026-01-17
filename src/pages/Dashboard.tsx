@@ -17,14 +17,19 @@ interface DashboardProps {
 
 export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, userRole }: DashboardProps) => {
   const [currentPage, setCurrentPage] = useState<'activities' | 'videos' | 'documents' | 'profile'>('activities');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader />
       <div className="flex">
-      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <Sidebar 
+        currentPage={currentPage} 
+        onNavigate={setCurrentPage}
+        onSidebarToggle={setSidebarOpen}
+      />
 
-        <main className="ml-64 flex-1 p-8 pt-24">
+        <main className={`flex-1 p-8 pt-24 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         {/* Admin Controls - Admin pode gerenciar professor e aluno */}
         {userRole === 'admin' && (
           <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">

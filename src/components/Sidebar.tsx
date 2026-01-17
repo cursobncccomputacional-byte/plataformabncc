@@ -79,7 +79,7 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
         <div className="p-4 border-b border-opacity-20 border-white flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             {sidebarOpen && (
-              <div className="flex-1 flex justify-center">
+              <div className="flex items-center justify-start">
                 <img 
                   src="/logo/Logo Nova Edu (Oficial)-10.png" 
                   alt="Nova Edu Logo" 
@@ -95,11 +95,6 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
-          {sidebarOpen && (
-            <p className="text-xs text-white text-opacity-70 font-medium text-center">
-              Plataforma BNCC
-            </p>
-          )}
         </div>
 
         {/* Scroll Area (menus + links úteis) */}

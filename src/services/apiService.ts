@@ -86,8 +86,8 @@ class ApiService {
       }
 
       // Log da resposta para debug
-      if (endpoint === '/users' && options.method === 'POST') {
-        console.log('=== apiService: Resposta RAW do POST /users ===');
+      if (endpoint === '/users/index.php' && options.method === 'POST') {
+        console.log('=== apiService: Resposta RAW do POST /users/index.php ===');
         console.log('Status:', response.status);
         console.log('Content-Type:', contentType);
         console.log('Texto completo (primeiros 500 chars):', textResponse.substring(0, 500));
@@ -159,7 +159,8 @@ class ApiService {
    * Listar usuários (admin/root apenas)
    */
   async getUsers(): Promise<ApiResponse> {
-    return this.request('/users');
+    // Chamar diretamente o arquivo PHP para não depender de rewrite (/api/users/)
+    return this.request('/users/index.php');
   }
 
   /**
@@ -173,7 +174,8 @@ class ApiService {
     school?: string;
     subjects?: string[];
   }): Promise<ApiResponse> {
-    return this.request('/users', {
+    // Chamar diretamente o arquivo PHP para não depender de rewrite (/api/users/)
+    return this.request('/users/index.php', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -183,21 +185,37 @@ class ApiService {
    * Trocar senha de usuário (admin/root apenas)
    */
   async changePassword(userId: string, newPassword: string): Promise<ApiResponse> {
-    return this.request(`/users/${userId}/change-password`, {
+    // Chamar diretamente o arquivo PHP para não depender de rewrite (/api/users/change-password)
+    return this.request(`/users/change-password.php`, {
       method: 'PATCH',
-      body: JSON.stringify({ new_password: newPassword }),
+      body: JSON.stringify({ user_id: userId, new_password: newPassword }),
+    });
+  }
+
+  /**
+   * Deletar usuário (admin/root apenas)
+   */
+  async deleteUser(userId: string): Promise<ApiResponse> {
+    // Chamar diretamente o arquivo PHP para não depender de rewrite (/api/users/:id)
+    // O backend já aceita user_id no body/query.
+    return this.request(`/users/index.php`, {
+      method: 'DELETE',
+      body: JSON.stringify({ user_id: userId }),
     });
   }
 
   /**
    * Verificar se a API está disponível
+   * Usa o endpoint /auth/me para verificar se a API está respondendo
    */
   async checkApiAvailability(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/test.php`, {
+      const response = await fetch(`${this.baseUrl}/auth/me`, {
         method: 'GET',
       });
-      return response.ok;
+      // A API retorna 401 se não autenticado, mas isso significa que está funcionando
+      // Retorna true se status for 200 ou 401 (API funcionando)
+      return response.status === 200 || response.status === 401;
     } catch {
       return false;
     }

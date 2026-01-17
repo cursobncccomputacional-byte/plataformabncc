@@ -1,36 +1,18 @@
-# Permitir execução de PHP
-<IfModule mod_php.c>
-  php_flag engine on
-</IfModule>
+# .htaccess mínimo e compatível (evita 500 por diretivas não suportadas)
+Options -Indexes
 
-# Permitir acesso aos arquivos PHP
-<FilesMatch "\.php$">
-  SetHandler application/x-httpd-php
-</FilesMatch>
-
-# Rewrite: /api/users/ -> /api/users/index.php
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /api/users/
-  
-  # Se acessar /api/users/ (sem arquivo), usar index.php
-  # IMPORTANTE: Preservar o método HTTP (GET, POST, etc)
+
+  # Tudo que não for arquivo/pasta física vai para index.php
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_URI} ^/api/users/?$ [NC]
-  RewriteRule ^$ index.php [L,QSA]
-  
-  # Se a requisição não termina com .php e o arquivo .php existe, redirecionar
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_FILENAME}.php -f
-  RewriteRule ^([^/]+)/?$ $1.php [L,QSA]
+  RewriteRule ^ index.php [L,QSA]
 </IfModule>
 
-# Headers CORS
+# CORS (opcional; também existe via api/config/cors.php)
 <IfModule mod_headers.c>
-  Header set Access-Control-Allow-Origin "*"
-  Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  Header set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
   Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID"
-  Header set Access-Control-Allow-Credentials "true"
 </IfModule>

@@ -111,18 +111,18 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
+              Usuário
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                 style={{ '--tw-ring-color': '#005a93' } as React.CSSProperties}
-                placeholder="seu@email.com"
+                placeholder="seu.usuario"
               />
             </div>
           </div>

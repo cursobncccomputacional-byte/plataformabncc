@@ -1,0 +1,50 @@
+Assunto: PHP não executa arquivos - Erro 404 em todos os arquivos PHP
+
+Olá,
+
+Estou com um problema crítico no meu domínio www.novaedubncc.com.br.
+
+PROBLEMA:
+Nenhum arquivo PHP está sendo executado. Todos os arquivos PHP retornam erro 404 (Not Found), mesmo estando presentes no servidor e sendo visíveis via FTP.
+
+DETALHES TÉCNICOS:
+- Domínio: www.novaedubncc.com.br
+- Pasta onde arquivos estão: /novaedu/
+- Servidor: Apache 2.4.65
+- PHP: 7.4.33
+
+ARQUIVOS TESTADOS (todos retornam 404):
+- https://www.novaedubncc.com.br/novaedu/test-direto.php
+- https://www.novaedubncc.com.br/novaedu/diagnostico-completo.php
+- https://www.novaedubncc.com.br/novaedu/phpinfo.php
+- https://www.novaedubncc.com.br/novaedu/api/test.php
+- Todos os arquivos em /novaedu/api/ retornam 404
+
+O QUE JÁ VERIFIQUEI:
+✅ Arquivos existem no servidor (confirmado via FTP)
+✅ Permissões corretas (644 para arquivos, 755 para pastas)
+✅ Arquivos HTML funcionam normalmente (index.html carrega perfeitamente)
+✅ .htaccess foi testado e removido (problema persiste mesmo sem .htaccess)
+❌ Nenhum arquivo PHP é executado - todos retornam 404
+
+ESTRUTURA DA APLICAÇÃO:
+- Frontend React (SPA) em /novaedu/
+- API PHP em /novaedu/api/
+- Arquivos estáticos (HTML, JS, CSS) funcionam normalmente
+- Apenas arquivos PHP não são executados
+
+SOLICITAÇÕES:
+1. Verificar se PHP está habilitado para a pasta /novaedu/
+2. Verificar configuração do DocumentRoot do VirtualHost para este domínio
+3. Verificar se há restrições de execução de PHP na pasta
+4. Verificar logs de erro do Apache para entender o problema
+5. Confirmar o caminho real do DocumentRoot do domínio
+6. Verificar se há configurações específicas que impedem execução de PHP
+
+URGÊNCIA:
+Este é um problema crítico que impede completamente o funcionamento da aplicação.
+
+Agradeço desde já pela atenção e aguardo retorno.
+
+Atenciosamente,
+[Seu Nome]

@@ -1,5 +1,6 @@
 # Arquivos de configuração sensíveis
 config-database.php
+api/config/database.php
 
 # Logs
 *.log

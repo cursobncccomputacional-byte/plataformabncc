@@ -4,3 +4,7 @@
 VITE_SUPABASE_URL=https://demo-plataforma-bncc.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlbW8tcGxhdGFmb3JtYS1ibmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI4MDAsImV4cCI6MjA1MDU0ODgwMH0.demo-key-for-testing
 
+# API Backend PHP
+# DocumentRoot é /novaedu/, então API deve estar em /novaedu/api/
+VITE_API_URL=https://www.novaedubncc.com.br/novaedu/api
+

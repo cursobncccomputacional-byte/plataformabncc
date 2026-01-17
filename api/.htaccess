@@ -1,22 +1,15 @@
-# Permitir execução de PHP
-<IfModule mod_php.c>
-  php_flag engine on
-</IfModule>
-
-# Permitir acesso aos arquivos PHP
+# Garantir que arquivos PHP sejam executados
 <FilesMatch "\.php$">
-  SetHandler application/x-httpd-php
+    SetHandler application/x-httpd-php
 </FilesMatch>
 
-# Headers CORS (backup, caso cors.php não funcione)
-<IfModule mod_headers.c>
-  Header set Access-Control-Allow-Origin "*"
-  Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-  Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID"
-  Header set Access-Control-Allow-Credentials "true"
-</IfModule>
+# Não permitir listagem de diretório
+Options -Indexes
 
-# Permitir acesso a arquivos JSON
-<FilesMatch "\.json$">
-  Header set Content-Type "application/json"
-</FilesMatch>
+# Garantir que erros PHP não sejam exibidos como HTML
+php_flag display_errors Off
+php_flag log_errors On
+
+# Sempre retornar JSON para erros
+php_value error_reporting E_ALL
+php_value display_errors 0

@@ -1,0 +1,496 @@
+[
+  {
+    "type": "folder",
+    "path": "assets",
+    "name": "assets",
+    "size": "-",
+    "modified": "2026-01-15 11:35:32",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "images",
+    "name": "images",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "images/activities",
+    "name": "activities",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "images/gallery",
+    "name": "gallery",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "images/videos",
+    "name": "videos",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "logo",
+    "name": "logo",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "pdf",
+    "name": "pdf",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "pdf/anos-finais",
+    "name": "anos-finais",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "pdf/anos-iniciais",
+    "name": "anos-iniciais",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "pdf/educacao-infantil",
+    "name": "educacao-infantil",
+    "size": "-",
+    "modified": "2026-01-15 11:35:30",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": ".htaccess",
+    "name": ".htaccess",
+    "size": "2.03 KB",
+    "sizeBytes": 2083,
+    "modified": "2026-01-15 11:39:26",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "assets/__vite-browser-external-BIHI7g3E.js",
+    "name": "__vite-browser-external-BIHI7g3E.js",
+    "size": "33 Bytes",
+    "sizeBytes": 33,
+    "modified": "2026-01-15 11:35:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "assets/index-2VDC-HEi.js",
+    "name": "index-2VDC-HEi.js",
+    "size": "897 KB",
+    "sizeBytes": 918527,
+    "modified": "2026-01-15 11:35:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "assets/index-D7JHakpt.css",
+    "name": "index-D7JHakpt.css",
+    "size": "52.84 KB",
+    "sizeBytes": 54105,
+    "modified": "2026-01-15 11:35:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "assets/pdf.worker-DHaD_gt7.mjs",
+    "name": "pdf.worker-DHaD_gt7.mjs",
+    "size": "2.09 MB",
+    "sizeBytes": 2195543,
+    "modified": "2026-01-15 11:35:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "images/videos/colorindo_codigos.jpeg",
+    "name": "colorindo_codigos.jpeg",
+    "size": "143.74 KB",
+    "sizeBytes": 147185,
+    "modified": "2025-11-06 14:45:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "images/videos/desenhando_personagem.jpg",
+    "name": "desenhando_personagem.jpg",
+    "size": "96.38 KB",
+    "sizeBytes": 98696,
+    "modified": "2025-11-06 14:45:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "images/videos/jogo-velha-sensorial.png",
+    "name": "jogo-velha-sensorial.png",
+    "size": "458.11 KB",
+    "sizeBytes": 469105,
+    "modified": "2025-11-06 14:45:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "images/videos/mapeando-vizinhanca.jpeg",
+    "name": "mapeando-vizinhanca.jpeg",
+    "size": "12.4 KB",
+    "sizeBytes": 12696,
+    "modified": "2025-11-06 14:45:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "index.html",
+    "name": "index.html",
+    "size": "505 Bytes",
+    "sizeBytes": 505,
+    "modified": "2026-01-15 11:35:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "index.php",
+    "name": "index.php",
+    "size": "234 Bytes",
+    "sizeBytes": 234,
+    "modified": "2026-01-15 11:36:24",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-1.png",
+    "name": "Logo Nova Edu (Oficial)-1.png",
+    "size": "239.31 KB",
+    "sizeBytes": 245051,
+    "modified": "2025-10-22 20:29:15",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-10.png",
+    "name": "Logo Nova Edu (Oficial)-10.png",
+    "size": "183.1 KB",
+    "sizeBytes": 187496,
+    "modified": "2025-10-18 10:43:27",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-1.png",
+    "name": "Logo Nova Edu (Oficial)-11-1.png",
+    "size": "239.53 KB",
+    "sizeBytes": 245277,
+    "modified": "2025-10-18 10:28:37",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-10.png",
+    "name": "Logo Nova Edu (Oficial)-11-10.png",
+    "size": "184.12 KB",
+    "sizeBytes": 188534,
+    "modified": "2025-10-18 10:28:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-11.png",
+    "name": "Logo Nova Edu (Oficial)-11-11.png",
+    "size": "202.35 KB",
+    "sizeBytes": 207203,
+    "modified": "2025-10-18 10:28:36",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-12.png",
+    "name": "Logo Nova Edu (Oficial)-11-12.png",
+    "size": "181.64 KB",
+    "sizeBytes": 186000,
+    "modified": "2025-10-18 10:28:35",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-13.png",
+    "name": "Logo Nova Edu (Oficial)-11-13.png",
+    "size": "104.14 KB",
+    "sizeBytes": 106635,
+    "modified": "2025-10-18 10:28:31",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-14.png",
+    "name": "Logo Nova Edu (Oficial)-11-14.png",
+    "size": "124.87 KB",
+    "sizeBytes": 127865,
+    "modified": "2025-10-18 10:28:33",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-15.png",
+    "name": "Logo Nova Edu (Oficial)-11-15.png",
+    "size": "100.89 KB",
+    "sizeBytes": 103312,
+    "modified": "2025-10-18 10:28:34",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-16.png",
+    "name": "Logo Nova Edu (Oficial)-11-16.png",
+    "size": "104.33 KB",
+    "sizeBytes": 106836,
+    "modified": "2025-10-18 10:28:34",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-2.png",
+    "name": "Logo Nova Edu (Oficial)-11-2.png",
+    "size": "241.49 KB",
+    "sizeBytes": 247282,
+    "modified": "2025-10-18 10:28:38",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-3.png",
+    "name": "Logo Nova Edu (Oficial)-11-3.png",
+    "size": "235.89 KB",
+    "sizeBytes": 241548,
+    "modified": "2025-10-18 10:28:39",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-4.png",
+    "name": "Logo Nova Edu (Oficial)-11-4.png",
+    "size": "237.84 KB",
+    "sizeBytes": 243544,
+    "modified": "2025-10-18 10:28:40",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-5.png",
+    "name": "Logo Nova Edu (Oficial)-11-5.png",
+    "size": "236.93 KB",
+    "sizeBytes": 242621,
+    "modified": "2025-10-18 10:28:41",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-6.png",
+    "name": "Logo Nova Edu (Oficial)-11-6.png",
+    "size": "234.45 KB",
+    "sizeBytes": 240073,
+    "modified": "2025-10-18 10:28:42",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-7.png",
+    "name": "Logo Nova Edu (Oficial)-11-7.png",
+    "size": "180.82 KB",
+    "sizeBytes": 185157,
+    "modified": "2025-10-18 10:28:43",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-8.png",
+    "name": "Logo Nova Edu (Oficial)-11-8.png",
+    "size": "177.73 KB",
+    "sizeBytes": 181993,
+    "modified": "2025-10-18 10:28:43",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11-9.png",
+    "name": "Logo Nova Edu (Oficial)-11-9.png",
+    "size": "178.69 KB",
+    "sizeBytes": 182979,
+    "modified": "2025-10-18 10:28:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-11.png",
+    "name": "Logo Nova Edu (Oficial)-11.png",
+    "size": "202.35 KB",
+    "sizeBytes": 207203,
+    "modified": "2025-10-18 10:43:35",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-12.png",
+    "name": "Logo Nova Edu (Oficial)-12.png",
+    "size": "181.64 KB",
+    "sizeBytes": 186000,
+    "modified": "2025-10-18 10:43:35",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-13.png",
+    "name": "Logo Nova Edu (Oficial)-13.png",
+    "size": "104.14 KB",
+    "sizeBytes": 106635,
+    "modified": "2025-10-18 10:43:36",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-14.png",
+    "name": "Logo Nova Edu (Oficial)-14.png",
+    "size": "124.87 KB",
+    "sizeBytes": 127865,
+    "modified": "2025-10-18 10:43:37",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-15.png",
+    "name": "Logo Nova Edu (Oficial)-15.png",
+    "size": "100.89 KB",
+    "sizeBytes": 103312,
+    "modified": "2025-10-18 10:43:38",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-16.png",
+    "name": "Logo Nova Edu (Oficial)-16.png",
+    "size": "104.33 KB",
+    "sizeBytes": 106836,
+    "modified": "2025-10-18 10:43:38",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-2.png",
+    "name": "Logo Nova Edu (Oficial)-2.png",
+    "size": "241.49 KB",
+    "sizeBytes": 247282,
+    "modified": "2025-10-18 10:43:29",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-3.png",
+    "name": "Logo Nova Edu (Oficial)-3.png",
+    "size": "235.89 KB",
+    "sizeBytes": 241548,
+    "modified": "2025-10-18 10:43:30",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-4.png",
+    "name": "Logo Nova Edu (Oficial)-4.png",
+    "size": "237.01 KB",
+    "sizeBytes": 242696,
+    "modified": "2025-10-18 10:43:31",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-5.png",
+    "name": "Logo Nova Edu (Oficial)-5.png",
+    "size": "236.93 KB",
+    "sizeBytes": 242621,
+    "modified": "2025-10-18 10:43:32",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-6.png",
+    "name": "Logo Nova Edu (Oficial)-6.png",
+    "size": "234.45 KB",
+    "sizeBytes": 240073,
+    "modified": "2025-10-18 10:43:33",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-7.png",
+    "name": "Logo Nova Edu (Oficial)-7.png",
+    "size": "180.34 KB",
+    "sizeBytes": 184671,
+    "modified": "2025-10-22 20:29:15",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-8.png",
+    "name": "Logo Nova Edu (Oficial)-8.png",
+    "size": "177.73 KB",
+    "sizeBytes": 181993,
+    "modified": "2025-10-18 10:43:27",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "logo/Logo Nova Edu (Oficial)-9.png",
+    "name": "Logo Nova Edu (Oficial)-9.png",
+    "size": "178.69 KB",
+    "sizeBytes": 182979,
+    "modified": "2025-10-18 10:43:27",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "pdf/anos-finais/mapeando-vizinhanca.pdf",
+    "name": "mapeando-vizinhanca.pdf",
+    "size": "631.02 KB",
+    "sizeBytes": 646164,
+    "modified": "2025-10-22 14:39:26",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "pdf/anos-iniciais/colorindo-codigos.pdf",
+    "name": "colorindo-codigos.pdf",
+    "size": "204.01 KB",
+    "sizeBytes": 208905,
+    "modified": "2025-10-22 14:11:43",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "pdf/educacao-infantil/desenhando-personagem.pdf",
+    "name": "desenhando-personagem.pdf",
+    "size": "552.52 KB",
+    "sizeBytes": 565782,
+    "modified": "2025-10-22 14:03:25",
+    "permissions": "666"
+  }
+]

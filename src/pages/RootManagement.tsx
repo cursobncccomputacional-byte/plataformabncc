@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Shield } from 'lucide-react';
+import { Plus, Search, Key, Trash2, Edit } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { useAuth } from '../contexts/LocalAuthContext';
+import { ToastNotification } from '../components/ToastNotification';
 import type { CreateUserData, User } from '../types/bncc';
 
 type RoleFilter = 'all' | 'root' | 'admin' | 'professor' | 'aluno';
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export const RootManagement = () => {
-  const { user, getAllUsers, createUser } = useAuth();
+  const { user, getAllUsers, createUser, changePassword, deleteUser } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +24,9 @@ export const RootManagement = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState<CreateUserData>({
     name: '',
     email: '',
@@ -109,6 +114,8 @@ export const RootManagement = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
+    
     try {
       const res = await createUser(formData);
       if (res.error) {
@@ -116,6 +123,8 @@ export const RootManagement = () => {
         return;
       }
 
+      // Sucesso!
+      setSuccess(`Usuário "${formData.name}" criado com sucesso!`);
       setShowCreateModal(false);
       setFormData({
         name: '',
@@ -127,8 +136,67 @@ export const RootManagement = () => {
       });
 
       await loadUsers();
+      
+      // Limpar mensagem de sucesso após 5 segundos
+      setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar usuário');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !newPassword) return;
+
+    if (newPassword.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await changePassword(selectedUser.id, newPassword);
+      if (res.error) {
+        setError(res.error.message);
+      } else {
+        setSuccess(`Senha do usuário "${selectedUser.name}" alterada com sucesso!`);
+        setShowChangePasswordModal(false);
+        setSelectedUser(null);
+        setNewPassword('');
+        setTimeout(() => setSuccess(null), 5000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao alterar senha');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`Tem certeza que deseja deletar o usuário "${userName}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await deleteUser(userId);
+      if (res.error) {
+        setError(res.error.message);
+      } else {
+        setSuccess(`Usuário "${userName}" deletado com sucesso!`);
+        await loadUsers();
+        setTimeout(() => setSuccess(null), 5000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao deletar usuário');
     } finally {
       setLoading(false);
     }
@@ -155,16 +223,11 @@ export const RootManagement = () => {
         <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
           <div className="pt-6 px-4 sm:px-6 max-w-[1800px] mx-auto">
             <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-lg" style={{ backgroundColor: '#044982' }}>
-                  <Shield className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: '#044982' }}>
-                    Gerenciamento de Usuários
-                  </h1>
-                  <p className="text-gray-600">Crie e liste usuários do sistema.</p>
-                </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: '#044982' }}>
+                  Gerenciamento de Usuários
+                </h1>
+                <p className="text-gray-600">Crie e liste usuários do sistema.</p>
               </div>
 
               <button
@@ -178,9 +241,21 @@ export const RootManagement = () => {
             </div>
 
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-red-800">{error}</p>
-              </div>
+              <ToastNotification
+                message={error}
+                type="error"
+                duration={6000}
+                onClose={() => setError(null)}
+              />
+            )}
+
+            {success && (
+              <ToastNotification
+                message={success}
+                type="success"
+                duration={5000}
+                onClose={() => setSuccess(null)}
+              />
             )}
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
@@ -252,6 +327,9 @@ export const RootManagement = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Criado em
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -278,6 +356,38 @@ export const RootManagement = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(u.created_at).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(u);
+                                setNewPassword('');
+                                setShowChangePasswordModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 transition-colors"
+                              title="Alterar senha"
+                            >
+                              <Key className="h-4 w-4" />
+                            </button>
+                            {/* Botão de deletar - não aparece para o próprio usuário logado */}
+                            {u.id !== user?.id && (
+                              <button
+                                onClick={() => handleDeleteUser(u.id, u.name)}
+                                className="text-red-600 hover:text-red-900 transition-colors"
+                                title="Deletar usuário"
+                                disabled={loading}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* Se for o próprio usuário, mostrar mensagem */}
+                            {u.id === user?.id && (
+                              <span className="text-xs text-gray-400" title="Você não pode deletar sua própria conta">
+                                -
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -329,17 +439,19 @@ export const RootManagement = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usuário (Login)</label>
                 <input
                   type="text"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData((s) => ({ ...s, email: e.target.value }))}
+                  onChange={(e) => setFormData((s) => ({ ...s, email: e.target.value.trim() }))}
                   placeholder="ex: raphael.vasconcelos"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:border-transparent"
                   style={{ ['--tw-ring-color' as any]: '#005a93' }}
                 />
-                <p className="text-xs text-gray-500 mt-1">Sem @ (é o campo `usuario` no banco).</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Este será o nome de usuário para login (sem @). Exemplo: raphael.vasconcelos
+                </p>
               </div>
 
               <div>
@@ -353,6 +465,7 @@ export const RootManagement = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:border-transparent"
                   style={{ ['--tw-ring-color' as any]: '#005a93' }}
                 />
+                <p className="text-xs text-gray-500 mt-1">Mínimo de 6 caracteres</p>
               </div>
 
               <div>
@@ -372,15 +485,19 @@ export const RootManagement = () => {
 
               {(formData.role === 'professor' || formData.role === 'aluno') && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Escola</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Escola <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.school || ''}
                     onChange={(e) => setFormData((s) => ({ ...s, school: e.target.value }))}
+                    placeholder="Nome da escola"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:border-transparent"
                     style={{ ['--tw-ring-color' as any]: '#005a93' }}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Obrigatório para professores e alunos</p>
                 </div>
               )}
 
@@ -390,6 +507,7 @@ export const RootManagement = () => {
                   onClick={() => {
                     setShowCreateModal(false);
                     setError(null);
+                    setSuccess(null);
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
                 >
@@ -402,6 +520,57 @@ export const RootManagement = () => {
                   style={{ backgroundColor: '#005a93' }}
                 >
                   {loading ? 'Criando...' : 'Criar Usuário'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alterar Senha */}
+      {showChangePasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-xl font-bold mb-4">Alterar Senha</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Alterando senha do usuário: <strong>{selectedUser.name}</strong>
+            </p>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:border-transparent"
+                  style={{ ['--tw-ring-color' as any]: '#005a93' }}
+                />
+                <p className="text-xs text-gray-500 mt-1">Mínimo de 6 caracteres</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePasswordModal(false);
+                    setSelectedUser(null);
+                    setNewPassword('');
+                    setError(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || newPassword.length < 6}
+                  className="px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: '#005a93' }}
+                >
+                  {loading ? 'Alterando...' : 'Alterar Senha'}
                 </button>
               </div>
             </form>

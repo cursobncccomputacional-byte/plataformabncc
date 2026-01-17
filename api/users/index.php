@@ -1,422 +1,204 @@
 <?php
 /**
- * Endpoint para gerenciar usuários
- * GET /api/users - Listar usuários
- * POST /api/users - Criar usuário
- * 
- * Requer: Admin ou Root
+ * Endpoint de usuários (JSON)
+ *
+ * GET    /api/users/index.php            -> lista usuários
+ * POST   /api/users/index.php            -> cria usuário
+ * DELETE /api/users/index.php            -> remove usuário (body: { user_id })
+ *
+ * Obs: este arquivo estava com trechos corrompidos e causava erro 500 (parse error).
+ * Esta versão é propositalmente simples e robusta.
  */
 
-// Iniciar buffer de saída para capturar qualquer output inesperado
-ob_start();
+declare(strict_types=1);
 
-// Capturar todos os erros e retornar como JSON
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Não exibir erros na tela, apenas logar
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
-// Handler de erros fatal
-register_shutdown_function(function() {
-    $error = error_get_last();
-    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        ob_clean();
-        http_response_code(500);
+// CORS + preflight (mantém o comportamento esperado no frontend)
+require_once __DIR__ . '/../config/cors.php';
+
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/auth.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+function json_response(int $status, array $payload): void {
+    if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'error' => true,
-            'message' => 'Erro fatal no servidor',
-            'details' => $error['message'] . ' em ' . $error['file'] . ':' . $error['line']
-        ]);
-        exit;
+        http_response_code($status);
     }
-});
-
-// Handler de exceções não capturadas
-set_exception_handler(function($exception) {
-    ob_clean();
-    error_log("API: Exceção não capturada - " . $exception->getMessage());
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'error' => true,
-        'message' => 'Erro no servidor',
-        'details' => $exception->getMessage()
-    ]);
-    exit;
-});
-
-// Log do método HTTP recebido ANTES de qualquer processamento
-error_log("API: ===== INÍCIO DO ARQUIVO /users/index.php =====");
-error_log("API: REQUEST_METHOD: " . ($_SERVER['REQUEST_METHOD'] ?? 'NÃO DEFINIDO'));
-error_log("API: REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? 'NÃO DEFINIDO'));
-error_log("API: SCRIPT_NAME: " . ($_SERVER['SCRIPT_NAME'] ?? 'NÃO DEFINIDO'));
-error_log("API: QUERY_STRING: " . ($_SERVER['QUERY_STRING'] ?? 'NÃO DEFINIDO'));
-
-try {
-    // Limpar qualquer output que possa ter sido gerado antes
-    if (ob_get_level() > 0) {
-        ob_clean();
-    }
-    
-    // Definir headers ANTES de incluir outros arquivos
-    header('Content-Type: application/json; charset=utf-8');
-    
-    require_once __DIR__ . '/../config/cors.php';
-    require_once __DIR__ . '/../config/database.php';
-    require_once __DIR__ . '/../config/auth.php';
-    
-    // Verificar permissão (admin ou root)
-    $currentUser = requireAuth();
-    if ($currentUser['role'] !== 'admin' && $currentUser['role'] !== 'root') {
-        ob_clean();
-        http_response_code(403);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => true, 'message' => 'Acesso negado']);
-        exit;
-    }
-} catch(Exception $e) {
-    ob_clean();
-    error_log("API: Erro ao inicializar - " . $e->getMessage());
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'error' => true,
-        'message' => 'Erro ao inicializar endpoint',
-        'details' => $e->getMessage()
-    ]);
-    exit;
-} catch(Error $e) {
-    ob_clean();
-    error_log("API: Erro fatal ao inicializar - " . $e->getMessage());
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'error' => true,
-        'message' => 'Erro fatal ao inicializar endpoint',
-        'details' => $e->getMessage()
-    ]);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-global $pdo;
+function read_json_body(): array {
+    $raw = file_get_contents('php://input');
+    if ($raw === false || trim($raw) === '') {
+        return [];
+    }
+    $data = json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+        json_response(400, ['error' => true, 'message' => 'JSON inválido: ' . json_last_error_msg()]);
+    }
+    return $data;
+}
 
-// Log do método HTTP ANTES de processar qualquer requisição
-$httpMethod = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'NÃO DEFINIDO');
-error_log("API: ===== MÉTODO HTTP DETECTADO: $httpMethod =====");
-error_log("API: REQUEST_METHOD original: " . ($_SERVER['REQUEST_METHOD'] ?? 'NÃO DEFINIDO'));
-error_log("API: REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? 'NÃO DEFINIDO'));
+// Autenticação + autorização
+$currentUser = requireAuth();
+if (($currentUser['role'] ?? null) !== 'admin' && ($currentUser['role'] ?? null) !== 'root') {
+    json_response(403, ['error' => true, 'message' => 'Acesso negado']);
+}
 
-// ============================================
-// POST - Criar usuário (VERIFICAR PRIMEIRO)
-// ============================================
-if ($httpMethod === 'POST') {
-    error_log("API: ===== PROCESSANDO POST /users =====");
-    error_log("API: Content-Type recebido: " . ($_SERVER['CONTENT_TYPE'] ?? 'não definido'));
-    
-    try {
-        // Garantir que o header Content-Type está definido ANTES de qualquer output
-        if (ob_get_level() > 0) {
-            ob_clean();
+$method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+try {
+    global $pdo;
+    if (!isset($pdo)) {
+        json_response(500, ['error' => true, 'message' => 'Conexão com banco não disponível']);
+    }
+
+    if ($method === 'GET') {
+        $stmt = $pdo->query("SELECT * FROM usuarios ORDER BY data_criacao DESC");
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $usersList = [];
+        foreach ($users as $user) {
+            $usersList[] = [
+                'id' => $user['id'],
+                'name' => $user['nome'],
+                'email' => $user['usuario'],
+                'role' => $user['nivel_acesso'],
+                'school' => $user['escola'] ?? '',
+                'subjects' => json_decode($user['materias'] ?? '[]', true),
+                'created_at' => $user['data_criacao'],
+                'last_login' => $user['ultimo_login'] ?? null,
+                'is_active' => (bool)($user['ativo'] ?? 0),
+            ];
         }
-        header('Content-Type: application/json; charset=utf-8');
-        
-        // Obter dados do body
-        $rawInput = file_get_contents('php://input');
-        $data = json_decode($rawInput, true);
-        
-        // Verificar se o JSON foi decodificado corretamente
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400);
-            echo json_encode([
-                'error' => true, 
-                'message' => 'JSON inválido: ' . json_last_error_msg()
-            ]);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
-        }
-        
-        // Validar campos obrigatórios
-        if (!isset($data['name']) || !isset($data['email']) || !isset($data['password']) || !isset($data['role'])) {
-            http_response_code(400);
-            echo json_encode(['error' => true, 'message' => 'Campos obrigatórios: name, email, password, role']);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
-        }
-    
-        $name = trim($data['name']);
-        $usuario = trim($data['email']); // Frontend envia como "email", mas é "usuario" no banco
-        $password = $data['password'];
-        $role = $data['role'];
-        // Para root e admin, escola pode ser NULL ou string vazia
-        // Para professor e aluno, escola é obrigatória (já validado acima)
-        $school = isset($data['school']) && !empty(trim($data['school'])) ? trim($data['school']) : null;
+
+        json_response(200, ['error' => false, 'users' => $usersList]);
+    }
+
+    if ($method === 'POST') {
+        $data = read_json_body();
+
+        $name = trim((string)($data['name'] ?? ''));
+        $usuario = trim((string)($data['email'] ?? ''));
+        $password = (string)($data['password'] ?? '');
+        $role = (string)($data['role'] ?? '');
+        $school = isset($data['school']) && trim((string)$data['school']) !== '' ? trim((string)$data['school']) : null;
         $subjects = isset($data['subjects']) && is_array($data['subjects']) ? $data['subjects'] : [];
-        
-        error_log("API: Dados recebidos - Name: $name, Usuario: $usuario, Role: $role, School: " . ($school ?? 'NULL'));
-        
-        // Validar senha
+
+        if ($name === '' || $usuario === '' || $password === '' || $role === '') {
+            json_response(400, ['error' => true, 'message' => 'Campos obrigatórios: name, email, password, role']);
+        }
         if (strlen($password) < 6) {
-            http_response_code(400);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['error' => true, 'message' => 'A senha deve ter pelo menos 6 caracteres']);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
+            json_response(400, ['error' => true, 'message' => 'A senha deve ter pelo menos 6 caracteres']);
         }
-        
-        // Validar nível de acesso
+
         $allowedRoles = ['root', 'admin', 'professor', 'aluno'];
-        if (!in_array($role, $allowedRoles)) {
-            http_response_code(400);
-            echo json_encode(['error' => true, 'message' => 'Nível de acesso inválido']);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
+        if (!in_array($role, $allowedRoles, true)) {
+            json_response(400, ['error' => true, 'message' => 'Nível de acesso inválido']);
         }
-        
-        // Admin só pode criar professor e aluno
+
+        // Admin só cria professor/aluno
         if ($currentUser['role'] === 'admin' && ($role === 'root' || $role === 'admin')) {
-            http_response_code(403);
-            echo json_encode(['error' => true, 'message' => 'Administradores só podem criar professores e alunos']);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
+            json_response(403, ['error' => true, 'message' => 'Administradores só podem criar professores e alunos']);
         }
-        
-        // Escola é obrigatória apenas para professor e aluno
+
         if (($role === 'professor' || $role === 'aluno') && empty($school)) {
-            http_response_code(400);
-            echo json_encode(['error' => true, 'message' => 'Escola é obrigatória para professores e alunos']);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
+            json_response(400, ['error' => true, 'message' => 'Escola é obrigatória para professores e alunos']);
         }
-    
-    try {
-        // Verificar se usuário já existe
+
+        // Verificar duplicidade
         $checkStmt = $pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
         $checkStmt->execute([$usuario]);
-        $existingUser = $checkStmt->fetch();
-        if ($existingUser) {
-            error_log("API: Usuário já existe - ID: " . $existingUser['id']);
-            ob_clean();
-            header('Content-Type: application/json; charset=utf-8');
-            http_response_code(409);
-            echo json_encode(['error' => true, 'message' => 'Este usuário já está cadastrado']);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
+        if ($checkStmt->fetch()) {
+            json_response(409, ['error' => true, 'message' => 'Este usuário já está cadastrado']);
         }
-        error_log("API: Usuário não existe, prosseguindo com criação");
-        
-        // Gerar ID único
-        $userId = $role . '-' . strtolower(str_replace([' ', '.'], ['-', ''], $usuario)) . '-' . substr(md5($usuario . time()), 0, 8);
-        
-        // Gerar hash da senha
+
+        $userId = $role . '-' . strtolower(str_replace([' ', '.'], ['-', ''], $usuario)) . '-' . substr(md5($usuario . microtime(true)), 0, 8);
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-        
-        // Preparar materias como JSON
-        $materiasJson = !empty($subjects) ? json_encode($subjects) : null;
-        
-        // Iniciar transação para garantir atomicidade
+        $materiasJson = !empty($subjects) ? json_encode($subjects, JSON_UNESCAPED_UNICODE) : null;
+
         $pdo->beginTransaction();
-        
-        try {
-            // Inserir usuário no banco
-            $insertStmt = $pdo->prepare("
-                INSERT INTO usuarios (id, nome, usuario, senha, nivel_acesso, escola, materias, ativo, data_criacao)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())
-            ");
-            
-            error_log("API: Tentando inserir usuário - ID: $userId, Nome: $name, Usuário: $usuario, Role: $role, School: " . ($school ?? 'NULL'));
-            error_log("API: Hash da senha: " . substr($hashedPassword, 0, 20) . "...");
-            error_log("API: Materias JSON: " . ($materiasJson ?? 'NULL'));
-            
-            $insertResult = $insertStmt->execute([
-                $userId,
-                $name,
-                $usuario,
-                $hashedPassword,
-                $role,
-                $school,
-                $materiasJson
-            ]);
-            
-            if (!$insertResult) {
-                $errorInfo = $insertStmt->errorInfo();
-                error_log("API: Erro ao executar INSERT - " . json_encode($errorInfo));
-                $pdo->rollBack();
-                http_response_code(500);
-                echo json_encode([
-                    'error' => true,
-                    'message' => 'Erro ao inserir usuário no banco de dados',
-                    'details' => $errorInfo[2] ?? 'Erro desconhecido'
-                ]);
-                exit;
-            }
-            
-            // Verificar se a inserção realmente funcionou
-            $rowCount = $insertStmt->rowCount();
-            error_log("API: Linhas afetadas pelo INSERT: $rowCount");
-            
-            if ($rowCount === 0) {
-                error_log("API: AVISO - INSERT executado mas nenhuma linha foi afetada!");
-                $pdo->rollBack();
-                http_response_code(500);
-                echo json_encode([
-                    'error' => true,
-                    'message' => 'Usuário não foi inserido no banco de dados (nenhuma linha afetada)'
-                ]);
-                exit;
-            }
-            
-            // Commit da transação
-            $pdo->commit();
-            error_log("API: Transação commitada com sucesso - ID: $userId");
-            
-            // Buscar usuário criado (após commit)
-            $selectStmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = ?");
-            $selectStmt->execute([$userId]);
-            $newUser = $selectStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$newUser) {
-                error_log("API: ERRO CRÍTICO - Usuário inserido mas não encontrado ao buscar!");
-                http_response_code(500);
-                echo json_encode([
-                    'error' => true,
-                    'message' => 'Usuário foi inserido mas não foi encontrado no banco de dados'
-                ]);
-                exit;
-            }
-            
-            error_log("API: Usuário encontrado após inserção: " . json_encode($newUser));
-            
-            // Converter para formato inglês
-            $response = [
-                'error' => false,
-                'message' => 'Usuário criado com sucesso',
-                'user' => [
-                    'id' => $newUser['id'],
-                    'name' => $newUser['nome'],
-                    'email' => $newUser['usuario'],
-                    'role' => $newUser['nivel_acesso'],
-                    'school' => $newUser['escola'] ?? '',
-                    'subjects' => json_decode($newUser['materias'] ?? '[]', true),
-                    'created_at' => $newUser['data_criacao'],
-                    'last_login' => $newUser['ultimo_login'] ?? null,
-                    'is_active' => (bool)$newUser['ativo']
-                ]
-            ];
-            
-            error_log("API: Resposta final POST: " . json_encode($response));
-            error_log("API: Verificando estrutura - error: " . ($response['error'] ? 'true' : 'false'));
-            error_log("API: Verificando estrutura - user existe: " . (isset($response['user']) ? 'sim' : 'não'));
-            error_log("API: Verificando estrutura - users existe: " . (isset($response['users']) ? 'sim' : 'não'));
-            
-            // Garantir que o header está definido antes de enviar a resposta
-            ob_clean(); // Limpar qualquer output anterior
-            header('Content-Type: application/json; charset=utf-8');
-            http_response_code(201);
-            $jsonResponse = json_encode($response);
-            error_log("API: ===== ENVIANDO RESPOSTA POST =====");
-            error_log("API: Status HTTP: 201");
-            error_log("API: JSON final a ser enviado: " . $jsonResponse);
-            error_log("API: Tamanho do JSON: " . strlen($jsonResponse) . " bytes");
-            error_log("API: ====================================");
-            echo $jsonResponse;
-            if (ob_get_level() > 0) {
-                ob_end_flush(); // Enviar o buffer
-            }
-            exit;
-        
-        } catch(PDOException $e) {
-            // Rollback em caso de erro
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            error_log("API: Exceção PDO ao criar usuário: " . $e->getMessage());
-            error_log("API: Código do erro: " . $e->getCode());
-            error_log("API: Trace: " . $e->getTraceAsString());
-            http_response_code(500);
-            echo json_encode([
-                'error' => true,
-                'message' => 'Erro ao criar usuário',
-                'details' => $e->getMessage()
-            ]);
-            exit;
-        } catch(Exception $e) {
-            // Rollback em caso de erro
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            ob_clean();
-            error_log("API: Exceção genérica ao criar usuário: " . $e->getMessage());
-            http_response_code(500);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode([
-                'error' => true,
-                'message' => $e->getMessage()
-            ]);
-            if (ob_get_level() > 0) {
-                ob_end_flush();
-            }
-            exit;
+        $insertStmt = $pdo->prepare("
+            INSERT INTO usuarios (id, nome, usuario, senha, nivel_acesso, escola, materias, ativo, data_criacao)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW())
+        ");
+        $insertStmt->execute([$userId, $name, $usuario, $hashedPassword, $role, $school, $materiasJson]);
+        $pdo->commit();
+
+        // Retornar usuário criado
+        $selectStmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = ?");
+        $selectStmt->execute([$userId]);
+        $newUser = $selectStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$newUser) {
+            json_response(500, ['error' => true, 'message' => 'Usuário criado mas não encontrado']);
         }
-    } catch(Exception $e) {
-        // Catch para o try externo (linha 246)
-        ob_clean();
-        error_log("API: Erro ao processar criação de usuário - " . $e->getMessage());
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'error' => true,
-            'message' => 'Erro ao processar criação de usuário',
-            'details' => $e->getMessage()
+
+        json_response(201, [
+            'error' => false,
+            'message' => 'Usuário criado com sucesso',
+            'user' => [
+                'id' => $newUser['id'],
+                'name' => $newUser['nome'],
+                'email' => $newUser['usuario'],
+                'role' => $newUser['nivel_acesso'],
+                'school' => $newUser['escola'] ?? '',
+                'subjects' => json_decode($newUser['materias'] ?? '[]', true),
+                'created_at' => $newUser['data_criacao'],
+                'last_login' => $newUser['ultimo_login'] ?? null,
+                'is_active' => (bool)($newUser['ativo'] ?? 0),
+            ],
         ]);
-        if (ob_get_level() > 0) {
-            ob_end_flush();
-        }
-        exit;
     }
-    } catch(Exception $e) {
-        // Catch para o try do POST (linha 181)
-        ob_clean();
-        error_log("API: Erro no POST - " . $e->getMessage());
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'error' => true,
-            'message' => 'Erro ao processar requisição POST',
-            'details' => $e->getMessage()
-        ]);
-        if (ob_get_level() > 0) {
-            ob_end_flush();
+
+    if ($method === 'DELETE') {
+        $data = read_json_body();
+        $userId = (string)($data['user_id'] ?? ($_GET['id'] ?? ''));
+        $userId = trim($userId);
+        if ($userId === '') {
+            json_response(400, ['error' => true, 'message' => 'ID do usuário não fornecido']);
         }
-        exit;
-    } catch(Error $e) {
-        // Catch para erros fatais no POST
-        ob_clean();
-        error_log("API: Erro fatal no POST - " . $e->getMessage());
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'error' => true,
-            'message' => 'Erro fatal ao processar requisição POST',
-            'details' => $e->getMessage()
-        ]);
-        if (ob_get_level() > 0) {
-            ob_end_flush();
+
+        if ($userId === ($currentUser['id'] ?? '')) {
+            json_response(403, ['error' => true, 'message' => 'Você não pode deletar sua própria conta']);
         }
-        exit;
+
+        $checkStmt = $pdo->prepare("SELECT id, nivel_acesso FROM usuarios WHERE id = ?");
+        $checkStmt->execute([$userId]);
+        $userToDelete = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$userToDelete) {
+            json_response(404, ['error' => true, 'message' => 'Usuário não encontrado']);
+        }
+
+        // Só root pode apagar root
+        if (($userToDelete['nivel_acesso'] ?? '') === 'root' && ($currentUser['role'] ?? '') !== 'root') {
+            json_response(403, ['error' => true, 'message' => 'Apenas root pode deletar usuários root']);
+        }
+
+        $deleteStmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
+        $deleteStmt->execute([$userId]);
+        if ($deleteStmt->rowCount() === 0) {
+            json_response(500, ['error' => true, 'message' => 'Erro ao deletar usuário']);
+        }
+
+        json_response(200, ['error' => false, 'message' => 'Usuário deletado com sucesso']);
     }
+
+    json_response(405, ['error' => true, 'message' => 'Método não permitido']);
+} catch (PDOException $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    json_response(500, ['error' => true, 'message' => 'Erro no banco de dados', 'details' => $e->getMessage()]);
+} catch (Throwable $e) {
+    json_response(500, ['error' => true, 'message' => 'Erro no servidor', 'details' => $e->getMessage()]);
 }
 
 // Método não suportado

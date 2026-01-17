@@ -40,12 +40,32 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
     filterUsers();
   }, [users, searchTerm, roleFilter, statusFilter]);
 
-  const loadUsers = () => {
-    const allUsers = getAllUsers();
-    setUsers(allUsers);
+  const loadUsers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('=== CARREGANDO USUÁRIOS ===');
+      const allUsers = await getAllUsers();
+      console.log('Usuários recebidos:', allUsers);
+      console.log('Total de usuários:', allUsers.length);
+      setUsers(allUsers);
+      console.log('Estado users atualizado');
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+      setError('Erro ao carregar usuários. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterUsers = () => {
+    console.log('=== FILTRO DE USUÁRIOS ===');
+    console.log('Usuários antes do filtro:', users);
+    console.log('Total de usuários:', users.length);
+    console.log('Search term:', searchTerm);
+    console.log('Role filter:', roleFilter);
+    console.log('Status filter:', statusFilter);
+    
     let filtered = users;
 
     // Search filter
@@ -55,11 +75,13 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
         u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.school?.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      console.log('Após filtro de busca:', filtered.length);
     }
 
     // Role filter
     if (roleFilter !== 'all') {
       filtered = filtered.filter(u => u.role === roleFilter);
+      console.log('Após filtro de role:', filtered.length);
     }
 
     // Status filter
@@ -67,8 +89,12 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
       filtered = filtered.filter(u => 
         statusFilter === 'active' ? u.is_active : !u.is_active
       );
+      console.log('Após filtro de status:', filtered.length);
     }
 
+    console.log('Usuários filtrados finais:', filtered);
+    console.log('Total filtrado:', filtered.length);
+    console.log('========================');
     setFilteredUsers(filtered);
   };
 
@@ -77,24 +103,39 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
     setLoading(true);
     setError(null);
 
-    const result = await createUser(formData);
-    
-    if (result.error) {
-      setError(result.error.message);
-    } else {
-      setShowCreateModal(false);
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        role: 'professor',
-        school: '',
-        subjects: []
-      });
-      loadUsers();
+    console.log('=== CRIANDO USUÁRIO ===');
+    console.log('Dados do formulário:', formData);
+
+    try {
+      const result = await createUser(formData);
+      
+      console.log('Resultado da criação:', result);
+      
+      if (result.error) {
+        console.error('Erro ao criar usuário:', result.error);
+        setError(result.error.message);
+      } else {
+        console.log('Usuário criado com sucesso!');
+        setShowCreateModal(false);
+        setFormData({
+          name: '',
+          email: '',
+          password: '',
+          role: 'professor',
+          school: '',
+          subjects: []
+        });
+        // Aguardar um pouco antes de recarregar para garantir que o banco foi atualizado
+        setTimeout(() => {
+          loadUsers();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Erro inesperado ao criar usuário:', error);
+      setError(error instanceof Error ? error.message : 'Erro inesperado ao criar usuário');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const handleEditUser = async (e: React.FormEvent) => {
@@ -206,7 +247,16 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
         {/* Error Message */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-800">{error}</p>
+            <p className="text-red-800 font-semibold">Erro: {error}</p>
+            <p className="text-red-600 text-sm mt-1">Verifique o console do navegador para mais detalhes.</p>
+          </div>
+        )}
+
+        {/* Debug Info - Remover em produção */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-md p-3 text-xs">
+            <p><strong>Debug:</strong> Total de usuários: {users.length} | Filtrados: {filteredUsers.length}</p>
+            <p>Loading: {loading ? 'Sim' : 'Não'} | Error: {error || 'Nenhum'}</p>
           </div>
         )}
 
@@ -286,8 +336,22 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <p className="text-gray-500">
+                        {users.length === 0 
+                          ? 'Nenhum usuário encontrado. Clique em "Novo Usuário" para criar um.' 
+                          : 'Nenhum usuário corresponde aos filtros aplicados.'}
+                      </p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        Total de usuários no sistema: {users.length}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{user.name}</div>
@@ -348,16 +412,11 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Nenhum usuário encontrado</p>
-            </div>
-          )}
         </div>
 
         {/* Create User Modal */}

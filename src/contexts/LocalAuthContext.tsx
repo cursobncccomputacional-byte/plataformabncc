@@ -366,23 +366,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Verificar se foi criado com sucesso
       // A API retorna 'user' (singular) quando bem-sucedida
       if (!apiResponse.error) {
-        // Se tem user (singular), sucesso
-        if (apiResponse.user) {
-          console.log('LocalAuthContext: Usuário criado com sucesso na API (user encontrado)');
+        // CRITÉRIO PRINCIPAL: Deve ter o campo 'user' com dados válidos
+        if (apiResponse.user && apiResponse.user.id) {
+          console.log('LocalAuthContext: Usuário criado com sucesso na API');
+          console.log('LocalAuthContext: Dados do usuário criado:', apiResponse.user);
           return { error: null };
         }
         
-        // Se tem message de sucesso, considerar sucesso mesmo sem user (pode ser que a API não retorne user)
+        // Se não tem user, mas tem mensagem de sucesso, ainda assim considerar erro
+        // porque a API sempre retorna 'user' quando bem-sucedida
         if (apiResponse.message && (apiResponse.message.includes('sucesso') || apiResponse.message.includes('criado'))) {
-          console.log('LocalAuthContext: Usuário criado (mensagem de sucesso detectada)');
-          return { error: null };
+          console.warn('LocalAuthContext: AVISO - Mensagem de sucesso mas sem campo user!');
+          console.warn('LocalAuthContext: Resposta completa:', apiResponse);
+          return { 
+            error: new Error('Usuário aparentemente criado, mas dados não retornados. Verifique se foi realmente inserido no banco.') 
+          };
         }
         
-        // Se não tem erro e não tem mensagem de erro, considerar sucesso
-        if (!apiResponse.message || (!apiResponse.message.toLowerCase().includes('erro') && !apiResponse.message.toLowerCase().includes('error'))) {
-          console.log('LocalAuthContext: Considerando sucesso (sem erro e sem mensagem de erro)');
-          return { error: null };
-        }
+        // Se não tem erro mas também não tem user nem mensagem clara, considerar erro
+        console.error('LocalAuthContext: ERRO - Resposta sem erro mas também sem dados do usuário!');
+        console.error('LocalAuthContext: Resposta completa:', apiResponse);
+        return { 
+          error: new Error('Resposta da API incompleta. Usuário pode não ter sido criado.') 
+        };
       }
       
       // Se chegou aqui, houve erro
@@ -424,10 +430,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error('Você não pode deletar sua própria conta') };
     }
 
-    // TODO: Implementar endpoint DELETE /api/users/:id na API PHP
-    return { 
-      error: new Error('Funcionalidade de deletar usuário via API ainda não implementada. Endpoint necessário: DELETE /api/users/:id') 
-    };
+    try {
+      const apiResponse = await apiService.deleteUser(userId);
+      
+      if (!apiResponse.error) {
+        return { error: null };
+      }
+      
+      return { 
+        error: new Error(apiResponse.message || 'Erro ao deletar usuário') 
+      };
+    } catch (error) {
+      return { 
+        error: new Error(error instanceof Error ? error.message : 'Erro ao deletar usuário') 
+      };
+    }
   };
 
   const toggleUserStatus = async (userId: string) => {

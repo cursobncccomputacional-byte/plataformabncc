@@ -1,0 +1,116 @@
+[
+  {
+    "type": "folder",
+    "path": "auth",
+    "name": "auth",
+    "size": "-",
+    "modified": "2026-01-15 10:14:15",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "config",
+    "name": "config",
+    "size": "-",
+    "modified": "2026-01-15 10:13:56",
+    "permissions": "666"
+  },
+  {
+    "type": "folder",
+    "path": "users",
+    "name": "users",
+    "size": "-",
+    "modified": "2026-01-15 10:14:22",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": ".htaccess",
+    "name": ".htaccess",
+    "size": "736 Bytes",
+    "sizeBytes": 736,
+    "modified": "2026-01-15 11:45:36",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "auth/login.php",
+    "name": "login.php",
+    "size": "2.77 KB",
+    "sizeBytes": 2836,
+    "modified": "2026-01-15 10:16:36",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "auth/logout.php",
+    "name": "logout.php",
+    "size": "476 Bytes",
+    "sizeBytes": 476,
+    "modified": "2026-01-15 10:14:51",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "auth/me.php",
+    "name": "me.php",
+    "size": "468 Bytes",
+    "sizeBytes": 468,
+    "modified": "2026-01-15 10:14:51",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "config/auth.php",
+    "name": "auth.php",
+    "size": "3.15 KB",
+    "sizeBytes": 3222,
+    "modified": "2026-01-15 10:16:36",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "config/cors.php",
+    "name": "cors.php",
+    "size": "969 Bytes",
+    "sizeBytes": 969,
+    "modified": "2026-01-15 10:36:24",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "config/database.php",
+    "name": "database.php",
+    "size": "1.03 KB",
+    "sizeBytes": 1055,
+    "modified": "2026-01-15 10:18:41",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "README.md",
+    "name": "README.md",
+    "size": "2.42 KB",
+    "sizeBytes": 2481,
+    "modified": "2026-01-15 10:19:50",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "test.php",
+    "name": "test.php",
+    "size": "976 Bytes",
+    "sizeBytes": 976,
+    "modified": "2026-01-15 11:48:07",
+    "permissions": "666"
+  },
+  {
+    "type": "file",
+    "path": "users/index.php",
+    "name": "index.php",
+    "size": "1.72 KB",
+    "sizeBytes": 1761,
+    "modified": "2026-01-15 10:16:36",
+    "permissions": "666"
+  }
+]

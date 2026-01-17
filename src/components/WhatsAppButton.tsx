@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { MessageCircle } from 'lucide-react';
 
 export const WhatsAppButton = () => {
-  const phoneNumber = '5531971381729'; // Número sem formatação
+  const phoneNumber = '553197870751'; // Número sem formatação (+55 31 9787-0751)
   const message = encodeURIComponent('Olá, vim pelo site! Gostaria de saber mais informações sobre os produtos');
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 
