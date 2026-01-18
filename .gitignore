@@ -12,6 +12,7 @@ api/config/database.php
 # Sistema operacional
 .DS_Store
 Thumbs.db
+~$*.xlsx
 
 # IDE
 .vscode/

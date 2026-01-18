@@ -1,0 +1,5 @@
+# Permitir acesso ao endpoint de atividades
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/activities/
+</IfModule>

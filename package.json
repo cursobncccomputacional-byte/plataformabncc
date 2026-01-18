@@ -6,15 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-atividades-xlsx.js",
+    "validate-xlsx": "node scripts/validate-atividades-xlsx.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "list-files": "node scripts/listar-arquivos.js"
+    "list-files": "node scripts/listar-arquivos.js",
+    "sync-activities": "node scripts/sync-activities-to-db.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.344.0",
+    "mysql2": "^3.16.0",
     "pdfjs-dist": "^4.7.76",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

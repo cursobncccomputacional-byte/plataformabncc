@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Play, Clock, BookOpen } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { Activity } from '../types/bncc';
+import { resolvePublicAssetUrl } from '../utils/assetUrl';
 
 const svgPlaceholderDataUri = (title: string) => {
   const safe = (title || 'Vídeo Aula').slice(0, 40);
@@ -123,20 +124,25 @@ export const VideoCourses = () => {
             Nenhuma vídeo aula cadastrada ainda.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredVideos.map((video, index) => (
             <motion.div
               key={video.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+              transition={{ delay: Math.min(index * 0.05, 0.5) }}
+              className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-100 group cursor-pointer"
+              onClick={() => {
+                if (!video.video_url) return;
+                setSelectedVideo({ url: video.video_url, title: video.title });
+                if (user) updateUserProgress(user.id, video.id, false);
+              }}
             >
               <div className="relative">
                 <img
-                  src={video.thumbnail_url || svgPlaceholderDataUri(video.title)}
+                  src={resolvePublicAssetUrl(video.thumbnail_url) || svgPlaceholderDataUri(video.title)}
                   alt={video.title}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300"
                   loading="lazy"
                   decoding="async"
                   onError={(e) => {
@@ -144,57 +150,56 @@ export const VideoCourses = () => {
                     target.src = svgPlaceholderDataUri(video.title);
                   }}
                 />
-                {/* Anos escolares sobre a miniatura */}
-                <div className="absolute bottom-3 left-3 right-3 flex gap-1 flex-wrap">
-                  {video.schoolYears.map((yearId) => (
-                    <span
-                      key={yearId}
-                      className="bg-white/90 text-gray-800 border border-gray-200 px-2 py-0.5 rounded text-[11px] font-medium shadow-sm"
-                    >
-                      {getYearName(yearId)}
-                    </span>
-                  ))}
-                </div>
-                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
-                  <div className="opacity-0 hover:opacity-100 transition-opacity duration-300">
-                    <Play className="w-12 h-12 text-white" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform scale-90 group-hover:scale-100">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                      <Play className="w-8 h-8 text-white fill-white" />
+                    </div>
                   </div>
                 </div>
-                <div className="absolute bottom-3 right-3">
-                  <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
+                
+                {/* Duração no canto superior direito */}
+                <div className="absolute top-2 right-2">
+                  <div className="bg-black/75 backdrop-blur-sm text-white px-2 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     <span>{formatDuration(video.duration)}</span>
                   </div>
                 </div>
+                
+                {/* Anos escolares compactos no rodapé */}
+                {video.schoolYears.length > 0 && (
+                  <div className="absolute bottom-2 left-2 right-2 flex gap-1 flex-wrap">
+                    {video.schoolYears.slice(0, 2).map((yearId) => (
+                      <span
+                        key={yearId}
+                        className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      >
+                        {getYearName(yearId)}
+                      </span>
+                    ))}
+                    {video.schoolYears.length > 2 && (
+                      <span className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
+                        +{video.schoolYears.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <BookOpen className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-500">
-                    {video.schoolYears.map(getYearName).join(', ')}
-                  </span>
-                </div>
-                <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">
+                <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 text-sm leading-tight">
                   {video.title}
                 </h3>
-                <p className="text-sm text-gray-600 line-clamp-2">
-                  {video.description}
-                </p>
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => {
-                      if (!video.video_url) return;
-                      setSelectedVideo({ url: video.video_url, title: video.title });
-                      if (user) updateUserProgress(user.id, video.id, false);
-                    }}
-                    className="flex-1 bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors text-sm"
-                  >
-                    Assistir
-                  </button>
-                  <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    Favoritar
-                  </button>
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!video.video_url) return;
+                    setSelectedVideo({ url: video.video_url, title: video.title });
+                    if (user) updateUserProgress(user.id, video.id, false);
+                  }}
+                  className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium mt-2"
+                >
+                  Assistir Aula
+                </button>
               </div>
             </motion.div>
             ))}

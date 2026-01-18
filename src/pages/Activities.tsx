@@ -6,6 +6,7 @@ import { Activity, SchoolYear, BNCCAxis } from '../types/bncc';
 import { SecurePDFViewer } from '../components/SecurePDFViewer';
 import { activityLogger } from '../services/ActivityLogger';
 import { ActivityDuration } from '../components/ActivityDuration';
+import { resolvePublicAssetUrl } from '../utils/assetUrl';
 
 const typeIcons = {
   plugada: Monitor,
@@ -94,9 +95,11 @@ export const Activities = () => {
   }
 
   if (selectedAxis !== 'all') {
-    filteredActivities = filteredActivities.filter(activity => 
-      activity.axisId === selectedAxis
-    );
+    filteredActivities = filteredActivities.filter(activity => {
+      // Suportar tanto axisId (legado) quanto axisIds (novo)
+      const axisIds = activity.axisIds || (activity.axisId ? [activity.axisId] : []);
+      return axisIds.includes(selectedAxis);
+    });
   }
 
   if (searchTerm) {
@@ -331,7 +334,7 @@ export const Activities = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-4">Todas as Atividades</h2>
         </motion.div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredActivities.map((activity, index) => {
             const TypeIcon = typeIcons[activity.type];
             return (
@@ -339,14 +342,14 @@ export const Activities = () => {
                 key={activity.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                transition={{ delay: Math.min(index * 0.05, 0.5) }}
+                className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-100 group"
               >
                 <div className="relative">
                   <img
-                    src={activity.thumbnail_url || svgPlaceholderDataUri(activity.title)}
+                    src={resolvePublicAssetUrl(activity.thumbnail_url) || svgPlaceholderDataUri(activity.title)}
                     alt={activity.title}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
@@ -354,140 +357,106 @@ export const Activities = () => {
                       target.src = svgPlaceholderDataUri(activity.title);
                     }}
                   />
-                  {/* Anos escolares sobre a miniatura */}
-                  <div className="absolute bottom-3 left-3 right-3 flex gap-1 flex-wrap">
-                    {activity.schoolYears.map((yearId) => (
-                      <span
-                        key={yearId}
-                        className="bg-white/90 text-gray-800 border border-gray-200 px-2 py-0.5 rounded text-[11px] font-medium shadow-sm"
-                      >
-                        {getYearName(yearId)}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="absolute top-3 left-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeColors[activity.type]}`}>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  
+                  {/* Badges compactos no topo */}
+                  <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-1">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold backdrop-blur-sm ${typeColors[activity.type]} border border-white/20`}>
                       {typeLabels[activity.type]}
                     </span>
-                  </div>
-                  <div className="absolute top-3 right-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${difficultyColors[activity.difficulty]}`}>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold backdrop-blur-sm ${difficultyColors[activity.difficulty]} border border-white/20`}>
                       {difficultyLabels[activity.difficulty]}
                     </span>
                   </div>
+                  
+                  {/* Anos escolares compactos no rodapé da imagem */}
+                  {activity.schoolYears.length > 0 && (
+                    <div className="absolute bottom-2 left-2 right-2 flex gap-1 flex-wrap">
+                      {activity.schoolYears.slice(0, 2).map((yearId) => (
+                        <span
+                          key={yearId}
+                          className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium"
+                        >
+                          {getYearName(yearId)}
+                        </span>
+                      ))}
+                      {activity.schoolYears.length > 2 && (
+                        <span className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
+                          +{activity.schoolYears.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    {(() => {
-                      const AxisIcon = getAxisIcon(activity.axisId);
-                      return <AxisIcon className="w-4 h-4 text-gray-500" />;
-                    })()}
-                    <span className="text-sm text-gray-500">
-                      {getAxisName(activity.axisId)}
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 text-sm leading-tight">
+                    {activity.title}
+                  </h3>
+                  
+                  {/* Duração e eixo em linha compacta */}
+                  <div className="flex items-center gap-2 mb-3 text-xs text-gray-500">
+                    <ActivityDuration
+                      videoUrl={activity.video_url}
+                      fallbackMinutes={activity.duration}
+                      className="text-xs"
+                    />
+                    <span>•</span>
+                    <span className="truncate">
+                      {(activity.axisIds || (activity.axisId ? [activity.axisId] : []))
+                        .map(id => getAxisName(id))
+                        .join(', ')}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {activity.title}
-                  </h3>
-
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {activity.description}
-                  </p>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">Anos:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {activity.schoolYears.map((yearId) => (
-                          <span
-                            key={yearId}
-                            className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
-                          >
-                            {getYearName(yearId)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">Duração:</span>
-                      <ActivityDuration
-                        videoUrl={activity.video_url}
-                        fallbackMinutes={activity.duration}
-                        className="text-sm text-gray-600"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
+                  {/* Botões de ação compactos */}
+                  <div className="flex gap-1.5">
                     {activity.video_url && (
                       <button 
                         onClick={() => handleViewVideo(activity)}
-                        className="flex-1 text-white px-4 py-2 rounded-lg transition-colors text-sm" 
+                        className="flex-1 text-white px-3 py-1.5 rounded-lg transition-all text-xs font-medium hover:shadow-md" 
                         style={{ backgroundColor: '#005a93' }} 
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#004a7a'} 
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#005a93'}
                       >
-                        Ver Vídeo
+                        Vídeo
                       </button>
                     )}
-                    {(activity.pedagogical_pdf_url || activity.material_pdf_url || activity.document_url) && (
-                      <div className="flex flex-col gap-2 flex-1">
-                        {(activity.pedagogical_pdf_url || activity.document_url) && (
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() =>
-                                handleViewPDF(
-                                  activity,
-                                  activity.pedagogical_pdf_url || activity.document_url || '',
-                                  'Estrutura Pedagógica'
-                                )
-                              }
-                              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1"
-                            >
-                              <Eye className="w-4 h-4" />
-                              Estrutura
-                            </button>
-                            {(user?.role === 'admin' || user?.role === 'professor') && (
-                              <button 
-                                onClick={() =>
-                                  handleDownloadPDF(
-                                    activity,
-                                    activity.pedagogical_pdf_url || activity.document_url || ''
-                                  )
-                                }
-                                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
-                              >
-                                <Download className="w-4 h-4" />
-                                Baixar
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {activity.material_pdf_url && (
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => handleViewPDF(activity, activity.material_pdf_url!, 'Material da Aula')}
-                              className="flex-1 bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors text-sm flex items-center justify-center gap-1"
-                            >
-                              <Eye className="w-4 h-4" />
-                              Material
-                            </button>
-                            {(user?.role === 'admin' || user?.role === 'professor') && (
-                              <button 
-                                onClick={() => handleDownloadPDF(activity, activity.material_pdf_url!)}
-                                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
-                              >
-                                <Download className="w-4 h-4" />
-                                Baixar
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                    {(activity.pedagogical_pdf_url || activity.document_url) && (
+                      <button 
+                        onClick={() =>
+                          handleViewPDF(
+                            activity,
+                            activity.pedagogical_pdf_url || activity.document_url || '',
+                            'Estrutura Pedagógica'
+                          )
+                        }
+                        className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Estrutura
+                      </button>
+                    )}
+                    {activity.material_pdf_url && (
+                      <button 
+                        onClick={() => handleViewPDF(activity, activity.material_pdf_url!, 'Material da Aula')}
+                        className="flex-1 bg-sky-600 text-white px-3 py-1.5 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Material
+                      </button>
+                    )}
+                    {((user?.role === 'admin' || user?.role === 'professor') && (activity.pedagogical_pdf_url || activity.material_pdf_url || activity.document_url)) && (
+                      <button 
+                        onClick={() => {
+                          const url = activity.pedagogical_pdf_url || activity.material_pdf_url || activity.document_url || '';
+                          if (url) handleDownloadPDF(activity, url);
+                        }}
+                        className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center"
+                        title="Baixar"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
                 </div>

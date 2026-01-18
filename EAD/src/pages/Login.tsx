@@ -31,13 +31,25 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#044982] to-[#005a93] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#044982] via-[#005a93] to-[#044982] flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-20 right-20 w-64 h-64 bg-white rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+      </div>
+      
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md"
+        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10"
       >
         <div className="text-center mb-8">
+          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <img 
+              src="/nova-edu-ead-branco.png" 
+              alt="Nova Edu EAD Logo" 
+              className="h-16 w-auto"
+            />
+          </div>
           <h1 className="text-3xl font-bold text-[#044982] mb-2">Nova Edu EAD</h1>
           <p className="text-gray-600">Entre para continuar aprendendo</p>
         </div>

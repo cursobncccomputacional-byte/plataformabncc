@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, BookOpen, Eye } from 'lucide-react';
+import { Download, BookOpen, Eye, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { Activity } from '../types/bncc';
 import { SecurePDFViewer } from '../components/SecurePDFViewer';
 import { activityLogger } from '../services/ActivityLogger';
+import { resolvePublicAssetUrl } from '../utils/assetUrl';
 
 export const Documents = () => {
   const { getActivities, getSchoolYears, user } = useAuth();
@@ -50,6 +51,26 @@ export const Documents = () => {
       // Log do download
       activityLogger.logDownload(user.id, user.name, user.email, 'document', activity.id, activity.title);
     }
+  };
+
+  const svgPlaceholderDataUri = (title: string) => {
+    const safe = (title || 'Documento').slice(0, 40);
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+        <defs>
+          <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stop-color="#DC2626"/>
+            <stop offset="1" stop-color="#EF4444"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="450" fill="url(#g)"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+          font-family="Arial, Helvetica, sans-serif" font-size="42" fill="#ffffff" opacity="0.95">
+          ${safe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+        </text>
+      </svg>
+    `.trim();
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   };
 
   return (
@@ -117,81 +138,96 @@ export const Documents = () => {
             Nenhum documento cadastrado ainda.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredDocuments.map((doc, index) => (
             <motion.div
               key={doc.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+              transition={{ delay: Math.min(index * 0.05, 0.5) }}
+              className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-100 group"
             >
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="text-2xl">📄</span>
+              <div className="relative">
+                <img
+                  src={resolvePublicAssetUrl(doc.thumbnail_url) || svgPlaceholderDataUri(doc.title)}
+                  alt={doc.title}
+                  className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = svgPlaceholderDataUri(doc.title);
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                {/* Badge PDF no topo esquerdo */}
+                <div className="absolute top-2 left-2">
+                  <div className="bg-red-600 backdrop-blur-sm text-white px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border border-white/20 shadow-lg">
+                    <FileText className="w-3 h-3" />
+                    <span>PDF</span>
                   </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BookOpen className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-500">
-                      {doc.schoolYears.map(getYearName).join(', ')}
-                    </span>
+                
+                {/* Anos escolares compactos no rodapé */}
+                {doc.schoolYears.length > 0 && (
+                  <div className="absolute bottom-2 left-2 right-2 flex gap-1 flex-wrap">
+                    {doc.schoolYears.slice(0, 2).map((yearId) => (
+                      <span
+                        key={yearId}
+                        className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      >
+                        {getYearName(yearId)}
+                      </span>
+                    ))}
+                    {doc.schoolYears.length > 2 && (
+                      <span className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
+                        +{doc.schoolYears.length - 2}
+                      </span>
+                    )}
                   </div>
-                  <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">
-                    {doc.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                    {doc.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">PDF</span>
-                    <div className="flex items-center gap-2">
-                      {(doc.pedagogical_pdf_url || doc.document_url) && (
-                        <button
-                          onClick={() =>
-                            handleViewPDF(doc, doc.pedagogical_pdf_url || doc.document_url || '', 'Estrutura Pedagógica')
-                          }
-                          className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Estrutura
-                        </button>
-                      )}
-                      {doc.material_pdf_url && (
-                        <button
-                          onClick={() => handleViewPDF(doc, doc.material_pdf_url!, 'Material da Aula')}
-                          className="flex items-center gap-1 text-sky-600 hover:text-sky-700 text-sm font-medium"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Material
-                        </button>
-                      )}
-                      {(user?.role === 'admin' || user?.role === 'professor') && (
-                        <>
-                          {(doc.pedagogical_pdf_url || doc.document_url) && (
-                            <button
-                              onClick={() => handleDownload(doc, doc.pedagogical_pdf_url || doc.document_url || '')}
-                              className="flex items-center gap-1 text-gray-700 hover:text-gray-900 text-sm font-medium"
-                            >
-                              <Download className="w-4 h-4" />
-                              Baixar Estrutura
-                            </button>
-                          )}
-                          {doc.material_pdf_url && (
-                            <button
-                              onClick={() => handleDownload(doc, doc.material_pdf_url!)}
-                              className="flex items-center gap-1 text-gray-700 hover:text-gray-900 text-sm font-medium"
-                            >
-                              <Download className="w-4 h-4" />
-                              Baixar Material
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
+                )}
+              </div>
+
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 text-sm leading-tight">
+                  {doc.title}
+                </h3>
+                
+                {/* Botões de ação compactos - mostrando todos os ícones disponíveis */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {(doc.pedagogical_pdf_url || doc.document_url) && (
+                    <button
+                      onClick={() =>
+                        handleViewPDF(doc, doc.pedagogical_pdf_url || doc.document_url || '', 'Estrutura Pedagógica')
+                      }
+                      className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 min-w-[80px]"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Estrutura</span>
+                    </button>
+                  )}
+                  {doc.material_pdf_url && (
+                    <button
+                      onClick={() => handleViewPDF(doc, doc.material_pdf_url!, 'Material da Aula')}
+                      className="flex-1 bg-sky-600 text-white px-3 py-1.5 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1 min-w-[80px]"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Material</span>
+                    </button>
+                  )}
+                  {((user?.role === 'admin' || user?.role === 'professor') && (doc.pedagogical_pdf_url || doc.material_pdf_url || doc.document_url)) && (
+                    <button 
+                      onClick={() => {
+                        const url = doc.pedagogical_pdf_url || doc.material_pdf_url || doc.document_url || '';
+                        if (url) handleDownload(doc, url);
+                      }}
+                      className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center"
+                      title="Baixar"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>

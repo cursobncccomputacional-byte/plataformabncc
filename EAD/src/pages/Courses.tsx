@@ -43,14 +43,33 @@ export const Courses = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-[#044982] text-white shadow-lg">
+      <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <Link to="/" className="text-2xl font-bold">Nova Edu EAD</Link>
+          <div className="flex justify-between items-center">
+            <Link to="/" className="flex items-center gap-3">
+              <img 
+                src="/nova-edu-ead.png" 
+                alt="Nova Edu EAD Logo" 
+                className="h-12 w-auto"
+              />
+            </Link>
+            <Link
+              to="/"
+              className="text-[#044982] hover:text-[#005a93] transition font-medium"
+            >
+              Voltar ao Início
+            </Link>
+          </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold mb-8 text-[#044982]">Nossos Cursos</h1>
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold mb-4 text-[#044982]">Nossos Cursos</h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Explore nossa seleção completa de cursos online e transforme sua carreira
+          </p>
+        </div>
 
         {/* Search */}
         <div className="mb-8">

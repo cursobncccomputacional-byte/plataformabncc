@@ -31,24 +31,35 @@ export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-[#044982] text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/" className="text-2xl font-bold">Nova Edu EAD</Link>
-          <div className="flex items-center gap-4">
-            <span>Olá, {user?.name}</span>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 hover:text-gray-300 transition"
-            >
-              <LogOut className="w-4 h-4" />
-              Sair
-            </button>
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <Link to="/" className="flex items-center gap-3">
+              <img 
+                src="/nova-edu-ead.png" 
+                alt="Nova Edu EAD Logo" 
+                className="h-12 w-auto"
+              />
+            </Link>
+            <div className="flex items-center gap-4">
+              <span className="text-gray-700">Olá, <span className="font-semibold text-[#044982]">{user?.name}</span></span>
+              <button
+                onClick={logout}
+                className="flex items-center gap-2 text-gray-700 hover:text-[#044982] transition px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold mb-8 text-[#044982]">Meus Cursos</h1>
+        <div className="mb-12">
+          <h1 className="text-5xl font-bold mb-4 text-[#044982]">Meus Cursos</h1>
+          <p className="text-xl text-gray-600">Continue de onde parou e alcance seus objetivos</p>
+        </div>
 
         {loading ? (
           <div className="text-center py-12">

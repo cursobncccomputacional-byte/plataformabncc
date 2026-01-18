@@ -94,9 +94,23 @@ export const CourseDetail = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-[#044982] text-white shadow-lg">
+      <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <Link to="/cursos" className="text-2xl font-bold">Nova Edu EAD</Link>
+          <div className="flex justify-between items-center">
+            <Link to="/" className="flex items-center gap-3">
+              <img 
+                src="/nova-edu-ead.png" 
+                alt="Nova Edu EAD Logo" 
+                className="h-12 w-auto"
+              />
+            </Link>
+            <Link
+              to="/cursos"
+              className="text-[#044982] hover:text-[#005a93] transition font-medium"
+            >
+              ← Voltar aos Cursos
+            </Link>
+          </div>
         </div>
       </header>
 

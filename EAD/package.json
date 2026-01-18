@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/copy-logo.js",
     "preview": "vite preview",
-    "build:prod": "vite build --mode production"
+    "build:prod": "vite build --mode production && node scripts/copy-logo.js"
   },
   "dependencies": {
     "framer-motion": "^12.23.22",

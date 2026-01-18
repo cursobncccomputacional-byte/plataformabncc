@@ -190,14 +190,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkApiSession();
   }, []);
 
-  // Carregar atividades via planilha XLSX após login
+  // Carregar atividades do banco (com fallback para Excel)
   useEffect(() => {
-    const loadSpreadsheet = async () => {
+    const loadActivities = async () => {
       if (!user) return;
       try {
-        // Preferência: URL configurada. Caso contrário, respeitar BASE_URL do Vite
-        const configuredUrl = import.meta.env.VITE_ACTIVITIES_XLSX_URL as string | undefined;
+        // 1. Tentar carregar do banco de dados primeiro
+        try {
+          const apiResponse = await apiService.getActivities();
+          if (!apiResponse.error && apiResponse.activities && Array.isArray(apiResponse.activities)) {
+            // Converter formato da API para formato Activity
+            const activities: Activity[] = apiResponse.activities.map((a: any) => ({
+              id: a.id,
+              title: a.title,
+              description: a.description || 'Sem descrição',
+              type: a.type,
+              schoolYears: a.schoolYears || [],
+              axisId: a.axisId || '',
+              axisIds: a.axisIds || (a.axisId ? [a.axisId] : []),
+              knowledgeObjectId: a.knowledgeObjectId || '',
+              skillIds: a.skillIds || [],
+              duration: a.duration || 0,
+              difficulty: a.difficulty || 'medio',
+              materials: a.materials || [],
+              objectives: a.objectives || [],
+              thumbnail_url: a.thumbnail_url || '',
+              video_url: a.video_url || undefined,
+              document_url: a.document_url || undefined,
+              pedagogical_pdf_url: a.pedagogical_pdf_url || undefined,
+              material_pdf_url: a.material_pdf_url || undefined,
+              created_at: a.created_at || new Date().toISOString(),
+            }));
+            
+            setSpreadsheetActivities(activities);
+            setActivitiesSpreadsheet({ loaded: true, url: 'database', error: null });
+            return; // Sucesso ao carregar do banco
+          }
+        } catch (dbError) {
+          console.warn('Erro ao carregar atividades do banco, tentando Excel...', dbError);
+        }
 
+        // 2. Fallback: carregar do Excel
+        const configuredUrl = import.meta.env.VITE_ACTIVITIES_XLSX_URL as string | undefined;
         const candidates = configuredUrl
           ? [configuredUrl]
           : [
@@ -223,11 +257,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setActivitiesSpreadsheet({ loaded: false, url: candidates[0] ?? null, error: msg });
       } catch (e) {
         setSpreadsheetActivities([]);
-        const msg = e instanceof Error ? e.message : 'Erro desconhecido ao carregar XLSX';
+        const msg = e instanceof Error ? e.message : 'Erro desconhecido ao carregar atividades';
         setActivitiesSpreadsheet({ loaded: false, url: null, error: msg });
       }
     };
-    loadSpreadsheet();
+    loadActivities();
   }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
@@ -582,7 +616,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const getActivitiesByAxis = (axisId: string) => {
     const list = spreadsheetActivities.length > 0 ? spreadsheetActivities : activities;
-    return list.filter(activity => activity.axisId === axisId);
+    return list.filter(activity => {
+      // Suportar tanto axisId (legado) quanto axisIds (novo)
+      const axisIds = activity.axisIds || (activity.axisId ? [activity.axisId] : []);
+      return axisIds.includes(axisId);
+    });
   };
 
   const getVideoCoursesByYear = (yearId: string) => {

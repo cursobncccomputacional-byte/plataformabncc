@@ -47,9 +47,25 @@ export const Header = ({ onLoginClick, onNavigateToAbout }: HeaderProps) => {
             {[
               { id: 'inicio', label: 'Início', isLink: false },
               { id: 'cursos', label: 'Cursos', isLink: false },
-              { id: 'sobre', label: 'Sobre', isLink: true }
+              { id: 'sobre', label: 'Sobre', isLink: true },
+              { id: 'formacao', label: 'Formação Continuada', isExternal: true, url: 'https://ead.novaedubncc.com.br' }
             ].map((item, index) => (
-              item.isLink ? (
+              item.isExternal ? (
+                <motion.a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-700 hover:text-blue-600 transition-colors font-medium relative group"
+                  whileHover={{ y: -2 }}
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  {item.label}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-blue-400 group-hover:w-full transition-all duration-300"></span>
+                </motion.a>
+              ) : item.isLink ? (
                 <motion.button
                   key={item.id}
                   onClick={onNavigateToAbout}
@@ -118,9 +134,21 @@ export const Header = ({ onLoginClick, onNavigateToAbout }: HeaderProps) => {
             {[
               { id: 'inicio', label: 'Início', isLink: false },
               { id: 'cursos', label: 'Cursos', isLink: false },
-              { id: 'sobre', label: 'Sobre', isLink: true }
+              { id: 'sobre', label: 'Sobre', isLink: true },
+              { id: 'formacao', label: 'Formação Continuada', isExternal: true, url: 'https://ead.novaedubncc.com.br' }
             ].map((item) => (
-              item.isLink ? (
+              item.isExternal ? (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block w-full text-left text-gray-700 hover:text-blue-600 transition-colors font-medium py-2"
+                >
+                  {item.label}
+                </a>
+              ) : item.isLink ? (
                 <button
                   key={item.id}
                   onClick={onNavigateToAbout}

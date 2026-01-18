@@ -205,6 +205,13 @@ class ApiService {
   }
 
   /**
+   * Buscar atividades do banco de dados
+   */
+  async getActivities(): Promise<ApiResponse> {
+    return this.request('/activities/index.php');
+  }
+
+  /**
    * Verificar se a API está disponível
    * Usa o endpoint /auth/me para verificar se a API está respondendo
    */

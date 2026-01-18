@@ -1,5 +1,5 @@
 import { useAuth } from '../contexts/LocalAuthContext';
-import { LogOut, User, Shield, GraduationCap } from 'lucide-react';
+import { LogOut, User, Shield, GraduationCap, BookOpen } from 'lucide-react';
 
 export const DashboardHeader = () => {
   const { user, signOut } = useAuth();
@@ -34,7 +34,18 @@ export const DashboardHeader = () => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-end items-center h-16">
+        <div className="flex justify-between items-center h-16">
+          {/* Formação Continuada Link */}
+          <a
+            href="https://ead.novaedubncc.com.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-[#044982] hover:text-[#005a93] transition-colors font-medium"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Formação Continuada</span>
+          </a>
+
           {/* User Info */}
           <div className="flex items-center space-x-4">
             <div className="text-right">

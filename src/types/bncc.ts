@@ -37,7 +37,8 @@ export interface Activity {
   description: string;
   type: 'plugada' | 'desplugada';
   schoolYears: string[];
-  axisId: string;
+  axisId: string; // Mantido para compatibilidade, mas deprecated - usar axisIds
+  axisIds: string[]; // Múltiplos eixos suportados
   knowledgeObjectId: string;
   skillIds: string[];
   duration: number; // em minutos
