@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Mail, Lock, ArrowLeft } from 'lucide-react';
+import { BookOpen, Mail, Lock, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
+import { apiService } from '../services/apiService';
 
 interface LoginProps {
   onBack: () => void;
@@ -16,8 +17,37 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showClearCache, setShowClearCache] = useState(false);
 
   const { signIn, signUp } = useAuth();
+
+  // Limpar cache/sessões antigas ao montar o componente
+  useEffect(() => {
+    // Verificar se há dados antigos que podem causar problemas
+    const hasOldData = localStorage.getItem('api_authenticated') || 
+                      localStorage.getItem('api_session_id') ||
+                      localStorage.getItem('plataforma-bncc-user');
+    
+    if (hasOldData) {
+      // Não limpar automaticamente, mas mostrar opção se houver erro
+      console.info('ℹ️ Dados de sessão antigos detectados. Se houver problemas, use o botão "Limpar Cache"');
+    }
+  }, []);
+
+  const handleClearCache = () => {
+    try {
+      // Limpar todas as sessões e cache
+      apiService.clearAllSessions();
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Recarregar a página para garantir limpeza completa
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro ao limpar cache:', error);
+      setError('Erro ao limpar cache. Tente fechar e abrir o navegador.');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +55,31 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
     setLoading(true);
 
     if (isLogin) {
+      // Resetar flag de mostrar botão de limpar cache
+      setShowClearCache(false);
+      
       const { error } = await signIn(email, password);
       if (error) {
-        setError(error.message);
+        // A mensagem de erro já vem melhorada do apiService
+        // Adicionar informações adicionais se necessário
+        let errorMessage = error.message;
+        
+        // Se for erro de rede, adicionar dicas de solução
+        if (error.message.includes('conectar') || 
+            error.message.includes('Failed to fetch') || 
+            error.message.includes('NetworkError')) {
+          errorMessage += '\n\n💡 Dicas:';
+          errorMessage += '\n• Se funcionou na guia anônima, tente limpar o cache do navegador';
+          errorMessage += '\n• Verifique se está conectado à internet';
+          errorMessage += '\n• Tente desativar VPN ou proxy temporariamente';
+          errorMessage += '\n• Verifique se o firewall não está bloqueando';
+          errorMessage += '\n• Se estiver em rede corporativa, entre em contato com o suporte de TI';
+          
+          // Mostrar botão para limpar cache
+          setShowClearCache(true);
+        }
+        
+        setError(errorMessage);
         setLoading(false);
       } else {
         onSuccess();
@@ -168,7 +220,16 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
             <div className={`p-3 rounded-lg text-sm ${
               error.includes('criada') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
             }`}>
-              {error}
+              <div className="whitespace-pre-line">{error}</div>
+              {showClearCache && (
+                <button
+                  onClick={handleClearCache}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Limpar Cache e Recarregar
+                </button>
+              )}
             </div>
           )}
 

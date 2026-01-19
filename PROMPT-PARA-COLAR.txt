@@ -1,0 +1,35 @@
+Preciso coletar informações sobre a configuração da API e requisições HTTP desta aplicação para comparar com outra aplicação que está tendo problemas de acesso.
+
+Por favor, me forneça as seguintes informações:
+
+1. **Configuração da API:**
+   - Qual é a URL base da API? (ex: https://exemplo.com/api)
+   - Onde está configurada? (arquivo .env, código, etc.)
+   - A API é própria ou externa? (Google Drive, etc.)
+
+2. **Como as requisições são feitas:**
+   - Mostre o código do serviço/arquivo que faz requisições HTTP
+   - Quais headers são enviados? (Content-Type, Authorization, etc.)
+   - Usa `credentials: 'include'` ou `credentials: 'same-origin'`?
+   - Usa fetch, axios, ou outra biblioteca?
+
+3. **Configuração de CORS (se API própria):**
+   - Mostre o arquivo de configuração CORS (se houver)
+   - Quais origens estão permitidas?
+   - Usa `Access-Control-Allow-Credentials: true`?
+   - Permite headers customizados?
+
+4. **Método de Autenticação:**
+   - Como a autenticação funciona? (cookies, tokens, etc.)
+   - Onde o token/sessão é armazenado? (localStorage, cookies, etc.)
+   - Como é enviado nas requisições? (header, cookie, etc.)
+
+5. **Estrutura de Pastas:**
+   - Onde está a API? (mesma pasta do frontend, pasta separada, etc.)
+   - Há arquivo .htaccess? Onde está e qual é o conteúdo?
+
+6. **Exemplo de Requisição:**
+   - Mostre um exemplo completo de uma requisição de login ou autenticação
+   - Inclua: URL, método, headers, body, etc.
+
+Por favor, mostre os arquivos relevantes e código específico.
