@@ -1,0 +1,18 @@
+<?php
+/**
+ * Configuração do Banco de Dados EAD
+ * Copie este arquivo para config-database-ead.php e preencha com suas credenciais
+ */
+
+return [
+    'host' => 'srv1311.hstgr.io',
+    'database' => 'u985723830_ead', // Banco separado para EAD
+    'username' => 'u985723830_ead_root',
+    'password' => 'SUA_SENHA_AQUI',
+    'charset' => 'utf8mb4',
+    'options' => [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ],
+];

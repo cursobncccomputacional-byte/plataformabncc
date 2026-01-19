@@ -1,0 +1,90 @@
+═══════════════════════════════════════════════════════════════
+  CHECKLIST: Upload para cursos.novaedubncc.com.br
+═══════════════════════════════════════════════════════════════
+
+📁 DESTINO NO SERVIDOR:
+   /home/u985723830/domains/novaedubncc.com.br/public_html/cursos/
+
+═══════════════════════════════════════════════════════════════
+  ARQUIVOS PARA UPLOAD
+═══════════════════════════════════════════════════════════════
+
+✅ 1. .htaccess
+   📍 Local: cursos/.htaccess
+   📍 Servidor: public_html/cursos/.htaccess
+
+✅ 2. index.html
+   📍 Local: dist/index.html
+   📍 Servidor: public_html/cursos/index.html
+
+✅ 3. Pasta assets/ (COMPLETA)
+   📍 Local: dist/assets/ (todos os arquivos)
+   📍 Servidor: public_html/cursos/assets/
+   
+   Arquivos dentro de assets/:
+   - __vite-browser-external-BIHI7g3E.js
+   - index-BVAT3pY0.css
+   - index-BZYP33x_.js
+   - pdf.worker-DHaD_gt7.mjs
+
+✅ 4. Outros arquivos e pastas (opcional, mas recomendado):
+   📍 Local: dist/ (todos os outros arquivos/pastas)
+   📍 Servidor: public_html/cursos/
+   
+   Inclui:
+   - atividades.xlsx
+   - favicon.png
+   - favicon-ead.png
+   - images/
+   - logo/
+   - pdf/
+   - thumb/
+   - nova-edu-ead-branco.png
+   - nova-edu-ead.png
+   - video-ead-hero.mp4
+
+═══════════════════════════════════════════════════════════════
+  ESTRUTURA FINAL NO SERVIDOR
+═══════════════════════════════════════════════════════════════
+
+public_html/cursos/
+├── .htaccess
+├── index.html
+├── assets/
+│   ├── __vite-browser-external-BIHI7g3E.js
+│   ├── index-BVAT3pY0.css
+│   ├── index-BZYP33x_.js
+│   └── pdf.worker-DHaD_gt7.mjs
+├── atividades.xlsx
+├── favicon.png
+├── favicon-ead.png
+├── images/
+├── logo/
+├── pdf/
+├── thumb/
+├── nova-edu-ead-branco.png
+├── nova-edu-ead.png
+└── video-ead-hero.mp4
+
+═══════════════════════════════════════════════════════════════
+  PERMISSÕES
+═══════════════════════════════════════════════════════════════
+
+📁 Pastas: 755 (drwxr-xr-x)
+📄 Arquivos: 644 (-rw-r--r--)
+
+═══════════════════════════════════════════════════════════════
+  TESTES APÓS UPLOAD
+═══════════════════════════════════════════════════════════════
+
+1. ✅ Acessar: https://cursos.novaedubncc.com.br
+   → Deve carregar a página normalmente
+
+2. ✅ Testar API: https://cursos.novaedubncc.com.br/api/auth.php?action=login
+   → Deve retornar erro 405 (método não permitido) = API acessível ✅
+
+3. ✅ Testar Login:
+   → Fazer login normalmente
+   → Deve funcionar ✅
+
+═══════════════════════════════════════════════════════════════

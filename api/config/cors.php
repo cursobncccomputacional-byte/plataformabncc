@@ -6,8 +6,9 @@
 
 // Lista de origens conhecidas e confiáveis
 $knownOrigins = [
-    'https://novaedubncc.com.br',
-    'https://www.novaedubncc.com.br',
+    'https://cursos.novaedubncc.com.br',  // Novo subdomínio principal
+    'https://novaedubncc.com.br',         // Mantido para compatibilidade durante migração
+    'https://www.novaedubncc.com.br',     // Mantido para compatibilidade
     'http://localhost:3000',
     'http://localhost:5173',
     'http://127.0.0.1:3000',

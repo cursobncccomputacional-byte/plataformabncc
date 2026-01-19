@@ -48,7 +48,7 @@ export const Header = ({ onLoginClick, onNavigateToAbout }: HeaderProps) => {
               { id: 'inicio', label: 'Início', isLink: false },
               { id: 'cursos', label: 'Cursos', isLink: false },
               { id: 'sobre', label: 'Sobre', isLink: true },
-              { id: 'formacao', label: 'Formação Continuada', isExternal: true, url: 'https://ead.novaedubncc.com.br' }
+              { id: 'formacao', label: 'Formação Continuada', isExternal: true, url: 'https://cursos.novaedubncc.com.br' }
             ].map((item, index) => (
               item.isExternal ? (
                 <motion.a
@@ -135,7 +135,7 @@ export const Header = ({ onLoginClick, onNavigateToAbout }: HeaderProps) => {
               { id: 'inicio', label: 'Início', isLink: false },
               { id: 'cursos', label: 'Cursos', isLink: false },
               { id: 'sobre', label: 'Sobre', isLink: true },
-              { id: 'formacao', label: 'Formação Continuada', isExternal: true, url: 'https://ead.novaedubncc.com.br' }
+              { id: 'formacao', label: 'Formação Continuada', isExternal: true, url: 'https://cursos.novaedubncc.com.br' }
             ].map((item) => (
               item.isExternal ? (
                 <a
