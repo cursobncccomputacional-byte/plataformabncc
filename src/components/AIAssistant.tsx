@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { activityLogger } from '../services/ActivityLogger';
-// import { groqService } from '../services/groqService'; // Desabilitado - usando apenas respostas pré-definidas
+import { apiService } from '../services/apiService';
 import { renderMarkdown } from '../utils/markdownRenderer';
 import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 
@@ -45,7 +45,7 @@ export const AIAssistant = ({ isOpen, onClose }: AIAssistantProps) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [apiError, setApiError] = useState(false);
-  const [usingAI, setUsingAI] = useState(false);
+  const [usingAI, setUsingAI] = useState(true); // Agora usando Groq
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -56,10 +56,10 @@ export const AIAssistant = ({ isOpen, onClose }: AIAssistantProps) => {
     scrollToBottom();
   }, [messages]);
 
-  // Usando apenas respostas pré-definidas por enquanto
+  // Usando Groq para respostas inteligentes
   useEffect(() => {
-    setIsOnline(false);
-    setUsingAI(false);
+    setIsOnline(true);
+    setUsingAI(true);
   }, []);
 
   const generateResponse = (userMessage: string): string => {
@@ -175,23 +175,74 @@ export const AIAssistant = ({ isOpen, onClose }: AIAssistantProps) => {
     setInputValue('');
     setIsTyping(true);
     setApiError(false);
-    setUsingAI(false); // Usando respostas locais
-    setIsOnline(false); // Modo offline com respostas pré-definidas
+    setUsingAI(true);
+    setIsOnline(true);
 
-    // Simular delay de resposta para melhor UX
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      // Verificar se é uma pergunta sobre sugestão de atividades do dia
+      const isActivitySuggestion = messageContent.toLowerCase().includes('atividade') && 
+                                   (messageContent.toLowerCase().includes('hoje') || 
+                                    messageContent.toLowerCase().includes('sugerir') ||
+                                    messageContent.toLowerCase().includes('sugestão') ||
+                                    messageContent.toLowerCase().includes('dia'));
 
-    // Usar apenas respostas pré-definidas
-    const response = generateResponse(messageContent);
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      type: 'assistant',
-      content: response,
-      timestamp: new Date()
-    };
+      let response: string;
+      
+      if (isActivitySuggestion) {
+        // Usar Groq para sugestões de atividades
+        const prompt = `Como assistente educacional especializado em BNCC e pensamento computacional, sugira atividades práticas para o professor aplicar hoje em sala de aula. ${messageContent}. Forneça sugestões detalhadas, práticas e alinhadas à BNCC.`;
+        
+        const aiResponse = await apiService.suggestActivitiesFromAI(prompt);
+        
+        if (aiResponse.error) {
+          // Fallback para resposta pré-definida se houver erro
+          response = generateResponse(messageContent);
+          setApiError(true);
+        } else {
+          response = aiResponse.suggestions || generateResponse(messageContent);
+        }
+      } else {
+        // Para outras perguntas, tentar usar Groq primeiro
+        const prompt = `Você é um assistente educacional especializado em BNCC e pensamento computacional. Responda de forma clara, prática e objetiva. ${messageContent}`;
+        
+        try {
+          const aiResponse = await apiService.suggestActivitiesFromAI(prompt);
+          
+          if (aiResponse.error || !aiResponse.suggestions) {
+            // Fallback para resposta pré-definida
+            response = generateResponse(messageContent);
+          } else {
+            response = aiResponse.suggestions;
+          }
+        } catch (error) {
+          // Fallback para resposta pré-definida em caso de erro
+          response = generateResponse(messageContent);
+          setApiError(true);
+        }
+      }
 
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsTyping(false);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: response,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      // Em caso de erro, usar resposta pré-definida
+      const response = generateResponse(messageContent);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: response,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      setApiError(true);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const clearConversation = () => {
@@ -391,7 +442,11 @@ export const AIAssistant = ({ isOpen, onClose }: AIAssistantProps) => {
                         await new Promise(resolve => setTimeout(resolve, 500));
 
                         // Usar apenas respostas pré-definidas
-                        const response = generateResponse(action.action);
+                        // Enviar ação como mensagem normal (será processada pelo handleSendMessage)
+                        setInputValue(action.action);
+                        setTimeout(() => {
+                          handleSendMessage();
+                        }, 100);
                         const assistantMessage: Message = {
                           id: (Date.now() + 1).toString(),
                           type: 'assistant',

@@ -1,3 +1,4 @@
+
 ## Resumo — Configuração de API e Requisições HTTP (LandingGrupoRaca)
 
 Este documento consolida onde a aplicação configura a API, como faz requisições HTTP, detalhes de CORS e autenticação, e exemplos de chamadas para comparação com outro projeto.

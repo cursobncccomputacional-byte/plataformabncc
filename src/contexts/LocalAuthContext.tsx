@@ -153,6 +153,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               created_at: apiResponse.user.created_at,
               last_login: apiResponse.user.last_login || new Date().toISOString(),
               is_active: apiResponse.user.is_active ?? true,
+              can_manage_activities: apiResponse.user.can_manage_activities ?? false,
+              can_manage_courses: apiResponse.user.can_manage_courses ?? false,
               bio: `Usuário ${apiResponse.user.role}`,
               updated_at: new Date().toISOString(),
             };
@@ -176,6 +178,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const savedUser = localStorage.getItem('plataforma-bncc-user');
       if (savedUser) {
         const userData = JSON.parse(savedUser);
+        
+        // Sempre tentar atualizar os dados do usuário da API para garantir permissões atualizadas
+        try {
+          const apiResponse = await apiService.getCurrentUser();
+          if (!apiResponse.error && apiResponse.user) {
+            // Atualizar com dados mais recentes da API (incluindo permissões)
+            const updatedUserData: Profile = {
+              ...userData,
+              id: apiResponse.user.id,
+              name: apiResponse.user.name,
+              email: apiResponse.user.email,
+              role: apiResponse.user.role,
+              school: apiResponse.user.school || userData.school || '',
+              subjects: apiResponse.user.subjects || userData.subjects || [],
+              created_at: apiResponse.user.created_at || userData.created_at,
+              last_login: apiResponse.user.last_login || userData.last_login || new Date().toISOString(),
+              is_active: apiResponse.user.is_active ?? userData.is_active ?? true,
+              can_manage_activities: apiResponse.user.can_manage_activities ?? false,
+              can_manage_courses: apiResponse.user.can_manage_courses ?? false,
+              bio: userData.bio || `Usuário ${apiResponse.user.role}`,
+              updated_at: new Date().toISOString(),
+            };
+            
+            setUser(updatedUserData);
+            setProfile(updatedUserData);
+            setSession({ user: updatedUserData });
+            localStorage.setItem('plataforma-bncc-user', JSON.stringify(updatedUserData));
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.warn('Erro ao atualizar dados do usuário da API:', error);
+          // Se falhar, usar dados do localStorage mesmo assim
+        }
+        
+        // Se a API falhar, usar dados do localStorage
         setUser(userData);
         setProfile(userData);
         setSession({ user: userData });
@@ -542,10 +580,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error('Você não pode desativar sua própria conta') };
     }
 
-    // TODO: Implementar endpoint PATCH /api/users/:id/toggle-status na API PHP
-    return { 
-      error: new Error('Funcionalidade de alterar status de usuário via API ainda não implementada. Endpoint necessário: PATCH /api/users/:id/toggle-status') 
-    };
+    try {
+      // Buscar usuário atual para saber o status
+      const allUsers = await getAllUsers();
+      const targetUser = allUsers.find(u => u.id === userId);
+      
+      if (!targetUser) {
+        return { error: new Error('Usuário não encontrado') };
+      }
+
+      // Alternar status (se está ativo, inativar; se está inativo, ativar)
+      const newStatus = !targetUser.is_active;
+      const apiResponse = await apiService.toggleUserStatus(userId, newStatus);
+      
+      if (!apiResponse.error) {
+        return { error: null };
+      }
+      
+      return { error: new Error(apiResponse.message || 'Erro ao alterar status do usuário') };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error('Erro ao alterar status do usuário') };
+    }
   };
 
   const changePassword = async (userId: string, newPassword: string) => {

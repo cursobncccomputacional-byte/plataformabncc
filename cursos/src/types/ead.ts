@@ -26,7 +26,8 @@ export interface Lesson {
   thumbnail_url: string | null;
   order_index: number;
   is_preview: boolean;
-  resources: any[];
+  module: 'I' | 'II'; // Módulo I ou II
+  resources: any[]; // Mantido para compatibilidade, mas não será usado
 }
 
 export interface Enrollment {

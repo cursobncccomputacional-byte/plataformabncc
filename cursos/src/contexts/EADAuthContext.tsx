@@ -14,6 +14,9 @@ interface EADAuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  isRoot: boolean;
+  isProfessor: boolean;
+  hasAccess: boolean; // root ou professor
 }
 
 const EADAuthContext = createContext<EADAuthContextType | undefined>(undefined);
@@ -58,6 +61,14 @@ export const EADAuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json();
 
       if (!data.error && data.user) {
+        const userRole = data.user.role?.toLowerCase();
+        
+        // Validar se o usuário tem acesso (root, professor ou professor_cursos)
+        if (userRole !== 'root' && userRole !== 'professor' && userRole !== 'professor_cursos') {
+          // Usuário não tem permissão para acessar o sistema de cursos
+          return false;
+        }
+
         const userData: User = {
           id: data.user.id,
           name: data.user.name,
@@ -85,6 +96,18 @@ export const EADAuthProvider = ({ children }: { children: ReactNode }) => {
     fetch('https://novaedubncc.com.br/api/auth/logout', { method: 'POST', credentials: 'include' });
   };
 
+  // Verificar se é root
+  const isRoot = user?.role?.toLowerCase() === 'root';
+  
+  // Verificar se é professor (do sistema principal)
+  const isProfessor = user?.role?.toLowerCase() === 'professor';
+  
+  // Verificar se é professor_cursos (acesso apenas aos cursos permitidos)
+  const isProfessorCursos = user?.role?.toLowerCase() === 'professor_cursos';
+  
+  // Verificar se tem acesso (root, professor ou professor_cursos)
+  const hasAccess = isRoot || isProfessor || isProfessorCursos;
+
   return (
     <EADAuthContext.Provider
       value={{
@@ -93,6 +116,9 @@ export const EADAuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         isAuthenticated: !!user,
+        isRoot,
+        isProfessor,
+        hasAccess,
       }}
     >
       {children}

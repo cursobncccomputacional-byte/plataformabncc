@@ -7,7 +7,7 @@ import { useEADAuth } from '../contexts/EADAuthContext';
 import { Enrollment } from '../types/ead';
 
 export const Dashboard = () => {
-  const { user, logout } = useEADAuth();
+  const { user, logout, isRoot } = useEADAuth();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +42,14 @@ export const Dashboard = () => {
               />
             </Link>
             <div className="flex items-center gap-4">
+              {isRoot && (
+                <Link
+                  to="/admin/usuarios"
+                  className="flex items-center gap-2 bg-[#044982] text-white px-4 py-2 rounded-lg hover:bg-[#005a93] transition"
+                >
+                  <span>Gestão de Usuários</span>
+                </Link>
+              )}
               <span className="text-gray-700">Olá, <span className="font-semibold text-[#044982]">{user?.name}</span></span>
               <button
                 onClick={logout}

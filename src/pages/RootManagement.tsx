@@ -1,18 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Key, Trash2, Edit } from 'lucide-react';
+import { Plus, Search, Key, Trash2, Edit, UserCheck, UserX } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { useAuth } from '../contexts/LocalAuthContext';
+import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
+import { ManageCourses } from './ManageCourses';
+import { ManageCoursePermissions } from './ManageCoursePermissions';
+import { AssignAccess } from './AssignAccess';
+import { ManageActivities } from './ManageActivities';
+import { ManageFormacaoContinuada } from './ManageFormacaoContinuada';
+import { ManageTrilhas } from './ManageTrilhas';
 import type { CreateUserData, User } from '../types/bncc';
 
-type RoleFilter = 'all' | 'root' | 'admin' | 'professor' | 'aluno';
+type RoleFilter = 'all' | 'root' | 'admin' | 'professor' | 'aluno' | 'professor_cursos';
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export const RootManagement = () => {
-  const { user, getAllUsers, createUser, changePassword, deleteUser } = useAuth();
+  const { user, getAllUsers, createUser, changePassword, deleteUser, toggleUserStatus } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas'>('users');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +96,8 @@ export const RootManagement = () => {
         return 'Administrador';
       case 'professor':
         return 'Professor';
+      case 'professor_cursos':
+        return 'Formação Continuada';
       case 'aluno':
         return 'Aluno';
       default:
@@ -103,6 +113,8 @@ export const RootManagement = () => {
         return 'bg-blue-100 text-blue-800';
       case 'professor':
         return 'bg-green-100 text-green-800';
+      case 'professor_cursos':
+        return 'bg-indigo-100 text-indigo-800';
       case 'aluno':
         return 'bg-yellow-100 text-yellow-800';
       default:
@@ -177,6 +189,32 @@ export const RootManagement = () => {
     }
   };
 
+  const handleToggleStatus = async (userId: string, userName: string, currentStatus: boolean) => {
+    const action = currentStatus ? 'inativar' : 'ativar';
+    if (!confirm(`Tem certeza que deseja ${action} o usuário "${userName}"?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await toggleUserStatus(userId);
+      if (res.error) {
+        setError(res.error.message);
+      } else {
+        setSuccess(`Usuário "${userName}" ${currentStatus ? 'inativado' : 'ativado'} com sucesso!`);
+        await loadUsers();
+        setTimeout(() => setSuccess(null), 5000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao alterar status do usuário');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteUser = async (userId: string, userName: string) => {
     if (!confirm(`Tem certeza que deseja deletar o usuário "${userName}"? Esta ação não pode ser desfeita.`)) {
       return;
@@ -218,10 +256,19 @@ export const RootManagement = () => {
       <DashboardHeader />
 
       <div className="flex">
-        <Sidebar currentPage="profile" onNavigate={() => {}} onSidebarToggle={setSidebarOpen} />
+        <Sidebar currentPage={currentPage} onNavigate={(page) => setCurrentPage(page as any)} onSidebarToggle={setSidebarOpen} />
 
         <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+          {/* Renderizar conteúdo baseado na página atual */}
+          {currentPage === 'assign-access' && <AssignAccess />}
+          {currentPage === 'courses' && <ManageCourses onNavigate={(page) => setCurrentPage(page as any)} currentPage={currentPage} />}
+          {currentPage === 'permissions' && <ManageCoursePermissions onNavigate={(page) => setCurrentPage(page as any)} currentPage={currentPage} />}
+          {currentPage === 'plataforma' && <ManageActivities />}
+          {currentPage === 'formacao-continuada' && <ManageFormacaoContinuada />}
+          {currentPage === 'trilhas' && <ManageTrilhas />}
+          {currentPage === 'users' && (
           <div className="pt-6 px-4 sm:px-6 max-w-[1800px] mx-auto">
+
             <div className="flex items-start justify-between gap-4 mb-3">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: '#044982' }}>
@@ -370,6 +417,25 @@ export const RootManagement = () => {
                             >
                               <Key className="h-4 w-4" />
                             </button>
+                            {/* Botão de ativar/inativar - não aparece para o próprio usuário logado */}
+                            {u.id !== user?.id && (
+                              <button
+                                onClick={() => handleToggleStatus(u.id, u.name, u.is_active ?? true)}
+                                className={`transition-colors ${
+                                  u.is_active
+                                    ? 'text-orange-600 hover:text-orange-900'
+                                    : 'text-green-600 hover:text-green-900'
+                                }`}
+                                title={u.is_active ? 'Inativar usuário' : 'Ativar usuário'}
+                                disabled={loading}
+                              >
+                                {u.is_active ? (
+                                  <UserX className="h-4 w-4" />
+                                ) : (
+                                  <UserCheck className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
                             {/* Botão de deletar - não aparece para o próprio usuário logado */}
                             {u.id !== user?.id && (
                               <button
@@ -383,7 +449,7 @@ export const RootManagement = () => {
                             )}
                             {/* Se for o próprio usuário, mostrar mensagem */}
                             {u.id === user?.id && (
-                              <span className="text-xs text-gray-400" title="Você não pode deletar sua própria conta">
+                              <span className="text-xs text-gray-400" title="Você não pode alterar sua própria conta">
                                 -
                               </span>
                             )}
@@ -418,6 +484,7 @@ export const RootManagement = () => {
               )}
             </div>
           </div>
+          )}
         </main>
       </div>
 

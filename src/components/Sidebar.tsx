@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap } from 'lucide-react';
+import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
+type PageType = 'activities' | 'videos' | 'documents' | 'profile' | 'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas';
+
 interface SidebarProps {
-  currentPage: 'activities' | 'videos' | 'documents' | 'profile';
-  onNavigate: (page: 'activities' | 'videos' | 'documents' | 'profile') => void;
+  currentPage: PageType;
+  onNavigate: (page: PageType) => void;
   onSidebarToggle?: (isOpen: boolean) => void;
 }
 
@@ -13,8 +15,16 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
   const { signOut, profile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  // Expandir menu Cursos se estiver em plataforma ou formacao-continuada
+  const [cursosMenuOpen, setCursosMenuOpen] = useState(
+    currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas'
+  );
 
   const isRoot = profile?.role === 'root';
+  // Root sempre tem acesso a tudo, então sempre mostra os menus
+  const canManageActivities = isRoot || (profile?.can_manage_activities ?? false);
+  const canManageCourses = isRoot || (profile?.can_manage_courses ?? false);
+  const showCursosMenu = canManageActivities || canManageCourses;
 
   // Notificar mudanças no estado da sidebar
   useEffect(() => {
@@ -39,21 +49,72 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const menuItems = isRoot
-    ? [{ id: 'profile' as const, icon: Users, label: 'Usuários' }]
-    : [
-        { id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' },
-        { id: 'videos' as const, icon: Video, label: 'Vídeo Aulas' },
-        { id: 'documents' as const, icon: FileText, label: 'Documentos' },
-        { id: 'profile' as const, icon: User, label: 'Perfil' },
-      ];
+  // Expandir menu Cursos quando navegar para plataforma, formacao-continuada ou trilhas
+  useEffect(() => {
+    if (currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas') {
+      setCursosMenuOpen(true);
+    }
+  }, [currentPage]);
 
-  const handleNavigate = (page: 'activities' | 'videos' | 'documents' | 'profile') => {
+  // Submenu de Cursos (Plataforma, Formação Continuada e Trilhas)
+  // Professores veem apenas o menu correspondente à sua permissão
+  const cursosSubMenuItems = [];
+  if (canManageActivities) {
+    cursosSubMenuItems.push({ id: 'plataforma' as const, icon: Activity, label: 'Plataforma' });
+  }
+  // Formação Continuada só aparece para quem tem can_manage_courses (root sempre tem acesso)
+  if (canManageCourses) {
+    cursosSubMenuItems.push({ id: 'formacao-continuada' as const, icon: GraduationCap, label: 'Formação Continuada' });
+  }
+  // Trilhas aparecem apenas para root (gerenciamento)
+  if (isRoot) {
+    cursosSubMenuItems.push({ id: 'trilhas' as const, icon: BookOpen, label: 'Trilhas' });
+  }
+
+  // Menu para Root
+  const rootMenuItems = [
+    { id: 'users' as const, icon: Users, label: 'Usuários' },
+    { id: 'assign-access' as const, icon: Settings, label: 'Atribuir Acesso' },
+    // Root sempre vê o menu Cursos expandido se tiver pelo menos uma permissão
+    ...(showCursosMenu ? [{ id: 'cursos-menu' as const, icon: BookOpen, label: 'Cursos', isParent: true }] : []),
+    { id: 'permissions' as const, icon: UserCheck, label: 'Atribuir Cursos' },
+  ];
+
+  // Menu para não-root (professores, admin, etc)
+  // Professores NÃO veem menu "Cursos" nem "Plataforma" (cadastro)
+  // Apenas veem "Atividades BNCC" para visualizar atividades já cadastradas
+  // Formação Continuada é acessada em outro subdomínio (cursos.novaedubncc.com.br)
+  const nonRootMenuItems = [];
+  
+  // Professores e admins veem Trilhas Pedagógicas (primeiro no menu)
+  if (canManageActivities || (profile?.role === 'admin')) {
+    nonRootMenuItems.push({ id: 'trilhas' as const, icon: BookOpen, label: 'Trilhas Pedagógicas' });
+  }
+  
+  // Professores veem apenas "Atividades BNCC" para visualizar (não cadastrar)
+  if (canManageActivities) {
+    nonRootMenuItems.push({ id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' });
+  }
+  
+  // Adicionar outros menus
+  nonRootMenuItems.push(
+    { id: 'videos' as const, icon: Video, label: 'Vídeo Aulas' },
+    { id: 'documents' as const, icon: FileText, label: 'Documentos' },
+    { id: 'profile' as const, icon: User, label: 'Perfil' }
+  );
+
+  const menuItems = isRoot ? rootMenuItems : nonRootMenuItems;
+
+  const handleNavigate = (page: PageType) => {
     onNavigate(page);
     // Fechar sidebar no mobile após clicar
     if (isMobile) {
       setSidebarOpen(false);
     }
+  };
+
+  const handleCursosMenuClick = () => {
+    setCursosMenuOpen(!cursosMenuOpen);
   };
 
   return (
@@ -104,6 +165,60 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
             {menuItems.map((item) => {
               const IconComponent = item.icon;
               const isActive = currentPage === item.id;
+              const isParent = (item as any).isParent;
+
+              if (isParent && item.id === 'cursos-menu') {
+                // Menu Cursos expandido (apenas para root ou quem tem ambas as permissões)
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      onClick={handleCursosMenuClick}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                        ${cursosMenuOpen || currentPage === 'plataforma' || currentPage === 'formacao-continuada'
+                          ? 'bg-white text-[#005a93] shadow-md' 
+                          : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <IconComponent size={20} />
+                        {sidebarOpen && (
+                          <span className="font-medium">{item.label}</span>
+                        )}
+                      </div>
+                      {sidebarOpen && (
+                        cursosMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                      )}
+                    </button>
+                    {cursosMenuOpen && sidebarOpen && (
+                      <div className="ml-4 space-y-1">
+                        {cursosSubMenuItems.map((subItem) => {
+                          const SubIconComponent = subItem.icon;
+                          const isSubActive = currentPage === subItem.id;
+                          return (
+                            <button
+                              key={subItem.id}
+                              onClick={() => handleNavigate(subItem.id)}
+                              className={`
+                                w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                                ${isSubActive 
+                                  ? 'bg-white bg-opacity-30 text-white font-semibold' 
+                                  : 'hover:bg-white hover:bg-opacity-10 text-white text-opacity-80'
+                                }
+                              `}
+                            >
+                              <SubIconComponent size={18} />
+                              <span>{subItem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              
 
               return (
                 <button

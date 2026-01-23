@@ -305,6 +305,16 @@ class ApiService {
   }
 
   /**
+   * Ativar/Inativar usuário (admin/root apenas)
+   */
+  async toggleUserStatus(userId: string, isActive: boolean): Promise<ApiResponse> {
+    return this.request('/users/index.php', {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: userId, is_active: isActive }),
+    });
+  }
+
+  /**
    * Deletar usuário (admin/root apenas)
    */
   async deleteUser(userId: string): Promise<ApiResponse> {
@@ -317,10 +327,1086 @@ class ApiService {
   }
 
   /**
+   * Habilitar/desabilitar Formação Continuada para o professor (root apenas)
+   */
+  async toggleFormacaoContinuada(userId: string, enable: boolean): Promise<ApiResponse> {
+    return this.request('/users/formacao-continuada.php', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, enable }),
+    });
+  }
+
+  /**
+   * Obter permissões de um usuário (root apenas)
+   */
+  async getUserPermissions(userId: string): Promise<ApiResponse> {
+    return this.request(`/users/permissions.php?user_id=${encodeURIComponent(userId)}`);
+  }
+
+  /**
+   * Atualizar permissões de um usuário (root apenas)
+   */
+  async updateUserPermissions(
+    userId: string,
+    permissions: {
+      can_manage_activities?: boolean;
+      can_manage_courses?: boolean;
+    }
+  ): Promise<ApiResponse> {
+    return this.request('/users/permissions.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        ...permissions,
+      }),
+    });
+  }
+
+  /**
    * Buscar atividades do banco de dados
    */
-  async getActivities(): Promise<ApiResponse> {
-    return this.request('/activities/index.php');
+  async getActivities(filters?: {
+    tipo?: string;
+    etapa?: string;
+    nivel_dificuldade?: string;
+    search?: string;
+  }): Promise<ApiResponse> {
+    const params = new URLSearchParams();
+    if (filters?.tipo) params.append('tipo', filters.tipo);
+    if (filters?.etapa) params.append('etapa', filters.etapa);
+    if (filters?.nivel_dificuldade) params.append('nivel_dificuldade', filters.nivel_dificuldade);
+    if (filters?.search) params.append('search', filters.search);
+    
+    const query = params.toString();
+    return this.request(`/activities/index.php${query ? '?' + query : ''}`);
+  }
+
+  /**
+   * Obter atividade específica por ID
+   */
+  async getActivity(activityId: string): Promise<ApiResponse> {
+    return this.request(`/activities/index.php?id=${encodeURIComponent(activityId)}`);
+  }
+
+  /**
+   * Criar atividade (requer can_manage_activities)
+   */
+  async createActivity(activityData: {
+    id: string;
+    nome_atividade: string;
+    descricao?: string;
+    tipo: 'Plugada' | 'Desplugada';
+    etapa: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais';
+    anos_escolares?: string[];
+    eixos_bncc?: string[];
+    duracao?: string;
+    nivel_dificuldade: 'Fácil' | 'Médio' | 'Difícil';
+    thumbnail_url?: string;
+    video_url: string;
+    pdf_estrutura_pedagogica_url?: string;
+    material_apoio_url?: string;
+  }): Promise<ApiResponse> {
+    // Obter usuário atual para enviar nos headers
+    const currentUser = await this.getCurrentUser();
+    
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      // Fallback: tentar do localStorage
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch (e) {
+        console.warn('Não foi possível obter usuário do localStorage:', e);
+      }
+    }
+    
+    return this.request('/activities/index.php', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(activityData),
+    });
+  }
+
+  /**
+   * Atualizar atividade (requer can_manage_activities)
+   */
+  async updateActivity(
+    activityId: string,
+    updates: Partial<{
+      nome_atividade: string;
+      descricao: string;
+      tipo: 'Plugada' | 'Desplugada';
+      etapa: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais';
+      anos_escolares: string[];
+      eixos_bncc: string[];
+      duracao: string;
+      nivel_dificuldade: 'Fácil' | 'Médio' | 'Difícil';
+      thumbnail_url: string;
+      video_url: string;
+      pdf_estrutura_pedagogica_url: string;
+      material_apoio_url: string;
+    }>
+  ): Promise<ApiResponse> {
+    // Obter usuário atual para enviar nos headers
+    const currentUser = await this.getCurrentUser();
+    
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      // Fallback: tentar do localStorage
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch (e) {
+        console.warn('Não foi possível obter usuário do localStorage:', e);
+      }
+    }
+    
+    return this.request('/activities/index.php', {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ id: activityId, ...updates }),
+    });
+  }
+
+  /**
+   * Deletar atividade (requer can_manage_activities)
+   */
+  /**
+   * Upload de imagem (thumbnail)
+   */
+  async uploadImage(file: File): Promise<ApiResponse & { url?: string }> {
+    const url = `${this.baseUrl}/upload/index.php`;
+    
+    // Obter usuário atual para autenticação
+    const currentUser = await this.getCurrentUserForCursosApi();
+    if (!currentUser) {
+      return {
+        error: true,
+        message: 'Usuário não autenticado',
+      };
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        headers: {
+          'X-User-Id': String(currentUser.id),
+          'X-User-Role': currentUser.role || '',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        return {
+          error: true,
+          message: data.message || 'Erro ao fazer upload da imagem',
+        };
+      }
+
+      return {
+        error: false,
+        message: data.message || 'Upload realizado com sucesso',
+        url: data.url,
+      };
+    } catch (error) {
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro ao fazer upload da imagem',
+      };
+    }
+  }
+
+  /**
+   * Trilhas Pedagógicas
+   */
+  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa'): Promise<ApiResponse & { trilhas?: any[] }> {
+    const query = tipo ? `?tipo=${tipo}` : '';
+    return this.request(`/trilhas/index.php${query}`);
+  }
+
+  async getTrilha(trilhaId: string): Promise<ApiResponse & { trilha?: any; atividades?: any[] }> {
+    return this.request(`/trilhas/index.php?id=${encodeURIComponent(trilhaId)}`);
+  }
+
+  async createTrilha(trilhaData: {
+    id: string;
+    titulo: string;
+    descricao?: string;
+    tipo: 'eixo_bncc' | 'etapa';
+    valor: string;
+    thumbnail_url?: string;
+    ordem?: number;
+  }): Promise<ApiResponse> {
+    return this.request('/trilhas/index.php', {
+      method: 'POST',
+      body: JSON.stringify(trilhaData),
+    });
+  }
+
+  async updateTrilha(trilhaId: string, updates: Partial<{
+    titulo: string;
+    descricao: string;
+    tipo: 'eixo_bncc' | 'etapa';
+    valor: string;
+    thumbnail_url: string;
+    ordem: number;
+    ativo: boolean;
+  }>): Promise<ApiResponse> {
+    return this.request('/trilhas/index.php', {
+      method: 'PUT',
+      body: JSON.stringify({ id: trilhaId, ...updates }),
+    });
+  }
+
+  async deleteTrilha(trilhaId: string): Promise<ApiResponse> {
+    return this.request('/trilhas/index.php', {
+      method: 'DELETE',
+      body: JSON.stringify({ id: trilhaId }),
+    });
+  }
+
+  /**
+   * Agente IA - Sugerir atividades do dia (Groq)
+   * Usa a API do Groq para gerar sugestões de atividades pedagógicas
+   */
+  async suggestActivitiesFromAI(prompt: string, groqToken?: string): Promise<ApiResponse & { suggestions?: string }> {
+    // Token deve ser configurado via variável de ambiente VITE_GROQ_API_KEY
+    const token = groqToken || import.meta.env.VITE_GROQ_API_KEY;
+    
+    if (!token) {
+      return {
+        error: true,
+        message: 'Chave da API Groq não configurada. Configure a variável de ambiente VITE_GROQ_API_KEY.',
+      };
+    }
+    
+    // Validar token
+    if (!token || token.length < 10) {
+      return {
+        error: true,
+        message: 'Token da API não configurado corretamente',
+      };
+    }
+    
+    try {
+      const requestBody = {
+        model: 'llama-3.1-70b-versatile', // Modelo atualizado e estável do Groq (mixtral-8x7b-32768 foi descontinuado)
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um assistente educacional especializado em sugerir atividades pedagógicas alinhadas à BNCC (Base Nacional Comum Curricular) para pensamento computacional. Forneça sugestões práticas, objetivas e detalhadas, incluindo objetivos, materiais necessários e passo a passo quando relevante. Foque em atividades plugadas e desplugadas para Educação Infantil, Anos Iniciais e Anos Finais.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      };
+
+      console.log('🔍 Debug - Requisição para Groq API:', {
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        model: requestBody.model,
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 10) + '...',
+      });
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Erro ao consultar IA: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorData.message || errorMessage;
+          console.error('Erro na API Groq:', errorData);
+        } catch (e) {
+          const errorText = await response.text().catch(() => '');
+          console.error('Erro na API Groq (texto):', errorText);
+          errorMessage = errorText || errorMessage;
+        }
+        return {
+          error: true,
+          message: errorMessage,
+        };
+      }
+
+      const data = await response.json();
+      const suggestions = data.choices?.[0]?.message?.content || '';
+      
+      return {
+        error: false,
+        message: 'Sugestões geradas com sucesso',
+        suggestions: suggestions,
+      };
+    } catch (error) {
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro ao consultar IA',
+      };
+    }
+  }
+
+  async deleteActivity(activityId: string): Promise<ApiResponse> {
+    // Obter usuário atual para enviar nos headers
+    const currentUser = await this.getCurrentUser();
+    
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      // Fallback: tentar do localStorage
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch (e) {
+        console.warn('Não foi possível obter usuário do localStorage:', e);
+      }
+    }
+    
+    return this.request('/activities/index.php', {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({ id: activityId }),
+    });
+  }
+
+  // ============================================
+  // Métodos de Gestão de Cursos (Root apenas)
+  // Usa a API do subdomínio cursos
+  // ============================================
+
+  /**
+   * Obter usuário atual para autenticação cross-domain
+   * Tenta múltiplas fontes: API, localStorage
+   */
+  private async getCurrentUserForCursosApi(): Promise<any> {
+    // Tentar via API primeiro
+    try {
+      const userResponse = await this.getCurrentUser();
+      if (!userResponse.error && userResponse.user) {
+        return userResponse.user;
+      } else if (!userResponse.error && (userResponse as any).data) {
+        return (userResponse as any).data;
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário atual via API:', e);
+    }
+
+    // Fallback: localStorage
+    try {
+      const savedUser = localStorage.getItem('plataforma-bncc-user');
+      if (savedUser) {
+        return JSON.parse(savedUser);
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário do localStorage:', e);
+    }
+
+    return null;
+  }
+
+  /**
+   * Listar todos os cursos (root apenas)
+   */
+  async getCourses(): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      
+      // Se tiver usuário, enviar informações no header para autenticação cross-domain
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = String(currentUser.id); // Garantir que é string
+        headers['X-User-Role'] = String(currentUser.role || '');
+        
+        // Debug log (remover em produção se necessário)
+        console.log('🔍 Debug - Enviando requisição para API de cursos:', {
+          userId: currentUser.id,
+          userRole: currentUser.role,
+          canManageCourses: currentUser.can_manage_courses,
+          headers: { 'X-User-Id': String(currentUser.id), 'X-User-Role': String(currentUser.role || '') }
+        });
+      } else {
+        console.warn('⚠️ Usuário não encontrado para autenticação na API de cursos');
+      }
+
+      const response = await fetch(`${cursosApiUrl}/courses/index.php`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      // Se for 401, verificar se é problema de autenticação
+      if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Erro 401 na API de cursos:', {
+          message: errorData.message || 'Não autenticado',
+          currentUser: currentUser ? { id: currentUser.id, role: currentUser.role } : null,
+          headersSent: currentUser && currentUser.id ? 'Sim' : 'Não'
+        });
+        
+        // Se for root ou tiver can_manage_courses, não deve retornar vazio - é um erro real
+        if (currentUser && (currentUser.role === 'root' || currentUser.can_manage_courses)) {
+          return { 
+            error: true, 
+            message: errorData.message || 'Erro de autenticação. Verifique se você está logado como root.' 
+          };
+        }
+        
+        // Para outros usuários, retornar vazio é normal
+        return { error: false, courses: [], count: 0 };
+      }
+
+      // Verificar se a resposta é JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('API retornou não-JSON:', text.substring(0, 200));
+        return { 
+          error: true, 
+          message: `Erro na API: ${response.status} ${response.statusText}. Resposta não é JSON.` 
+        };
+      }
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { 
+          error: true, 
+          message: data.message || `Erro ${response.status}: ${response.statusText}` 
+        };
+      }
+      
+      return { error: false, ...data };
+    } catch (error) {
+      console.error('Erro ao buscar cursos:', error);
+      return { 
+        error: true, 
+        message: error instanceof Error ? error.message : 'Erro ao conectar com a API de cursos' 
+      };
+    }
+  }
+
+  /**
+   * Criar curso (root apenas)
+   */
+  async createCourse(courseData: {
+    id: string;
+    titulo: string;
+    descricao?: string;
+    status?: string;
+    categoria?: string;
+    nome_instrutor?: string;
+    bio_instrutor?: string;
+    preco?: number;
+    thumbnail_url?: string;
+  }): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    
+    // Obter usuário atual para autenticação cross-domain
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/courses/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(courseData),
+      });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Atualizar curso (root apenas)
+   */
+  async updateCourse(courseId: string, updates: Partial<{
+    titulo: string;
+    descricao: string;
+    status: string;
+    categoria: string;
+    nome_instrutor: string;
+    bio_instrutor: string;
+    preco: number;
+    thumbnail_url: string;
+  }>): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    
+    let currentUser = null;
+    try {
+      const userResponse = await this.getCurrentUser();
+      if (!userResponse.error && userResponse.user) {
+        currentUser = userResponse.user;
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário atual:', e);
+    }
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/courses/index.php`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: courseId, ...updates }),
+      });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Deletar curso (root apenas)
+   */
+  async deleteCourse(courseId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    
+    let currentUser = null;
+    try {
+      const userResponse = await this.getCurrentUser();
+      if (!userResponse.error && userResponse.user) {
+        currentUser = userResponse.user;
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário atual:', e);
+    }
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/courses/index.php`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: courseId }),
+      });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Listar permissões de curso (root apenas)
+   */
+  async getCoursePermissions(userId?: string, courseId?: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (courseId) params.append('course_id', courseId);
+    
+    let currentUser = null;
+    try {
+      const userResponse = await this.getCurrentUser();
+      if (!userResponse.error && userResponse.user) {
+        currentUser = userResponse.user;
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário atual:', e);
+    }
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/permissions/index.php?${params.toString()}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Criar permissão de curso (root apenas)
+   */
+  async createCoursePermission(userId: string, courseId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    
+    let currentUser = null;
+    try {
+      const userResponse = await this.getCurrentUser();
+      if (!userResponse.error && userResponse.user) {
+        currentUser = userResponse.user;
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário atual:', e);
+    }
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/permissions/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId, course_id: courseId }),
+      });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Remover permissão de curso (root apenas)
+   */
+  async deleteCoursePermission(userId: string, courseId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    
+    let currentUser = null;
+    try {
+      const userResponse = await this.getCurrentUser();
+      if (!userResponse.error && userResponse.user) {
+        currentUser = userResponse.user;
+      }
+    } catch (e) {
+      console.warn('Não foi possível obter usuário atual:', e);
+    }
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/permissions/index.php`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId, course_id: courseId }),
+      });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  // ============================================
+  // Métodos de Módulos e Aulas (Formação Continuada)
+  // ============================================
+
+  /**
+   * Listar módulos de um curso
+   */
+  async getModulos(cursoId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/modulos/index.php?curso_id=${encodeURIComponent(cursoId)}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Criar módulo
+   */
+  async createModulo(moduloData: {
+    id: string;
+    curso_id: string;
+    titulo_modulo: string;
+    descricao?: string;
+    ordem?: number;
+  }): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/modulos/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(moduloData),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Atualizar módulo
+   */
+  async updateModulo(
+    moduloId: string,
+    updates: Partial<{
+      titulo_modulo: string;
+      descricao: string;
+      ordem: number;
+    }>
+  ): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/modulos/index.php`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: moduloId, ...updates }),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Deletar módulo
+   */
+  async deleteModulo(moduloId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/modulos/index.php`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: moduloId }),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Listar aulas de um módulo
+   */
+  async getAulas(moduloId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/aulas/index.php?modulo_id=${encodeURIComponent(moduloId)}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Criar aula
+   */
+  async createAula(aulaData: {
+    id: string;
+    modulo_id: string;
+    titulo: string;
+    descricao?: string;
+    video_url: string;
+    duracao_video?: number;
+    thumbnail_url?: string;
+    ordem?: number;
+  }): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/aulas/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(aulaData),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Atualizar aula
+   */
+  async updateAula(
+    aulaId: string,
+    updates: Partial<{
+      modulo_id: string;
+      titulo: string;
+      descricao: string;
+      video_url: string;
+      duracao_video: number;
+      thumbnail_url: string;
+      ordem: number;
+    }>
+  ): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/aulas/index.php`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: aulaId, ...updates }),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Deletar aula
+   */
+  async deleteAula(aulaId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = currentUser.id;
+        headers['X-User-Role'] = currentUser.role || '';
+      }
+
+      const response = await fetch(`${cursosApiUrl}/aulas/index.php`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: aulaId }),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
   }
 
   /**

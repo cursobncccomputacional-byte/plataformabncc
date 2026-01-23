@@ -138,6 +138,210 @@ class EADApiService {
       }),
     });
   }
+
+  // ============================================
+  // Métodos de Gestão de Usuários (Root apenas)
+  // Usa a API principal do sistema
+  // ============================================
+
+  /**
+   * Listar usuários (root apenas)
+   * Usa a API principal: /api/users/index.php
+   */
+  async getUsers(): Promise<ApiResponse> {
+    // Usar URL absoluta para a API principal
+    const mainApiUrl = 'https://novaedubncc.com.br/api';
+    const url = `${mainApiUrl}/users/index.php`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      const textResponse = await response.text();
+      const data = JSON.parse(textResponse);
+
+      if (!response.ok) {
+        return {
+          error: true,
+          message: data.message || 'Erro ao buscar usuários',
+        };
+      }
+
+      return {
+        error: false,
+        users: data.users || [],
+      };
+    } catch (error) {
+      console.error('Erro ao buscar usuários:', error);
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
+
+  /**
+   * Criar usuário (root apenas)
+   */
+  async createUser(userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    school?: string;
+    subjects?: string[];
+  }): Promise<ApiResponse> {
+    const mainApiUrl = 'https://novaedubncc.com.br/api';
+    const url = `${mainApiUrl}/users/index.php`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(userData),
+      });
+
+      const textResponse = await response.text();
+      const data = JSON.parse(textResponse);
+
+      if (!response.ok) {
+        return {
+          error: true,
+          message: data.message || 'Erro ao criar usuário',
+        };
+      }
+
+      return {
+        error: false,
+        user: data.user,
+        message: data.message,
+      };
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
+
+  /**
+   * Deletar usuário (root apenas)
+   */
+  async deleteUser(userId: string): Promise<ApiResponse> {
+    const mainApiUrl = 'https://novaedubncc.com.br/api';
+    const url = `${mainApiUrl}/users/index.php`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      const textResponse = await response.text();
+      const data = JSON.parse(textResponse);
+
+      if (!response.ok) {
+        return {
+          error: true,
+          message: data.message || 'Erro ao deletar usuário',
+        };
+      }
+
+      return {
+        error: false,
+        message: data.message || 'Usuário deletado com sucesso',
+      };
+    } catch (error) {
+      console.error('Erro ao deletar usuário:', error);
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
+
+  /**
+   * Ativar/Inativar usuário (root apenas)
+   */
+  async toggleUserStatus(userId: string, isActive: boolean): Promise<ApiResponse> {
+    const mainApiUrl = 'https://novaedubncc.com.br/api';
+    const url = `${mainApiUrl}/users/index.php`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId, is_active: isActive }),
+      });
+
+      const textResponse = await response.text();
+      const data = JSON.parse(textResponse);
+
+      if (!response.ok) {
+        return {
+          error: true,
+          message: data.message || 'Erro ao alterar status do usuário',
+        };
+      }
+
+      return {
+        error: false,
+        message: data.message,
+      };
+    } catch (error) {
+      console.error('Erro ao alterar status do usuário:', error);
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
+
+  /**
+   * Alterar senha de usuário (root apenas)
+   */
+  async changePassword(userId: string, newPassword: string): Promise<ApiResponse> {
+    const mainApiUrl = 'https://novaedubncc.com.br/api';
+    const url = `${mainApiUrl}/users/change-password.php`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId, new_password: newPassword }),
+      });
+
+      const textResponse = await response.text();
+      const data = JSON.parse(textResponse);
+
+      if (!response.ok) {
+        return {
+          error: true,
+          message: data.message || 'Erro ao alterar senha',
+        };
+      }
+
+      return {
+        error: false,
+        message: data.message || 'Senha alterada com sucesso',
+      };
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error);
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
+    }
+  }
 }
 
 export const eadApiService = new EADApiService();

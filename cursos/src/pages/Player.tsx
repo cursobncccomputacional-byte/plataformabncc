@@ -151,7 +151,17 @@ export const Player = () => {
           <span>{course.title}</span>
         </Link>
         <div className="text-sm text-gray-400">
-          {lessons.findIndex(l => l.id === lessonId) + 1} / {lessons.length}
+          {(() => {
+            const allLessons = [...lessons].sort((a, b) => {
+              // Ordenar por módulo primeiro, depois por ordem
+              if (a.module !== b.module) {
+                return a.module === 'I' ? -1 : 1;
+              }
+              return a.order_index - b.order_index;
+            });
+            const currentIndex = allLessons.findIndex(l => l.id === lessonId);
+            return `${currentIndex + 1} / ${allLessons.length}`;
+          })()}
         </div>
       </header>
 
@@ -185,41 +195,99 @@ export const Player = () => {
           </div>
         </div>
 
-        {/* Sidebar - Lessons List */}
+        {/* Sidebar - Lessons List por Módulo */}
         <div className="w-80 bg-gray-800 overflow-y-auto">
           <div className="p-4 border-b border-gray-700">
             <h3 className="font-semibold">Conteúdo do Curso</h3>
           </div>
           <div className="p-2">
-            {lessons.map((lesson, index) => {
-              const isActive = lesson.id === lessonId;
+            {(() => {
+              const moduleI = lessons.filter(l => l.module === 'I');
+              const moduleII = lessons.filter(l => l.module === 'II');
+              let lessonCounter = 0;
+
               return (
-                <Link
-                  key={lesson.id}
-                  to={`/curso/${courseId}/aula/${lesson.id}`}
-                  className={`block p-3 rounded-lg mb-2 transition ${
-                    isActive
-                      ? 'bg-[#044982] text-white'
-                      : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white bg-opacity-20 flex items-center justify-center text-sm font-bold">
-                        {index + 1}
+                <>
+                  {/* Módulo I */}
+                  {moduleI.length > 0 && (
+                    <div className="mb-4">
+                      <div className="px-3 py-2 bg-[#044982] text-white font-bold text-sm mb-2 rounded">
+                        Módulo I
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{lesson.title}</p>
-                        <p className="text-xs opacity-75">
-                          {Math.floor(lesson.video_duration / 60)}:
-                          {String(lesson.video_duration % 60).padStart(2, '0')}
-                        </p>
-                      </div>
+                      {moduleI.map((lesson) => {
+                        lessonCounter++;
+                        const isActive = lesson.id === lessonId;
+                        return (
+                          <Link
+                            key={lesson.id}
+                            to={`/curso/${courseId}/aula/${lesson.id}`}
+                            className={`block p-3 rounded-lg mb-2 transition ${
+                              isActive
+                                ? 'bg-[#044982] text-white'
+                                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-white bg-opacity-20 flex items-center justify-center text-sm font-bold">
+                                  {lessonCounter}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{lesson.title}</p>
+                                  <p className="text-xs opacity-75">
+                                    {Math.floor(lesson.video_duration / 60)}:
+                                    {String(lesson.video_duration % 60).padStart(2, '0')}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
                     </div>
-                  </div>
-                </Link>
+                  )}
+
+                  {/* Módulo II */}
+                  {moduleII.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 bg-[#005a93] text-white font-bold text-sm mb-2 rounded">
+                        Módulo II
+                      </div>
+                      {moduleII.map((lesson) => {
+                        lessonCounter++;
+                        const isActive = lesson.id === lessonId;
+                        return (
+                          <Link
+                            key={lesson.id}
+                            to={`/curso/${courseId}/aula/${lesson.id}`}
+                            className={`block p-3 rounded-lg mb-2 transition ${
+                              isActive
+                                ? 'bg-[#005a93] text-white'
+                                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-white bg-opacity-20 flex items-center justify-center text-sm font-bold">
+                                  {lessonCounter}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{lesson.title}</p>
+                                  <p className="text-xs opacity-75">
+                                    {Math.floor(lesson.video_duration / 60)}:
+                                    {String(lesson.video_duration % 60).padStart(2, '0')}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               );
-            })}
+            })()}
           </div>
         </div>
       </div>

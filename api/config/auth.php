@@ -18,8 +18,13 @@ function isAuthenticated() {
         return $_SESSION['user_id'];
     }
     
-    // Verificar token no header Authorization
+    // Verificar headers X-User-Id (para requisições cross-domain)
     $headers = getallheaders();
+    if (isset($headers['X-User-Id'])) {
+        return $headers['X-User-Id'];
+    }
+    
+    // Verificar token no header Authorization
     if (isset($headers['Authorization'])) {
         $token = str_replace('Bearer ', '', $headers['Authorization']);
         // Validar token (implementar JWT se necessário)
@@ -48,6 +53,8 @@ function getCurrentUser() {
         // Converter para formato inglês (para o frontend)
         return [
             'id' => $user['id'],
+            'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+            'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0),
             'name' => $user['nome'],
             'email' => $user['usuario'], // Campo usuario mapeado para email no frontend
             'role' => $user['nivel_acesso'],

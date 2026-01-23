@@ -1,9 +1,39 @@
 <?php
 /**
- * Configuração do Banco de Dados EAD
- * Copie este arquivo para config-database-ead.php e preencha com suas credenciais
+ * Configuração do Banco de Dados - Módulo Cursos
+ * 
+ * OPÇÃO 1: Usar o mesmo banco do sistema principal (RECOMENDADO)
+ * OPÇÃO 2: Usar banco separado (manter configuração antiga)
+ * 
+ * INSTRUÇÕES:
+ * 1. Copie este arquivo para config-database-ead.php
+ * 2. Escolha uma das opções abaixo
+ * 3. Preencha com suas credenciais
+ * 4. NUNCA commite o arquivo config-database-ead.php no Git!
  */
 
+// =====================================================
+// CONFIGURAÇÃO DO BANCO PRINCIPAL
+// =====================================================
+// Usando o mesmo banco do sistema principal: u985723830_novaedu
+return [
+    'host' => 'localhost', // ou IP do servidor
+    'database' => 'u985723830_novaedu', // BANCO PRINCIPAL
+    'username' => 'u985723830_novaedu_root', // Usuário do banco
+    'password' => 'Y8o~f~M2r', // Senha do banco
+    'charset' => 'utf8mb4',
+    'options' => [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ],
+];
+
+// =====================================================
+// OPÇÃO 2: BANCO SEPARADO (NÃO RECOMENDADO)
+// =====================================================
+// Descomente e ajuste se preferir manter banco separado
+/*
 return [
     'host' => 'srv1311.hstgr.io',
     'database' => 'u985723830_ead', // Banco separado para EAD
@@ -16,3 +46,4 @@ return [
         PDO::ATTR_EMULATE_PREPARES => false,
     ],
 ];
+*/

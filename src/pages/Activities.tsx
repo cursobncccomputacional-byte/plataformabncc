@@ -7,6 +7,7 @@ import { SecurePDFViewer } from '../components/SecurePDFViewer';
 import { activityLogger } from '../services/ActivityLogger';
 import { ActivityDuration } from '../components/ActivityDuration';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
+import { apiService } from '../services/apiService';
 
 const typeIcons = {
   plugada: Monitor,
@@ -56,16 +57,7 @@ const svgPlaceholderDataUri = (title: string) => {
 };
 
 export const Activities = () => {
-  const { 
-    getSchoolYears, 
-    getBNCCAxes, 
-    getActivities, 
-    getActivitiesByYear, 
-    getActivitiesByType, 
-    getActivitiesByAxis,
-    activitiesSpreadsheet,
-    user
-  } = useAuth();
+  const { user } = useAuth();
   
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -73,10 +65,176 @@ export const Activities = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPDF, setSelectedPDF] = useState<{ url: string; title: string } | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [allActivities, setAllActivities] = useState<Activity[]>([]);
 
-  const schoolYears = getSchoolYears();
-  const axes = getBNCCAxes();
-  const allActivities = getActivities();
+  const [userPermissions, setUserPermissions] = useState<{
+    can_manage_activities: boolean;
+    can_manage_courses: boolean;
+  } | null>(null);
+
+  // Buscar permissões atualizadas da API sempre que a página carregar
+  useEffect(() => {
+    const fetchUpdatedPermissions = async () => {
+      try {
+        const apiResponse = await apiService.getCurrentUser();
+        console.log('API Response:', apiResponse);
+        
+        if (!apiResponse.error && apiResponse.user) {
+          const updatedPermissions = {
+            can_manage_activities: apiResponse.user.can_manage_activities === true,
+            can_manage_courses: apiResponse.user.can_manage_courses === true,
+          };
+          
+          console.log('Permissões atualizadas da API:', updatedPermissions);
+          
+          // Atualizar localStorage
+          const savedUser = localStorage.getItem('plataforma-bncc-user');
+          if (savedUser) {
+            const userData = JSON.parse(savedUser);
+            const updatedUser = {
+              ...userData,
+              ...updatedPermissions,
+            };
+            localStorage.setItem('plataforma-bncc-user', JSON.stringify(updatedUser));
+            console.log('LocalStorage atualizado:', updatedUser);
+          }
+          
+          // Atualizar estado local
+          setUserPermissions(updatedPermissions);
+        } else {
+          console.warn('Erro na resposta da API ou usuário não encontrado:', apiResponse);
+          // Se falhar, usar permissões do usuário atual
+          if (user) {
+            setUserPermissions({
+              can_manage_activities: user.can_manage_activities === true,
+              can_manage_courses: user.can_manage_courses === true,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar permissões atualizadas:', error);
+        // Se falhar, usar permissões do usuário atual
+        if (user) {
+          setUserPermissions({
+            can_manage_activities: user.can_manage_activities === true,
+            can_manage_courses: user.can_manage_courses === true,
+          });
+        } else {
+          setUserPermissions({
+            can_manage_activities: false,
+            can_manage_courses: false,
+          });
+        }
+      }
+    };
+    
+    fetchUpdatedPermissions();
+  }, []); // Executar apenas uma vez ao montar
+
+  // Verificar permissão para ver atividades (usar permissões atualizadas se disponível)
+  const canViewActivities = user?.role === 'root' || 
+    (userPermissions?.can_manage_activities === true);
+  
+  // Debug log
+  useEffect(() => {
+    console.log('Verificação de permissões:', {
+      userRole: user?.role,
+      userCanManageActivities: user?.can_manage_activities,
+      userPermissionsCanManageActivities: userPermissions?.can_manage_activities,
+      canViewActivities: canViewActivities,
+    });
+  }, [user, userPermissions, canViewActivities]);
+
+  // Carregar atividades da nova API apenas se tiver permissão
+  useEffect(() => {
+    // Aguardar permissões serem carregadas antes de decidir
+    if (userPermissions === null) {
+      return; // Ainda carregando permissões
+    }
+    
+    if (canViewActivities) {
+      loadActivities();
+    } else {
+      setLoading(false);
+    }
+  }, [canViewActivities, userPermissions]);
+
+  const loadActivities = async () => {
+    setLoading(true);
+    try {
+      const response = await apiService.getActivities();
+      if (response.error) {
+        console.error('Erro ao carregar atividades:', response.message);
+        setAllActivities([]);
+      } else {
+        // Converter atividades da API para o formato esperado
+        const activities = (response.activities || []).map((act: any) => {
+          // Converter tipo: "Plugada" -> "plugada", "Desplugada" -> "desplugada"
+          const type = act.tipo === 'Plugada' ? 'plugada' : 'desplugada';
+          
+          // Converter dificuldade: "Fácil" -> "facil", "Médio" -> "medio", "Difícil" -> "dificil"
+          let difficulty = 'medio';
+          if (act.nivel_dificuldade === 'Fácil') difficulty = 'facil';
+          else if (act.nivel_dificuldade === 'Médio') difficulty = 'medio';
+          else if (act.nivel_dificuldade === 'Difícil') difficulty = 'dificil';
+          
+          // Converter duração (pode ser string como "15 minutos" ou número)
+          let duration = 0;
+          if (act.duracao) {
+            const durStr = String(act.duracao).toLowerCase();
+            const minutesMatch = durStr.match(/(\d+)\s*min/);
+            if (minutesMatch) {
+              duration = parseInt(minutesMatch[1]) || 0;
+            } else {
+              duration = parseInt(act.duracao) || 0;
+            }
+          }
+          
+          return {
+            id: act.id,
+            title: act.nome_atividade,
+            description: act.descricao || '',
+            type: type,
+            schoolYears: act.anos_escolares || [],
+            axisIds: act.eixos_bncc || [],
+            difficulty: difficulty,
+            duration: duration,
+            video_url: act.video_url,
+            pedagogical_pdf_url: act.pdf_estrutura_pedagogica_url,
+            material_pdf_url: act.material_apoio_url,
+            document_url: act.link_video,
+            thumbnail_url: act.thumbnail_url,
+            etapa: act.etapa,
+          };
+        });
+        setAllActivities(activities);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar atividades:', error);
+      setAllActivities([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gerar anos escolares e eixos a partir das atividades
+  const schoolYears: SchoolYear[] = Array.from(
+    new Set(allActivities.flatMap(a => a.schoolYears))
+  ).map((year, index) => ({
+    id: year,
+    name: year,
+    order: index,
+  }));
+
+  const axes: BNCCAxis[] = Array.from(
+    new Set(allActivities.flatMap(a => a.axisIds || []))
+  ).map((axis, index) => ({
+    id: axis,
+    name: axis,
+    order: index,
+  }));
+
   const isEmpty = allActivities.length === 0;
 
   // Filtrar atividades
@@ -137,6 +295,50 @@ export const Activities = () => {
     }
   };
 
+  const getYouTubeId = (url: string) => {
+    try {
+      const u = new URL(url);
+      // Suporta: youtube.com/watch?v=ID ou youtu.be/ID
+      if (u.hostname.includes('youtube.com') && u.searchParams.has('v')) {
+        return u.searchParams.get('v');
+      }
+      if (u.hostname.includes('youtu.be')) {
+        return u.pathname.split('/').filter(Boolean).pop();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getGoogleDriveId = (url: string) => {
+    try {
+      const u = new URL(url);
+      // Suporta: drive.google.com/file/d/ID/view ou drive.google.com/open?id=ID
+      if (u.hostname.includes('drive.google.com')) {
+        if (u.pathname.includes('/file/d/')) {
+          const parts = u.pathname.split('/file/d/');
+          if (parts[1]) {
+            return parts[1].split('/')[0];
+          }
+        }
+        if (u.searchParams.has('id')) {
+          return u.searchParams.get('id');
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const detectVideoType = (url: string): 'vimeo' | 'youtube' | 'googledrive' | 'direct' => {
+    if (url.includes('vimeo.com')) return 'vimeo';
+    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+    if (url.includes('drive.google.com')) return 'googledrive';
+    return 'direct';
+  };
+
   const handleDownloadPDF = (activity: Activity, url: string) => {
     if (url && (user?.role === 'admin' || user?.role === 'professor')) {
       const link = document.createElement('a');
@@ -195,6 +397,46 @@ export const Activities = () => {
     return year ? year.name : yearId;
   };
 
+  // Se ainda estiver carregando permissões, mostrar loading
+  if (userPermissions === null) {
+    return (
+      <div className="bg-transparent p-0">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-10 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#005a93] mb-4"></div>
+            <div className="text-gray-700 font-medium">Verificando permissões...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não tiver permissão, mostrar mensagem de acesso negado
+  if (!canViewActivities) {
+    return (
+      <div className="bg-transparent p-0">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-10 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Acesso Negado</h1>
+            <p className="text-gray-600 mb-4">
+              Você não tem permissão para visualizar as atividades da plataforma.
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              Para ter acesso, solicite ao administrador que habilite a permissão "Plataforma (Atividades)" 
+              na tela "Atribuir Acesso".
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-[#005a93] text-white rounded-lg hover:bg-[#004a7a] transition-colors"
+            >
+              Atualizar Página
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-transparent p-0">
       <div className="max-w-7xl mx-auto">
@@ -212,19 +454,17 @@ export const Activities = () => {
           </p>
         </motion.div>
         
-        {isEmpty ? (
+        {loading ? (
           <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-600">
-            <div className="text-gray-700 font-medium mb-2">Nenhuma atividade/aula cadastrada ainda.</div>
-            {activitiesSpreadsheet?.error && (
-              <div className="text-sm text-gray-600">
-                Não consegui carregar o arquivo de atividades em{' '}
-                <span className="font-mono">{activitiesSpreadsheet.url || '/atividades.xlsx'}</span> (
-                {activitiesSpreadsheet.error}).
-                <br />
-                Envie o arquivo para esse caminho (ou configure{' '}
-                <span className="font-mono">VITE_ACTIVITIES_XLSX_URL</span> no build).
-              </div>
-            )}
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#005a93] mb-4"></div>
+            <div className="text-gray-700 font-medium">Carregando atividades...</div>
+          </div>
+        ) : isEmpty ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-600">
+            <div className="text-gray-700 font-medium mb-2">Nenhuma atividade cadastrada ainda.</div>
+            <div className="text-sm text-gray-500">
+              As atividades serão exibidas aqui após serem criadas através do menu "Cursos" → "Plataforma".
+            </div>
           </div>
         ) : (
           <>
@@ -331,7 +571,7 @@ export const Activities = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Todas as Atividades</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Atividades da Plataforma</h2>
         </motion.div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -465,7 +705,12 @@ export const Activities = () => {
           })}
         </div>
 
-        {filteredActivities.length === 0 && (
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#005a93] mb-4"></div>
+            <p>Carregando atividades...</p>
+          </div>
+        ) : filteredActivities.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -512,26 +757,89 @@ export const Activities = () => {
               </button>
             </div>
             <div className="p-4">
-              {selectedVideo.url.includes('vimeo.com') ? (
-                <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                  <iframe
-                    src={`https://player.vimeo.com/video/${getVimeoId(selectedVideo.url)}?autoplay=1&title=0&byline=0&portrait=0`}
-                    className="absolute top-0 left-0 w-full h-full rounded-lg"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <video
-                  controls
-                  className="w-full h-auto max-h-[70vh] rounded-lg"
-                  preload="metadata"
-                >
-                  <source src={selectedVideo.url} type="video/mp4" />
-                  Seu navegador não suporta o elemento de vídeo.
-                </video>
-              )}
+              {(() => {
+                const videoType = detectVideoType(selectedVideo.url);
+                
+                switch (videoType) {
+                  case 'vimeo':
+                    return (
+                      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                        <iframe
+                          src={`https://player.vimeo.com/video/${getVimeoId(selectedVideo.url)}?autoplay=1&title=0&byline=0&portrait=0`}
+                          className="absolute top-0 left-0 w-full h-full rounded-lg"
+                          frameBorder="0"
+                          allow="autoplay; fullscreen; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    );
+                  
+                  case 'youtube':
+                    const youtubeId = getYouTubeId(selectedVideo.url);
+                    if (youtubeId) {
+                      return (
+                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                          <iframe
+                            src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+                            className="absolute top-0 left-0 w-full h-full rounded-lg"
+                            frameBorder="0"
+                            allow="autoplay; encrypted-media; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      );
+                    }
+                    break;
+                  
+                  case 'googledrive':
+                    const driveId = getGoogleDriveId(selectedVideo.url);
+                    if (driveId) {
+                      return (
+                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                          <iframe
+                            src={`https://drive.google.com/file/d/${driveId}/preview`}
+                            className="absolute top-0 left-0 w-full h-full rounded-lg"
+                            frameBorder="0"
+                            allow="autoplay"
+                            allowFullScreen
+                          />
+                        </div>
+                      );
+                    }
+                    break;
+                  
+                  case 'direct':
+                  default:
+                    return (
+                      <video
+                        controls
+                        className="w-full h-auto max-h-[70vh] rounded-lg"
+                        preload="metadata"
+                        controlsList="nodownload"
+                      >
+                        <source src={selectedVideo.url} type="video/mp4" />
+                        <source src={selectedVideo.url} type="video/webm" />
+                        <source src={selectedVideo.url} type="video/ogg" />
+                        Seu navegador não suporta o elemento de vídeo.
+                      </video>
+                    );
+                }
+                
+                // Fallback para URL direta se não detectar tipo
+                return (
+                  <video
+                    controls
+                    className="w-full h-auto max-h-[70vh] rounded-lg"
+                    preload="metadata"
+                    controlsList="nodownload"
+                  >
+                    <source src={selectedVideo.url} type="video/mp4" />
+                    <source src={selectedVideo.url} type="video/webm" />
+                    <source src={selectedVideo.url} type="video/ogg" />
+                    Seu navegador não suporta o elemento de vídeo.
+                  </video>
+                );
+              })()}
             </div>
           </div>
         </div>

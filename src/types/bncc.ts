@@ -82,12 +82,14 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'root' | 'admin' | 'professor' | 'aluno';
+  role: 'root' | 'admin' | 'professor' | 'aluno' | 'professor_cursos';
   school?: string;
   subjects?: string[];
   created_at: string;
   last_login?: string;
   is_active: boolean;
+  can_manage_activities?: boolean;
+  can_manage_courses?: boolean;
 }
 
 export interface LoginCredentials {
@@ -99,7 +101,7 @@ export interface CreateUserData {
   name: string;
   email: string;
   password: string;
-  role: 'root' | 'admin' | 'professor' | 'aluno';
+  role: 'root' | 'admin' | 'professor' | 'aluno' | 'professor_cursos';
   school?: string;
   subjects?: string[];
 }

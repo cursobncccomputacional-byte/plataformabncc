@@ -77,6 +77,9 @@ try {
                 'created_at' => $user['data_criacao'],
                 'last_login' => $user['ultimo_login'] ?? null,
                 'is_active' => (bool)($user['ativo'] ?? 0),
+                'formacao_continuada' => (bool)($user['formacao_continuada'] ?? 0),
+                'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+                'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0),
             ];
         }
 
@@ -100,7 +103,7 @@ try {
             json_response(400, ['error' => true, 'message' => 'A senha deve ter pelo menos 6 caracteres']);
         }
 
-        $allowedRoles = ['root', 'admin', 'professor', 'aluno'];
+        $allowedRoles = ['root', 'admin', 'professor', 'aluno', 'professor_cursos'];
         if (!in_array($role, $allowedRoles, true)) {
             json_response(400, ['error' => true, 'message' => 'Nível de acesso inválido']);
         }
@@ -110,6 +113,7 @@ try {
             json_response(403, ['error' => true, 'message' => 'Administradores só podem criar professores e alunos']);
         }
 
+        // Escola obrigatória apenas para professor e aluno (não para professor_cursos)
         if (($role === 'professor' || $role === 'aluno') && empty($school)) {
             json_response(400, ['error' => true, 'message' => 'Escola é obrigatória para professores e alunos']);
         }
@@ -155,6 +159,47 @@ try {
                 'last_login' => $newUser['ultimo_login'] ?? null,
                 'is_active' => (bool)($newUser['ativo'] ?? 0),
             ],
+        ]);
+    }
+
+    if ($method === 'PATCH') {
+        $data = read_json_body();
+        $userId = trim((string)($data['user_id'] ?? ''));
+        $isActive = isset($data['is_active']) ? (bool)$data['is_active'] : null;
+
+        if ($userId === '') {
+            json_response(400, ['error' => true, 'message' => 'ID do usuário não fornecido']);
+        }
+
+        if ($isActive === null) {
+            json_response(400, ['error' => true, 'message' => 'is_active é obrigatório']);
+        }
+
+        if ($userId === ($currentUser['id'] ?? '')) {
+            json_response(403, ['error' => true, 'message' => 'Você não pode inativar sua própria conta']);
+        }
+
+        $checkStmt = $pdo->prepare("SELECT id, nivel_acesso FROM usuarios WHERE id = ?");
+        $checkStmt->execute([$userId]);
+        $userToUpdate = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$userToUpdate) {
+            json_response(404, ['error' => true, 'message' => 'Usuário não encontrado']);
+        }
+
+        // Só root pode inativar root
+        if (($userToUpdate['nivel_acesso'] ?? '') === 'root' && ($currentUser['role'] ?? '') !== 'root') {
+            json_response(403, ['error' => true, 'message' => 'Apenas root pode inativar usuários root']);
+        }
+
+        $updateStmt = $pdo->prepare("UPDATE usuarios SET ativo = ? WHERE id = ?");
+        $updateStmt->execute([$isActive ? 1 : 0, $userId]);
+        if ($updateStmt->rowCount() === 0) {
+            json_response(500, ['error' => true, 'message' => 'Erro ao atualizar status do usuário']);
+        }
+
+        json_response(200, [
+            'error' => false,
+            'message' => $isActive ? 'Usuário ativado com sucesso' : 'Usuário inativado com sucesso'
         ]);
     }
 

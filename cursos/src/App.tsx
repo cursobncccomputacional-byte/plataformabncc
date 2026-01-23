@@ -6,7 +6,9 @@ import { CourseDetail } from './pages/CourseDetail';
 import { Player } from './pages/Player';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
+import { AdminUsers } from './pages/AdminUsers';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ProtectedRouteAdmin } from './components/ProtectedRouteAdmin';
 
 function App() {
   return (
@@ -31,6 +33,14 @@ function App() {
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/usuarios"
+            element={
+              <ProtectedRouteAdmin>
+                <AdminUsers />
+              </ProtectedRouteAdmin>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />

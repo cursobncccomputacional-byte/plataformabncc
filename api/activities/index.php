@@ -1,8 +1,13 @@
 <?php
 /**
- * Endpoint de atividades (JSON)
- *
- * GET    /api/activities/index.php  -> lista todas as atividades do banco
+ * API de Atividades (Plataforma BNCC)
+ * CRUD completo para vídeos de atividades educacionais
+ * 
+ * GET    /api/activities/index.php -> lista atividades
+ * GET    /api/activities/index.php?id=xxx -> detalhes da atividade
+ * POST   /api/activities/index.php -> cria atividade (requer can_manage_activities)
+ * PUT    /api/activities/index.php -> atualiza atividade (requer can_manage_activities)
+ * DELETE /api/activities/index.php -> deleta atividade (requer can_manage_activities)
  */
 
 declare(strict_types=1);
@@ -11,9 +16,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 
-// CORS + preflight
 require_once __DIR__ . '/../config/cors.php';
-
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/auth.php';
 
@@ -21,7 +24,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-function json_response(int $status, array $payload): void {
+function json_response_act(int $status, array $payload): void {
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
         http_response_code($status);
@@ -30,116 +33,569 @@ function json_response(int $status, array $payload): void {
     exit;
 }
 
-// Atividades são públicas (não requer autenticação obrigatória)
-// Mas tentamos obter usuário atual se houver sessão para logs futuros
-$currentUser = getCurrentUser();
-
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-if ($method !== 'GET') {
-    json_response(405, ['error' => true, 'message' => 'Método não permitido']);
+// Para GET, não precisa autenticação obrigatória (atividades podem ser públicas)
+// Mas tentamos obter usuário se houver sessão ou headers
+$currentUser = getCurrentUser();
+
+// Verificar permissão apenas para operações de escrita
+if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
+    if (!$currentUser) {
+        // Tentar obter do header X-User-Id como fallback
+        $headers = getallheaders();
+        if (isset($headers['X-User-Id'])) {
+            $userId = $headers['X-User-Id'];
+            $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = ? AND ativo = 1");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($user) {
+                $currentUser = [
+                    'id' => $user['id'],
+                    'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+                    'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0),
+                    'role' => $user['nivel_acesso'],
+                ];
+            }
+        }
+        
+        if (!$currentUser) {
+            json_response_act(401, ['error' => true, 'message' => 'Não autenticado']);
+        }
+    }
+    
+    $userRole = strtolower($currentUser['role'] ?? '');
+    $canManage = (bool)($currentUser['can_manage_activities'] ?? false);
+    
+    if ($userRole !== 'root' && !$canManage) {
+        json_response_act(403, [
+            'error' => true,
+            'message' => 'Você não tem permissão para gerenciar atividades. Solicite acesso ao administrador.'
+        ]);
+    }
+}
+
+function read_json_body(): array {
+    $raw = file_get_contents('php://input');
+    if ($raw === false || trim($raw) === '') {
+        return [];
+    }
+    $data = json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+        json_response_act(400, ['error' => true, 'message' => 'JSON inválido: ' . json_last_error_msg()]);
+    }
+    return $data;
 }
 
 try {
     global $pdo;
     if (!isset($pdo)) {
-        json_response(500, ['error' => true, 'message' => 'Erro de conexão com banco de dados']);
+        json_response_act(500, ['error' => true, 'message' => 'Erro de conexão com banco de dados']);
     }
 
-    // Verificar se a tabela existe (pode ser 'activities' ou 'atividades')
-    $stmt = $pdo->query("
-        SELECT TABLE_NAME 
-        FROM INFORMATION_SCHEMA.TABLES 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME IN ('activities', 'atividades')
-        LIMIT 1
-    ");
-    $table = $stmt->fetch();
-    
-    if (!$table) {
-        json_response(200, [
+    if ($method === 'GET') {
+        $activityId = $_GET['id'] ?? null;
+
+        if ($activityId) {
+            // Buscar atividade específica (com compatibilidade para campos antigos)
+            $stmt = $pdo->prepare("SELECT 
+                id,
+                COALESCE(nome_atividade, titulo) as nome_atividade,
+                descricao,
+                tipo,
+                etapa,
+                anos_escolares,
+                COALESCE(eixos_bncc, JSON_ARRAY(id_eixo)) as eixos_bncc,
+                COALESCE(disciplinas_transversais, '[]') as disciplinas_transversais,
+                duracao,
+                COALESCE(nivel_dificuldade, 
+                    CASE 
+                        WHEN dificuldade = 'facil' THEN 'Fácil'
+                        WHEN dificuldade = 'medio' THEN 'Médio'
+                        WHEN dificuldade = 'dificil' THEN 'Difícil'
+                        ELSE 'Médio'
+                    END
+                ) as nivel_dificuldade,
+                COALESCE(thumbnail_url, url_miniatura) as thumbnail_url,
+                COALESCE(video_url, url_video) as video_url,
+                COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                material_apoio_url,
+                COALESCE(criado_em, data_criacao) as criado_em,
+                atualizado_em,
+                criado_por
+            FROM atividades WHERE id = ?");
+            $stmt->execute([$activityId]);
+            $activity = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$activity) {
+                json_response_act(404, ['error' => true, 'message' => 'Atividade não encontrada']);
+            }
+
+            // Converter tipo para formato esperado
+            $tipo = $activity['tipo'] ?? '';
+            if (strtolower($tipo) === 'plugada') $tipo = 'Plugada';
+            if (strtolower($tipo) === 'desplugada') $tipo = 'Desplugada';
+            
+            // Converter eixos_bncc
+            $eixosBncc = [];
+            if (isset($activity['eixos_bncc'])) {
+                if (is_string($activity['eixos_bncc'])) {
+                    $decoded = json_decode($activity['eixos_bncc'], true);
+                    $eixosBncc = is_array($decoded) ? $decoded : [];
+                } elseif (is_array($activity['eixos_bncc'])) {
+                    $eixosBncc = $activity['eixos_bncc'];
+                }
+            }
+            
+            // Converter anos_escolares
+            $anosEscolares = [];
+            if (isset($activity['anos_escolares'])) {
+                if (is_string($activity['anos_escolares'])) {
+                    $decoded = json_decode($activity['anos_escolares'], true);
+                    $anosEscolares = is_array($decoded) ? $decoded : [];
+                } elseif (is_array($activity['anos_escolares'])) {
+                    $anosEscolares = $activity['anos_escolares'];
+                }
+            }
+
+            json_response_act(200, [
+                'error' => false,
+                'activity' => [
+                    'id' => $activity['id'],
+                    'nome_atividade' => $activity['nome_atividade'] ?? '',
+                    'descricao' => $activity['descricao'] ?? null,
+                    'tipo' => $tipo,
+                    'etapa' => $activity['etapa'] ?? null,
+                    'anos_escolares' => $anosEscolares,
+                    'eixos_bncc' => $eixosBncc,
+                    'duracao' => $activity['duracao'] ?? null,
+                    'nivel_dificuldade' => $activity['nivel_dificuldade'] ?? 'Médio',
+                    'thumbnail_url' => $activity['thumbnail_url'] ?? null,
+                    'video_url' => $activity['video_url'] ?? null,
+                    'pdf_estrutura_pedagogica_url' => $activity['pdf_estrutura_pedagogica_url'] ?? null,
+                    'material_apoio_url' => $activity['material_apoio_url'] ?? null,
+                    'criado_em' => $activity['criado_em'] ?? null,
+                    'atualizado_em' => $activity['atualizado_em'] ?? null,
+                    'criado_por' => $activity['criado_por'] ?? null,
+                ]
+            ]);
+        } else {
+            // Listar todas as atividades (com filtros opcionais)
+            $tipo = $_GET['tipo'] ?? null;
+            $etapa = $_GET['etapa'] ?? null;
+            $nivel = $_GET['nivel_dificuldade'] ?? null;
+            $search = $_GET['search'] ?? null;
+
+            // Selecionar campos novos e antigos para compatibilidade
+            $sql = "SELECT 
+                id,
+                COALESCE(nome_atividade, titulo) as nome_atividade,
+                descricao,
+                tipo,
+                etapa,
+                anos_escolares,
+                COALESCE(eixos_bncc, JSON_ARRAY(id_eixo)) as eixos_bncc,
+                COALESCE(disciplinas_transversais, '[]') as disciplinas_transversais,
+                duracao,
+                COALESCE(nivel_dificuldade, 
+                    CASE 
+                        WHEN dificuldade = 'facil' THEN 'Fácil'
+                        WHEN dificuldade = 'medio' THEN 'Médio'
+                        WHEN dificuldade = 'dificil' THEN 'Difícil'
+                        ELSE 'Médio'
+                    END
+                ) as nivel_dificuldade,
+                COALESCE(thumbnail_url, url_miniatura) as thumbnail_url,
+                COALESCE(video_url, url_video) as video_url,
+                COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                material_apoio_url,
+                COALESCE(criado_em, data_criacao) as criado_em,
+                atualizado_em,
+                criado_por,
+                titulo,
+                dificuldade,
+                url_miniatura,
+                url_video,
+                url_documento,
+                data_criacao,
+                id_eixo
+            FROM atividades WHERE 1=1";
+            $params = [];
+
+            if ($tipo) {
+                // Compatibilidade: aceitar tanto "Plugada" quanto "plugada"
+                $sql .= " AND (tipo = ? OR LOWER(tipo) = LOWER(?))";
+                $params[] = $tipo;
+                $params[] = $tipo;
+            }
+
+            if ($etapa) {
+                $sql .= " AND etapa = ?";
+                $params[] = $etapa;
+            }
+
+            if ($nivel) {
+                // Compatibilidade: buscar em nivel_dificuldade ou dificuldade (antigo)
+                $sql .= " AND (nivel_dificuldade = ? OR (dificuldade = ? AND nivel_dificuldade IS NULL))";
+                // Converter formato novo para antigo para busca
+                $nivelAntigo = '';
+                if ($nivel === 'Fácil') $nivelAntigo = 'facil';
+                elseif ($nivel === 'Médio') $nivelAntigo = 'medio';
+                elseif ($nivel === 'Difícil') $nivelAntigo = 'dificil';
+                $params[] = $nivel;
+                $params[] = $nivelAntigo;
+            }
+
+            if ($search) {
+                // Compatibilidade: buscar também em titulo (campo antigo)
+                $sql .= " AND (COALESCE(nome_atividade, titulo) LIKE ? OR descricao LIKE ?)";
+                $searchTerm = "%{$search}%";
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+
+            // Ordenar por criado_em se existir, senão por data_criacao (compatibilidade)
+            // Usar COALESCE apenas se ambos os campos existirem na query
+            $sql .= " ORDER BY COALESCE(criado_em, data_criacao, NOW()) DESC";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $activitiesData = [];
+            foreach ($activities as $activity) {
+                // Converter tipo para formato esperado (Plugada/Desplugada)
+                $tipo = $activity['tipo'] ?? '';
+                if (strtolower($tipo) === 'plugada') $tipo = 'Plugada';
+                if (strtolower($tipo) === 'desplugada') $tipo = 'Desplugada';
+                
+                // Converter eixos_bncc (pode vir como JSON string ou já processado)
+                $eixosBncc = [];
+                if (isset($activity['eixos_bncc'])) {
+                    if (is_string($activity['eixos_bncc'])) {
+                        $decoded = json_decode($activity['eixos_bncc'], true);
+                        $eixosBncc = is_array($decoded) ? $decoded : [];
+                    } elseif (is_array($activity['eixos_bncc'])) {
+                        $eixosBncc = $activity['eixos_bncc'];
+                    }
+                }
+                
+                // Converter anos_escolares (pode ser longtext antigo ou JSON)
+                $anosEscolares = [];
+                if (isset($activity['anos_escolares'])) {
+                    if (is_string($activity['anos_escolares'])) {
+                        $decoded = json_decode($activity['anos_escolares'], true);
+                        $anosEscolares = is_array($decoded) ? $decoded : [];
+                    } elseif (is_array($activity['anos_escolares'])) {
+                        $anosEscolares = $activity['anos_escolares'];
+                    }
+                }
+                
+                // Converter disciplinas_transversais (JSON)
+                $disciplinasTransversais = [];
+                if (isset($activity['disciplinas_transversais'])) {
+                    if (is_string($activity['disciplinas_transversais'])) {
+                        $decoded = json_decode($activity['disciplinas_transversais'], true);
+                        $disciplinasTransversais = is_array($decoded) ? $decoded : [];
+                    } elseif (is_array($activity['disciplinas_transversais'])) {
+                        $disciplinasTransversais = $activity['disciplinas_transversais'];
+                    }
+                }
+                
+                $activitiesData[] = [
+                    'id' => $activity['id'],
+                    'nome_atividade' => $activity['nome_atividade'] ?? '',
+                    'descricao' => $activity['descricao'] ?? null,
+                    'tipo' => $tipo,
+                    'etapa' => $activity['etapa'] ?? null,
+                    'anos_escolares' => $anosEscolares,
+                    'eixos_bncc' => $eixosBncc,
+                    'disciplinas_transversais' => $disciplinasTransversais,
+                    'duracao' => $activity['duracao'] ?? null,
+                    'nivel_dificuldade' => $activity['nivel_dificuldade'] ?? 'Médio',
+                    'thumbnail_url' => $activity['thumbnail_url'] ?? null,
+                    'video_url' => $activity['video_url'] ?? null,
+                    'pdf_estrutura_pedagogica_url' => $activity['pdf_estrutura_pedagogica_url'] ?? null,
+                    'material_apoio_url' => $activity['material_apoio_url'] ?? null,
+                    'criado_em' => $activity['criado_em'] ?? null,
+                    'atualizado_em' => $activity['atualizado_em'] ?? null,
+                ];
+            }
+
+            json_response_act(200, [
+                'error' => false,
+                'activities' => $activitiesData,
+                'count' => count($activitiesData)
+            ]);
+        }
+    }
+
+    if ($method === 'POST') {
+        $data = read_json_body();
+
+        $id = trim((string)($data['id'] ?? ''));
+        $nomeAtividade = trim((string)($data['nome_atividade'] ?? ''));
+        $descricao = isset($data['descricao']) && trim((string)$data['descricao']) !== '' 
+            ? trim((string)$data['descricao']) 
+            : null;
+        $tipo = (string)($data['tipo'] ?? '');
+        $etapa = (string)($data['etapa'] ?? '');
+        // Para Educação Infantil, anos_escolares deve ser array vazio []
+        // Para outras etapas, pode ser array vazio ou com valores
+        if ($etapa === 'Educação Infantil') {
+            $anosEscolares = '[]'; // JSON array vazio para Educação Infantil
+        } else {
+            $anosEscolares = isset($data['anos_escolares']) && is_array($data['anos_escolares'])
+                ? json_encode($data['anos_escolares'], JSON_UNESCAPED_UNICODE) 
+                : '[]'; // Array vazio ao invés de null
+        }
+        // eixos_bncc sempre deve ser um JSON array, mesmo que vazio
+        $eixosBncc = isset($data['eixos_bncc']) && is_array($data['eixos_bncc'])
+            ? json_encode($data['eixos_bncc'], JSON_UNESCAPED_UNICODE) 
+            : '[]'; // Array vazio ao invés de null
+        // disciplinas_transversais sempre deve ser um JSON array, mesmo que vazio
+        $disciplinasTransversais = isset($data['disciplinas_transversais']) && is_array($data['disciplinas_transversais'])
+            ? json_encode($data['disciplinas_transversais'], JSON_UNESCAPED_UNICODE) 
+            : '[]'; // Array vazio ao invés de null
+        $duracao = isset($data['duracao']) && trim((string)$data['duracao']) !== '' 
+            ? trim((string)$data['duracao']) 
+            : null;
+        $nivelDificuldade = (string)($data['nivel_dificuldade'] ?? '');
+        $thumbnailUrl = isset($data['thumbnail_url']) && trim((string)$data['thumbnail_url']) !== '' 
+            ? trim((string)$data['thumbnail_url']) 
+            : null;
+        $videoUrl = trim((string)($data['video_url'] ?? ''));
+        $pdfEstruturaUrl = isset($data['pdf_estrutura_pedagogica_url']) && trim((string)$data['pdf_estrutura_pedagogica_url']) !== '' 
+            ? trim((string)$data['pdf_estrutura_pedagogica_url']) 
+            : null;
+        $materialApoioUrl = isset($data['material_apoio_url']) && trim((string)$data['material_apoio_url']) !== '' 
+            ? trim((string)$data['material_apoio_url']) 
+            : null;
+
+        // Validações
+        $missingFields = [];
+        if (empty($id)) $missingFields[] = 'id';
+        if (empty($nomeAtividade)) $missingFields[] = 'nome_atividade';
+        if (empty($tipo)) $missingFields[] = 'tipo';
+        if (empty($etapa)) $missingFields[] = 'etapa';
+        if (empty($nivelDificuldade)) $missingFields[] = 'nivel_dificuldade';
+        if (empty($videoUrl)) $missingFields[] = 'video_url';
+        
+        if (!empty($missingFields)) {
+            json_response_act(400, [
+                'error' => true,
+                'message' => 'Campos obrigatórios faltando: ' . implode(', ', $missingFields),
+                'missing_fields' => $missingFields
+            ]);
+        }
+
+        $allowedTipos = ['Plugada', 'Desplugada'];
+        if (!in_array($tipo, $allowedTipos, true)) {
+            json_response_act(400, ['error' => true, 'message' => 'Tipo inválido. Use: Plugada ou Desplugada']);
+        }
+
+        $allowedEtapas = ['Educação Infantil', 'Anos Iniciais', 'Anos Finais'];
+        if (!in_array($etapa, $allowedEtapas, true)) {
+            json_response_act(400, ['error' => true, 'message' => 'Etapa inválida']);
+        }
+
+        $allowedNiveis = ['Fácil', 'Médio', 'Difícil'];
+        if (!in_array($nivelDificuldade, $allowedNiveis, true)) {
+            json_response_act(400, ['error' => true, 'message' => 'Nível de dificuldade inválido']);
+        }
+
+        // Verificar se já existe
+        $checkStmt = $pdo->prepare("SELECT id FROM atividades WHERE id = ?");
+        $checkStmt->execute([$id]);
+        if ($checkStmt->fetch()) {
+            json_response_act(409, ['error' => true, 'message' => 'Atividade com este ID já existe']);
+        }
+
+        // Criar atividade
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO atividades (
+                    id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais,
+                    duracao, nivel_dificuldade, thumbnail_url, video_url,
+                    pdf_estrutura_pedagogica_url, material_apoio_url, criado_por
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $params = [
+                $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
+                $duracao, $nivelDificuldade, $thumbnailUrl, $videoUrl,
+                $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
+            ];
+            
+            $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log('Erro no INSERT: ' . $e->getMessage());
+            throw $e; // Re-throw para ser capturado pelo catch externo
+        }
+
+        json_response_act(201, [
             'error' => false,
-            'activities' => [],
-            'message' => 'Tabela de atividades não encontrada no banco'
+            'message' => 'Atividade criada com sucesso',
+            'activity' => [
+                'id' => $id,
+                'nome_atividade' => $nomeAtividade
+            ]
         ]);
     }
 
-    $tableName = $table['TABLE_NAME'];
+    if ($method === 'PUT') {
+        $data = read_json_body();
+        $id = trim((string)($data['id'] ?? ''));
 
-    // Buscar todas as atividades
-    $stmt = $pdo->query("
-        SELECT 
-            id,
-            title,
-            description,
-            type,
-            school_years,
-            axis_id,
-            axis_ids,
-            knowledge_object_id,
-            skill_ids,
-            duration,
-            difficulty,
-            materials,
-            objectives,
-            thumbnail_url,
-            video_url,
-            document_url,
-            pedagogical_pdf_url,
-            material_pdf_url,
-            created_at
-        FROM {$tableName}
-        ORDER BY created_at DESC
-    ");
+        if (empty($id)) {
+            json_response_act(400, ['error' => true, 'message' => 'ID da atividade é obrigatório']);
+        }
 
-    $activities = [];
-    while ($row = $stmt->fetch()) {
-        // Converter JSON strings para arrays
-        $schoolYears = json_decode($row['school_years'] ?? '[]', true) ?: [];
-        $axisIds = json_decode($row['axis_ids'] ?? '[]', true) ?: [];
-        $skillIds = json_decode($row['skill_ids'] ?? '[]', true) ?: [];
-        $materials = json_decode($row['materials'] ?? '[]', true) ?: [];
-        $objectives = json_decode($row['objectives'] ?? '[]', true) ?: [];
+        // Verificar se existe
+        $checkStmt = $pdo->prepare("SELECT id FROM atividades WHERE id = ?");
+        $checkStmt->execute([$id]);
+        if (!$checkStmt->fetch()) {
+            json_response_act(404, ['error' => true, 'message' => 'Atividade não encontrada']);
+        }
 
-        $activities[] = [
-            'id' => $row['id'],
-            'title' => $row['title'],
-            'description' => $row['description'] ?: 'Sem descrição',
-            'type' => $row['type'],
-            'schoolYears' => $schoolYears,
-            'axisId' => $row['axis_id'] ?: '',
-            'axisIds' => $axisIds,
-            'knowledgeObjectId' => $row['knowledge_object_id'] ?: '',
-            'skillIds' => $skillIds,
-            'duration' => $row['duration'] ? (int)$row['duration'] : 0,
-            'difficulty' => $row['difficulty'] ?: 'medio',
-            'materials' => $materials,
-            'objectives' => $objectives,
-            'thumbnail_url' => $row['thumbnail_url'] ?: '',
-            'video_url' => $row['video_url'] ?: null,
-            'document_url' => $row['document_url'] ?: null,
-            'pedagogical_pdf_url' => $row['pedagogical_pdf_url'] ?: null,
-            'material_pdf_url' => $row['material_pdf_url'] ?: null,
-            'created_at' => $row['created_at'],
-        ];
+        $updates = [];
+        $params = [];
+
+        if (isset($data['nome_atividade'])) {
+            $updates[] = "nome_atividade = ?";
+            $params[] = trim((string)$data['nome_atividade']);
+        }
+        if (isset($data['descricao'])) {
+            $updates[] = "descricao = ?";
+            $params[] = trim((string)$data['descricao']);
+        }
+        if (isset($data['tipo'])) {
+            $updates[] = "tipo = ?";
+            $params[] = (string)$data['tipo'];
+        }
+        if (isset($data['etapa'])) {
+            $updates[] = "etapa = ?";
+            $params[] = (string)$data['etapa'];
+        }
+        if (isset($data['anos_escolares'])) {
+            $updates[] = "anos_escolares = ?";
+            $params[] = is_array($data['anos_escolares']) 
+                ? json_encode($data['anos_escolares'], JSON_UNESCAPED_UNICODE) 
+                : null;
+        }
+        if (isset($data['eixos_bncc'])) {
+            $updates[] = "eixos_bncc = ?";
+            $params[] = is_array($data['eixos_bncc']) 
+                ? json_encode($data['eixos_bncc'], JSON_UNESCAPED_UNICODE) 
+                : '[]';
+        }
+        if (isset($data['disciplinas_transversais'])) {
+            $updates[] = "disciplinas_transversais = ?";
+            $params[] = is_array($data['disciplinas_transversais']) 
+                ? json_encode($data['disciplinas_transversais'], JSON_UNESCAPED_UNICODE) 
+                : '[]';
+        }
+        if (isset($data['duracao'])) {
+            $updates[] = "duracao = ?";
+            $params[] = trim((string)$data['duracao']) ?: null;
+        }
+        if (isset($data['nivel_dificuldade'])) {
+            $updates[] = "nivel_dificuldade = ?";
+            $params[] = (string)$data['nivel_dificuldade'];
+        }
+        if (isset($data['thumbnail_url'])) {
+            $updates[] = "thumbnail_url = ?";
+            $params[] = trim((string)$data['thumbnail_url']) ?: null;
+        }
+        if (isset($data['video_url'])) {
+            $updates[] = "video_url = ?";
+            $params[] = trim((string)$data['video_url']);
+        }
+        if (isset($data['pdf_estrutura_pedagogica_url'])) {
+            $updates[] = "pdf_estrutura_pedagogica_url = ?";
+            $params[] = trim((string)$data['pdf_estrutura_pedagogica_url']) ?: null;
+        }
+        if (isset($data['material_apoio_url'])) {
+            $updates[] = "material_apoio_url = ?";
+            $params[] = trim((string)$data['material_apoio_url']) ?: null;
+        }
+
+        if (empty($updates)) {
+            json_response_act(400, ['error' => true, 'message' => 'Nenhum campo para atualizar']);
+        }
+
+        $params[] = $id;
+        $sql = "UPDATE atividades SET " . implode(', ', $updates) . " WHERE id = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        json_response_act(200, [
+            'error' => false,
+            'message' => 'Atividade atualizada com sucesso'
+        ]);
     }
 
-    json_response(200, [
-        'error' => false,
-        'activities' => $activities,
-        'count' => count($activities)
-    ]);
+    if ($method === 'DELETE') {
+        $data = read_json_body();
+        $id = trim((string)($data['id'] ?? ''));
+
+        if (empty($id)) {
+            json_response_act(400, ['error' => true, 'message' => 'ID da atividade é obrigatório']);
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM atividades WHERE id = ?");
+        $stmt->execute([$id]);
+
+        if ($stmt->rowCount() > 0) {
+            json_response_act(200, [
+                'error' => false,
+                'message' => 'Atividade deletada com sucesso'
+            ]);
+        } else {
+            json_response_act(404, ['error' => true, 'message' => 'Atividade não encontrada']);
+        }
+    }
+
+    json_response_act(405, ['error' => true, 'message' => 'Método não permitido']);
 
 } catch (PDOException $e) {
-    error_log('Erro ao buscar atividades: ' . $e->getMessage());
-    json_response(500, [
-        'error' => true,
-        'message' => 'Erro ao buscar atividades do banco de dados'
-    ]);
+    $errorMsg = $e->getMessage();
+    $errorCode = $e->getCode();
+    error_log('Erro ao gerenciar atividades: ' . $errorMsg);
+    error_log('Código do erro: ' . $errorCode);
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    
+    // Verificar se é erro de coluna não encontrada
+    if (strpos($errorMsg, "Unknown column") !== false) {
+        json_response_act(500, [
+            'error' => true,
+            'message' => 'Estrutura da tabela incompatível. Execute o script SQL: migrate-atividades-old-to-new.sql',
+            'details' => $errorMsg
+        ]);
+    } 
+    // Verificar se é erro de SQL syntax
+    elseif (strpos($errorMsg, "SQLSTATE") !== false || strpos($errorMsg, "SQL syntax") !== false) {
+        json_response_act(500, [
+            'error' => true,
+            'message' => 'Erro de SQL: ' . $errorMsg,
+            'details' => 'Verifique a estrutura da tabela atividades no banco de dados'
+        ]);
+    } 
+    // Outros erros de banco
+    else {
+        json_response_act(500, [
+            'error' => true,
+            'message' => 'Erro ao gerenciar atividades no banco de dados',
+            'details' => $errorMsg,
+            'code' => $errorCode
+        ]);
+    }
 } catch (Exception $e) {
-    error_log('Erro geral: ' . $e->getMessage());
-    json_response(500, [
+    $errorMsg = $e->getMessage();
+    error_log('Erro geral: ' . $errorMsg);
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    json_response_act(500, [
         'error' => true,
-        'message' => 'Erro inesperado: ' . $e->getMessage()
+        'message' => 'Erro inesperado: ' . $errorMsg
     ]);
 }

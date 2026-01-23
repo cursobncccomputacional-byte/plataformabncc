@@ -98,7 +98,9 @@ function handleLogin() {
                 'subjects' => json_decode($user['materias'] ?? '[]', true),
                 'created_at' => $user['data_criacao'],
                 'last_login' => $user['ultimo_login'],
-                'is_active' => (bool)$user['ativo']
+                'is_active' => (bool)$user['ativo'],
+                'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+                'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0)
             ],
             'session_id' => session_id()
         ];
@@ -171,7 +173,9 @@ function handleMe() {
                 'subjects' => json_decode($user['materias'] ?? '[]', true),
                 'created_at' => $user['data_criacao'],
                 'last_login' => $user['ultimo_login'],
-                'is_active' => (bool)$user['ativo']
+                'is_active' => (bool)$user['ativo'],
+                'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+                'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0)
             ]
         ];
         

@@ -182,70 +182,168 @@ export const CourseDetail = () => {
           </div>
         </div>
 
-        {/* Lessons */}
+        {/* Lessons por Módulo */}
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h2 className="text-2xl font-bold mb-6 text-[#044982]">Conteúdo do Curso</h2>
-          <div className="space-y-2">
-            {lessons.map((lesson, index) => {
-              const canAccess = enrolled || lesson.is_preview;
-              return (
-                <motion.div
-                  key={lesson.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`p-4 rounded-lg border-2 ${
-                    canAccess
-                      ? 'border-[#044982] hover:bg-gray-50 cursor-pointer'
-                      : 'border-gray-200 opacity-60'
-                  }`}
-                >
-                  {canAccess ? (
-                    <Link
-                      to={`/curso/${id}/aula/${lesson.id}`}
-                      className="flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-[#044982] text-white flex items-center justify-center font-bold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-[#044982]">{lesson.title}</h3>
-                          {lesson.description && (
-                            <p className="text-sm text-gray-600">{lesson.description}</p>
-                          )}
-                        </div>
+          
+          {/* Agrupar aulas por módulo */}
+          {(() => {
+            const moduleI = lessons.filter(l => l.module === 'I');
+            const moduleII = lessons.filter(l => l.module === 'II');
+            let lessonCounter = 0;
+
+            return (
+              <div className="space-y-8">
+                {/* Módulo I */}
+                {moduleI.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="bg-[#044982] text-white px-4 py-2 rounded-lg font-bold text-lg">
+                        Módulo I
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-500">
-                          {Math.floor(lesson.video_duration / 60)}:
-                          {String(lesson.video_duration % 60).padStart(2, '0')}
-                        </span>
-                        {lesson.is_preview && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                            Preview
-                          </span>
-                        )}
-                        <Play className="w-5 h-5 text-[#044982]" />
-                      </div>
-                    </Link>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-600">{lesson.title}</h3>
-                        </div>
-                      </div>
-                      <Lock className="w-5 h-5 text-gray-400" />
+                      <span className="text-gray-600">{moduleI.length} {moduleI.length === 1 ? 'aula' : 'aulas'}</span>
                     </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                    <div className="space-y-2">
+                      {moduleI.map((lesson) => {
+                        lessonCounter++;
+                        const canAccess = enrolled || lesson.is_preview;
+                        return (
+                          <motion.div
+                            key={lesson.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: lessonCounter * 0.05 }}
+                            className={`p-4 rounded-lg border-2 ${
+                              canAccess
+                                ? 'border-[#044982] hover:bg-gray-50 cursor-pointer'
+                                : 'border-gray-200 opacity-60'
+                            }`}
+                          >
+                            {canAccess ? (
+                              <Link
+                                to={`/curso/${id}/aula/${lesson.id}`}
+                                className="flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-full bg-[#044982] text-white flex items-center justify-center font-bold">
+                                    {lessonCounter}
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-[#044982]">{lesson.title}</h3>
+                                    {lesson.description && (
+                                      <p className="text-sm text-gray-600">{lesson.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-sm text-gray-500">
+                                    {Math.floor(lesson.video_duration / 60)}:
+                                    {String(lesson.video_duration % 60).padStart(2, '0')}
+                                  </span>
+                                  {lesson.is_preview && (
+                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                      Preview
+                                    </span>
+                                  )}
+                                  <Play className="w-5 h-5 text-[#044982]" />
+                                </div>
+                              </Link>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
+                                    {lessonCounter}
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-gray-600">{lesson.title}</h3>
+                                  </div>
+                                </div>
+                                <Lock className="w-5 h-5 text-gray-400" />
+                              </div>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Módulo II */}
+                {moduleII.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="bg-[#005a93] text-white px-4 py-2 rounded-lg font-bold text-lg">
+                        Módulo II
+                      </div>
+                      <span className="text-gray-600">{moduleII.length} {moduleII.length === 1 ? 'aula' : 'aulas'}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {moduleII.map((lesson) => {
+                        lessonCounter++;
+                        const canAccess = enrolled || lesson.is_preview;
+                        return (
+                          <motion.div
+                            key={lesson.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: lessonCounter * 0.05 }}
+                            className={`p-4 rounded-lg border-2 ${
+                              canAccess
+                                ? 'border-[#005a93] hover:bg-gray-50 cursor-pointer'
+                                : 'border-gray-200 opacity-60'
+                            }`}
+                          >
+                            {canAccess ? (
+                              <Link
+                                to={`/curso/${id}/aula/${lesson.id}`}
+                                className="flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-full bg-[#005a93] text-white flex items-center justify-center font-bold">
+                                    {lessonCounter}
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-[#005a93]">{lesson.title}</h3>
+                                    {lesson.description && (
+                                      <p className="text-sm text-gray-600">{lesson.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-sm text-gray-500">
+                                    {Math.floor(lesson.video_duration / 60)}:
+                                    {String(lesson.video_duration % 60).padStart(2, '0')}
+                                  </span>
+                                  {lesson.is_preview && (
+                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                      Preview
+                                    </span>
+                                  )}
+                                  <Play className="w-5 h-5 text-[#005a93]" />
+                                </div>
+                              </Link>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
+                                    {lessonCounter}
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-gray-600">{lesson.title}</h3>
+                                  </div>
+                                </div>
+                                <Lock className="w-5 h-5 text-gray-400" />
+                              </div>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
