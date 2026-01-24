@@ -29,6 +29,18 @@ class EADApiService {
     this.sessionId = localStorage.getItem('ead_session_id');
   }
 
+  private getSavedUserForHeaders(): { id?: string; role?: string } | null {
+    try {
+      const raw = localStorage.getItem('ead_user');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return { id: parsed.id, role: parsed.role };
+    } catch {
+      return null;
+    }
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -43,6 +55,16 @@ class EADApiService {
 
       if (this.sessionId) {
         headers['X-Session-ID'] = this.sessionId;
+      }
+
+      // Importante: no subdomínio, o cookie de sessão do domínio principal não vale.
+      // Enviar ID/Role via headers para autenticar na API do cursos.
+      const savedUser = this.getSavedUserForHeaders();
+      if (savedUser?.id) {
+        headers['X-User-Id'] = String(savedUser.id);
+      }
+      if (savedUser?.role) {
+        headers['X-User-Role'] = String(savedUser.role);
       }
 
       const response = await fetch(url, {

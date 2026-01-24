@@ -545,7 +545,7 @@ class ApiService {
   /**
    * Trilhas Pedagógicas
    */
-  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa'): Promise<ApiResponse & { trilhas?: any[] }> {
+  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa' | 'disciplina_transversal'): Promise<ApiResponse & { trilhas?: any[] }> {
     const query = tipo ? `?tipo=${tipo}` : '';
     return this.request(`/trilhas/index.php${query}`);
   }
@@ -558,7 +558,7 @@ class ApiService {
     id: string;
     titulo: string;
     descricao?: string;
-    tipo: 'eixo_bncc' | 'etapa';
+    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
     valor: string;
     thumbnail_url?: string;
     ordem?: number;
@@ -572,7 +572,7 @@ class ApiService {
   async updateTrilha(trilhaId: string, updates: Partial<{
     titulo: string;
     descricao: string;
-    tipo: 'eixo_bncc' | 'etapa';
+    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
     valor: string;
     thumbnail_url: string;
     ordem: number;
@@ -615,8 +615,89 @@ class ApiService {
     }
     
     try {
+      // Modelos válidos (2026): https://console.groq.com/docs/models
+      const candidateModels = [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+        'openai/gpt-oss-20b',
+      ] as const;
+
+      const tryCall = async (model: string) => {
+        const requestBody = {
+          model,
+          messages: [
+            {
+              role: 'system',
+              content: 'Você é um assistente educacional especializado em sugerir atividades pedagógicas alinhadas à BNCC (Base Nacional Comum Curricular) para pensamento computacional. Forneça sugestões práticas, objetivas e detalhadas, incluindo objetivos, materiais necessários e passo a passo quando relevante. Foque em atividades plugadas e desplugadas para Educação Infantil, Anos Iniciais e Anos Finais.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+        };
+
+        console.log('🔍 Debug - Requisição para Groq API:', {
+          url: 'https://api.groq.com/openai/v1/chat/completions',
+          model: requestBody.model,
+          tokenLength: token.length,
+          tokenPrefix: token.substring(0, 10) + '...',
+        });
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        return { response, requestBody };
+      };
+
+      let lastErrorMessage: string | null = null;
+      for (const model of candidateModels) {
+        const { response } = await tryCall(model);
+
+        if (response.ok) {
+          const data = await response.json();
+          const suggestions = data.choices?.[0]?.message?.content || '';
+          return {
+            error: false,
+            message: 'Sugestões geradas com sucesso',
+            suggestions: suggestions,
+          };
+        }
+
+        // Capturar erro e tentar próximo modelo se for descontinuação
+        try {
+          const errorData = await response.json();
+          const msg = errorData.error?.message || errorData.message || `Erro ao consultar IA: ${response.status}`;
+          lastErrorMessage = msg;
+          console.error('Erro na API Groq:', errorData);
+          if (typeof msg === 'string' && msg.toLowerCase().includes('decommissioned')) {
+            continue;
+          }
+          // Se não for descontinuação, parar aqui
+          return { error: true, message: msg };
+        } catch {
+          const errorText = await response.text().catch(() => '');
+          lastErrorMessage = errorText || `Erro ao consultar IA: ${response.status}`;
+          return { error: true, message: lastErrorMessage };
+        }
+      }
+
+      return {
+        error: true,
+        message: lastErrorMessage || 'Não foi possível consultar a IA (modelos indisponíveis).',
+      };
+
+      /*
       const requestBody = {
-        model: 'llama-3.1-70b-versatile', // Modelo atualizado e estável do Groq (mixtral-8x7b-32768 foi descontinuado)
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
@@ -672,6 +753,7 @@ class ApiService {
         message: 'Sugestões geradas com sucesso',
         suggestions: suggestions,
       };
+      */
     } catch (error) {
       return {
         error: true,
@@ -1102,6 +1184,41 @@ class ApiService {
     }
   }
 
+  /**
+   * Inscrever um usuário em um curso (root)
+   * Usado para o curso aparecer em "Meus Cursos" no subdomínio.
+   */
+  async enrollUserInCourse(userId: string, courseId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+
+      const response = await fetch(`${cursosApiUrl}/enrollments/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ user_id: userId, course_id: courseId }),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
   // ============================================
   // Métodos de Módulos e Aulas (Formação Continuada)
   // ============================================
@@ -1288,6 +1405,134 @@ class ApiService {
   }
 
   /**
+   * Vídeos (partes) de uma Aula
+   */
+  async getAulaVideos(aulaId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/aula-videos/index.php?aula_id=${encodeURIComponent(aulaId)}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  async createAulaVideo(videoData: {
+    id: string;
+    aula_id: string;
+    titulo: string;
+    descricao?: string;
+    video_url: string;
+    duracao_video?: number;
+    thumbnail_url?: string;
+    ordem?: number;
+  }): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/aula-videos/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(videoData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  async updateAulaVideo(videoId: string, updates: Partial<{
+    titulo: string;
+    descricao: string;
+    video_url: string;
+    duracao_video: number;
+    thumbnail_url: string;
+    ordem: number;
+    ativo: boolean;
+  }>): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/aula-videos/index.php`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: videoId, ...updates }),
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  async deleteAulaVideo(videoId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/aula-videos/index.php`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: videoId }),
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+      const data = await response.json();
+      return { error: !response.ok, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
    * Criar aula
    */
   async createAula(aulaData: {
@@ -1295,7 +1540,7 @@ class ApiService {
     modulo_id: string;
     titulo: string;
     descricao?: string;
-    video_url: string;
+    video_url?: string;
     duracao_video?: number;
     thumbnail_url?: string;
     ordem?: number;
@@ -1310,11 +1555,25 @@ class ApiService {
         headers['X-User-Role'] = currentUser.role || '';
       }
 
+      // Enviar apenas campos relevantes (legados só se vierem preenchidos)
+      const payload: any = {
+        id: aulaData.id,
+        modulo_id: aulaData.modulo_id,
+        titulo: aulaData.titulo,
+        descricao: aulaData.descricao,
+        ordem: aulaData.ordem,
+      };
+      if (aulaData.video_url && String(aulaData.video_url).trim() !== '') {
+        payload.video_url = aulaData.video_url;
+        payload.duracao_video = aulaData.duracao_video ?? 0;
+        payload.thumbnail_url = aulaData.thumbnail_url ?? '';
+      }
+
       const response = await fetch(`${cursosApiUrl}/aulas/index.php`, {
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify(aulaData),
+        body: JSON.stringify(payload),
       });
 
       const contentType = response.headers.get('content-type');

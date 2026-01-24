@@ -1,0 +1,11 @@
+Options -MultiViews
+RewriteEngine On
+
+# Se o arquivo/pasta existe, serve direto
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# SPA (React Router): qualquer rota volta para index.html
+RewriteRule ^ index.html [L]
+

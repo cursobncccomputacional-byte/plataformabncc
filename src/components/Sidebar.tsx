@@ -12,7 +12,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarProps) => {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   // Expandir menu Cursos se estiver em plataforma ou formacao-continuada
@@ -20,10 +20,20 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas'
   );
 
-  const isRoot = profile?.role === 'root';
+  // Evitar "piscar" menus: usar fallback do localStorage até a API atualizar o profile
+  const effectiveProfile = profile ?? (() => {
+    try {
+      const saved = localStorage.getItem('plataforma-bncc-user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const isRoot = effectiveProfile?.role === 'root';
   // Root sempre tem acesso a tudo, então sempre mostra os menus
-  const canManageActivities = isRoot || (profile?.can_manage_activities ?? false);
-  const canManageCourses = isRoot || (profile?.can_manage_courses ?? false);
+  const canManageActivities = isRoot || (effectiveProfile?.can_manage_activities ?? false);
+  const canManageCourses = isRoot || (effectiveProfile?.can_manage_courses ?? false);
   const showCursosMenu = canManageActivities || canManageCourses;
 
   // Notificar mudanças no estado da sidebar
@@ -87,7 +97,7 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
   const nonRootMenuItems = [];
   
   // Professores e admins veem Trilhas Pedagógicas (primeiro no menu)
-  if (canManageActivities || (profile?.role === 'admin')) {
+  if (canManageActivities || (effectiveProfile?.role === 'admin')) {
     nonRootMenuItems.push({ id: 'trilhas' as const, icon: BookOpen, label: 'Trilhas Pedagógicas' });
   }
   
@@ -162,6 +172,12 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
         <div className="flex-1 min-h-0 overflow-y-auto">
           {/* Navigation */}
           <nav className="p-4 space-y-2">
+            {/* Durante carregamento inicial, evita mudar/“sumir” itens */}
+            {loading && !effectiveProfile && (
+              <div className="text-white text-opacity-80 text-sm px-2 py-2">
+                Carregando menu...
+              </div>
+            )}
             {menuItems.map((item) => {
               const IconComponent = item.icon;
               const isActive = currentPage === item.id;

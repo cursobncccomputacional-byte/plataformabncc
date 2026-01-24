@@ -62,6 +62,10 @@ try {
         $courseId = $_GET['course_id'] ?? null;
 
         if ($userId) {
+            // Segurança: se não for root, só pode ver suas próprias permissões
+            if (($currentUser['role'] ?? '') !== 'root' && $userId !== ($currentUser['id'] ?? '')) {
+                json_response(403, ['error' => true, 'message' => 'Acesso negado']);
+            }
             // Buscar cursos permitidos para o usuário
             $stmt = $pdo->prepare("
                 SELECT 
@@ -116,8 +120,8 @@ try {
             json_response(400, ['error' => true, 'message' => 'user_id e course_id são obrigatórios']);
         }
 
-        // Verificar se o usuário existe e é professor_cursos
-        $stmt = $pdo->prepare("SELECT id, nivel_acesso FROM usuarios WHERE id = ?");
+        // Verificar se o usuário existe
+        $stmt = $pdo->prepare("SELECT id, nivel_acesso, can_manage_courses FROM usuarios WHERE id = ?");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
         
@@ -125,16 +129,18 @@ try {
             json_response(404, ['error' => true, 'message' => 'Usuário não encontrado']);
         }
 
-        // Permitir atribuir permissões para professor_cursos ou usuários com can_manage_courses
+        // Permitir atribuir permissões para professor_cursos, admin ou usuários com can_manage_courses
         $canManage = (bool)($user['can_manage_courses'] ?? false);
-        if ($user['nivel_acesso'] !== 'professor_cursos' && !$canManage) {
-            json_response(400, ['error' => true, 'message' => 'Permissões de curso só podem ser atribuídas a usuários com perfil professor_cursos ou com permissão can_manage_courses']);
+        $role = strtolower((string)($user['nivel_acesso'] ?? ''));
+        if ($role !== 'professor_cursos' && $role !== 'admin' && !$canManage) {
+            json_response(400, ['error' => true, 'message' => 'Permissões de curso só podem ser atribuídas a usuários com perfil professor_cursos/admin ou com permissão can_manage_courses']);
         }
 
         // Verificar se o curso existe
-        $stmt = $pdo->prepare("SELECT id FROM cursos WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT id, status, alunos_inscritos FROM cursos WHERE id = ?");
         $stmt->execute([$courseId]);
-        if (!$stmt->fetch()) {
+        $course = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$course) {
             json_response(404, ['error' => true, 'message' => 'Curso não encontrado']);
         }
 
@@ -152,9 +158,27 @@ try {
         ");
         $stmt->execute([$userId, $courseId, $currentUser['id']]);
 
+        // Se o curso já está publicado, criar inscrição automaticamente
+        // (isso faz o curso aparecer em "Meus Cursos" sem precisar clicar em "Explorar Cursos")
+        $inscrito = false;
+        if (($course['status'] ?? '') === 'publicado') {
+            $stmt = $pdo->prepare("SELECT id FROM inscricoes WHERE usuario_id = ? AND curso_id = ?");
+            $stmt->execute([$userId, $courseId]);
+            if (!$stmt->fetch()) {
+                $stmt = $pdo->prepare("INSERT INTO inscricoes (usuario_id, curso_id, inscrito_em) VALUES (?, ?, NOW())");
+                $stmt->execute([$userId, $courseId]);
+
+                // Atualizar contador de inscritos
+                $stmt = $pdo->prepare("UPDATE cursos SET alunos_inscritos = alunos_inscritos + 1 WHERE id = ?");
+                $stmt->execute([$courseId]);
+            }
+            $inscrito = true;
+        }
+
         json_response(201, [
             'error' => false,
-            'message' => 'Permissão criada com sucesso'
+            'message' => 'Permissão criada com sucesso',
+            'enrollment_created' => $inscrito
         ]);
     }
 

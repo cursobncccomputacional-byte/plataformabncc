@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useEADAuth } from '../contexts/EADAuthContext';
 
 export const Login = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,11 +17,11 @@ export const Login = () => {
     setLoading(true);
 
     try {
-      const success = await login(email, password);
+      const success = await login(identifier, password);
       if (success) {
         navigate('/dashboard');
       } else {
-        setError('Email ou senha incorretos');
+        setError('Usuário ou senha incorretos');
       }
     } catch (err) {
       setError('Erro ao fazer login. Tente novamente.');
@@ -43,20 +43,20 @@ export const Login = () => {
         className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10"
       >
         <div className="text-center mb-8">
-          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-white rounded-full shadow-md">
-            <img 
-              src="https://novaedubncc.com.br/logo/Logo Nova Edu (Oficial)-10.png" 
-              alt="Nova Edu" 
-              className="h-14 w-auto"
+          <div className="flex items-center justify-center mx-auto mb-4">
+            <img
+              src="https://novaedubncc.com.br/logo/Logo%20Nova%20Edu%20(Oficial)-10.png"
+              alt="Nova Edu"
+              className="h-12 sm:h-14 w-auto max-w-[260px] object-contain"
             />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2 drop-shadow">
+          <h1 className="text-3xl font-bold text-[#044982] mb-2">
             Nova Edu Cursos
           </h1>
-          <p className="text-blue-50">Entre para continuar aprendendo</p>
+          <p className="text-[#044982]">Entre para continuar aprendendo</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
               {error}
@@ -65,16 +65,17 @@ export const Login = () => {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email
+              Usuário
             </label>
             <input
               id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#044982]"
-              placeholder="seu@email.com"
+              placeholder="professor.teste01"
+              autoComplete="off"
             />
           </div>
 
@@ -90,6 +91,7 @@ export const Login = () => {
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#044982]"
               placeholder="••••••••"
+              autoComplete="off"
             />
           </div>
 

@@ -91,6 +91,7 @@ try {
                     SELECT id, nome_atividade, descricao, tipo, etapa, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
                     FROM atividades 
                     WHERE JSON_CONTAINS(COALESCE(eixos_bncc, '[]'), ?) 
+                    AND ativo = 1
                     ORDER BY criado_em DESC
                 ");
                 $eixoJson = json_encode($trilha['valor']);
@@ -101,10 +102,23 @@ try {
                 $stmtAtiv = $pdo->prepare("
                     SELECT id, nome_atividade, descricao, tipo, etapa, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
                     FROM atividades 
-                    WHERE etapa = ?
+                    WHERE etapa = ? 
+                    AND ativo = 1
                     ORDER BY criado_em DESC
                 ");
                 $stmtAtiv->execute([$trilha['valor']]);
+                $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
+            } elseif ($trilha['tipo'] === 'disciplina_transversal') {
+                // Buscar atividades que têm esta disciplina transversal no array JSON
+                $stmtAtiv = $pdo->prepare("
+                    SELECT id, nome_atividade, descricao, tipo, etapa, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                    FROM atividades 
+                    WHERE JSON_CONTAINS(COALESCE(disciplinas_transversais, '[]'), ?) 
+                    AND ativo = 1
+                    ORDER BY criado_em DESC
+                ");
+                $disciplinaJson = json_encode($trilha['valor']);
+                $stmtAtiv->execute([$disciplinaJson]);
                 $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
             }
             
@@ -192,9 +206,9 @@ try {
             json_response_trilha(400, ['error' => true, 'message' => 'Valor é obrigatório']);
         }
         
-        $allowedTipos = ['eixo_bncc', 'etapa'];
+        $allowedTipos = ['eixo_bncc', 'etapa', 'disciplina_transversal'];
         if (!in_array($tipo, $allowedTipos, true)) {
-            json_response_trilha(400, ['error' => true, 'message' => 'Tipo inválido. Use: eixo_bncc ou etapa']);
+            json_response_trilha(400, ['error' => true, 'message' => 'Tipo inválido. Use: eixo_bncc, etapa ou disciplina_transversal']);
         }
         
         // Verificar se já existe

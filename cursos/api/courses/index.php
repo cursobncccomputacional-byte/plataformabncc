@@ -86,10 +86,11 @@ try {
         // Verificar permissão de acesso ao curso
         $userRole = strtolower($currentUser['role'] ?? '');
         
-        // Root e professor têm acesso a todos os cursos
-        if ($userRole !== 'root' && $userRole !== 'professor') {
-            // professor_cursos precisa ter permissão específica
-            if ($userRole === 'professor_cursos') {
+        // Root e professor têm acesso a todos os cursos publicados.
+        // Admin e professor_cursos precisam de permissão específica (a menos que tenham can_manage_courses).
+        $canManageCourses = (bool)($currentUser['can_manage_courses'] ?? false);
+        if ($userRole !== 'root' && $userRole !== 'professor' && !$canManageCourses) {
+            if ($userRole === 'admin' || $userRole === 'professor_cursos') {
                 $stmt = $pdo->prepare("
                     SELECT id FROM permissoes_cursos 
                     WHERE usuario_id = ? AND curso_id = ?
@@ -101,25 +102,50 @@ try {
             }
         }
 
-        // Buscar aulas do curso organizadas por módulo
-        $stmt = $pdo->prepare("
-            SELECT 
-                id,
-                titulo,
-                descricao,
-                video_url,
-                duracao_video,
-                thumbnail_url,
-                ordem,
-                modulo,
-                eh_preview,
-                recursos
-            FROM aulas
-            WHERE curso_id = ?
-            ORDER BY modulo ASC, ordem ASC
-        ");
-        $stmt->execute([$courseId]);
-        $lessons = $stmt->fetchAll();
+        // Buscar aulas/vídeos do curso.
+        // Preferência: usar aula_videos (várias partes por aula). Se não existir, cair no legado (aulas.video_url).
+        $lessons = [];
+        try {
+            $stmt = $pdo->prepare("
+                SELECT
+                    av.id,
+                    av.titulo,
+                    av.descricao,
+                    av.video_url,
+                    av.duracao_video,
+                    av.thumbnail_url,
+                    av.ordem,
+                    m.ordem AS modulo_ordem
+                FROM aula_videos av
+                INNER JOIN aulas a ON a.id = av.aula_id
+                INNER JOIN modulos m ON m.id = a.modulo_id
+                WHERE m.curso_id = ?
+                  AND av.ativo = 1
+                ORDER BY m.ordem ASC, av.ordem ASC
+            ");
+            $stmt->execute([$courseId]);
+            $lessons = $stmt->fetchAll();
+        } catch (PDOException $e) {
+            // fallback legado
+            $stmt = $pdo->prepare("
+                SELECT 
+                    id,
+                    titulo,
+                    descricao,
+                    video_url,
+                    duracao_video,
+                    thumbnail_url,
+                    ordem,
+                    modulo,
+                    eh_preview,
+                    recursos
+                FROM aulas
+                WHERE curso_id = ?
+                ORDER BY modulo ASC, ordem ASC
+            ");
+            $stmt->execute([$courseId]);
+            $lessons = $stmt->fetchAll();
+        }
 
         // Converter JSON strings para arrays e renomear campos para API
         $courseData = [
@@ -142,17 +168,27 @@ try {
 
         $lessonsData = [];
         foreach ($lessons as $lesson) {
+            // quando vem de aula_videos: modulo_ordem é numérico (0,1,2,...)
+            $module = 'I';
+            if (isset($lesson['modulo_ordem'])) {
+                $idx = (int)$lesson['modulo_ordem'] + 1;
+                // suporte básico para I e II (resto vira "I")
+                $module = $idx === 2 ? 'II' : 'I';
+            } elseif (isset($lesson['modulo'])) {
+                $module = $lesson['modulo'] ?: 'I';
+            }
+
             $lessonsData[] = [
                 'id' => $lesson['id'],
                 'title' => $lesson['titulo'],
                 'description' => $lesson['descricao'],
                 'video_url' => $lesson['video_url'],
-                'video_duration' => (int)$lesson['duracao_video'],
+                'video_duration' => (int)($lesson['duracao_video'] ?? 0),
                 'thumbnail_url' => $lesson['thumbnail_url'],
-                'order_index' => (int)$lesson['ordem'],
-                'module' => isset($lesson['modulo']) ? $lesson['modulo'] : 'I', // Módulo I ou II (padrão: I)
-                'is_preview' => (bool)$lesson['eh_preview'],
-                'resources' => [], // Não usar recursos/documentos, apenas vídeos
+                'order_index' => (int)($lesson['ordem'] ?? 0),
+                'module' => $module,
+                'is_preview' => (bool)($lesson['eh_preview'] ?? 0),
+                'resources' => [],
             ];
         }
 
@@ -174,7 +210,8 @@ try {
         $userRole = strtolower($currentUser['role'] ?? '');
 
         // Root e usuários com can_manage_courses veem todos os cursos (incluindo rascunhos para gerenciamento)
-        // Professor e professor_cursos veem apenas cursos publicados
+        // Professor vê apenas cursos publicados
+        // Admin e professor_cursos veem apenas cursos permitidos (publicados)
         $canManageCourses = (bool)($currentUser['can_manage_courses'] ?? false);
         if ($userRole === 'root' || $canManageCourses) {
             $sql = "SELECT 
@@ -191,7 +228,7 @@ try {
                     LEFT JOIN inscricoes i ON i.curso_id = c.id
                     WHERE c.status = 'publicado'";
         } else {
-            // professor_cursos vê apenas cursos permitidos
+            // admin / professor_cursos vê apenas cursos permitidos
             $sql = "SELECT 
                         c.*,
                         COUNT(DISTINCT i.id) as alunos_inscritos
@@ -204,8 +241,8 @@ try {
 
         $params = [];
 
-        // Se for professor_cursos, adicionar user_id aos parâmetros
-        if ($userRole === 'professor_cursos') {
+        // Se for admin/professor_cursos (no modo restrito), adicionar user_id aos parâmetros
+        if ($userRole !== 'root' && !$canManageCourses && $userRole !== 'professor') {
             $params[] = $currentUser['id'];
         }
         

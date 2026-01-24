@@ -4,7 +4,9 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  // Subdomínio (cursos.novaedubncc.com.br): assets devem ser absolutos.
+  // Com base './', ao acessar /login os assets viram /login/assets/... e dão 404.
+  base: '/',
   root: path.resolve(__dirname),
   server: {
     host: 'localhost',

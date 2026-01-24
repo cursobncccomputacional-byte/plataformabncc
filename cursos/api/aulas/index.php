@@ -3,7 +3,7 @@
  * API de Aulas (Formação Continuada)
  * CRUD completo para aulas dentro de módulos
  * 
- * GET    /api/aulas/index.php?modulo_id=xxx -> lista aulas de um módulo
+ * GET    /api/aulas/index.php?modulo_id=xxx -> lista aulas de um módulo (inclui total_videos)
  * GET    /api/aulas/index.php?id=xxx -> detalhes da aula
  * POST   /api/aulas/index.php -> cria aula (requer can_manage_courses)
  * PUT    /api/aulas/index.php -> atualiza aula (requer can_manage_courses)
@@ -91,6 +91,22 @@ try {
                 json_response_aula(404, ['error' => true, 'message' => 'Aula não encontrada']);
             }
 
+            // Buscar vídeos/partes da aula (se a tabela existir)
+            $videos = [];
+            try {
+                $stmtV = $pdo->prepare("
+                    SELECT id, aula_id, titulo, descricao, video_url, duracao_video, thumbnail_url, ordem
+                    FROM aula_videos
+                    WHERE aula_id = ? AND ativo = 1
+                    ORDER BY ordem ASC, criado_em ASC
+                ");
+                $stmtV->execute([$aulaId]);
+                $videos = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                // tabela não existe ainda, ignorar
+                $videos = [];
+            }
+
             json_response_aula(200, [
                 'error' => false,
                 'aula' => [
@@ -101,18 +117,20 @@ try {
                     'modulo_titulo' => $aula['titulo_modulo'],
                     'titulo' => $aula['titulo'],
                     'descricao' => $aula['descricao'],
-                    'video_url' => $aula['video_url'],
-                    'duracao_video' => (int)($aula['duracao_video'] ?? 0),
-                    'thumbnail_url' => $aula['thumbnail_url'],
+                    'video_url' => $aula['video_url'], // legado
+                    'duracao_video' => (int)($aula['duracao_video'] ?? 0), // legado
+                    'thumbnail_url' => $aula['thumbnail_url'], // legado
                     'ordem' => (int)($aula['ordem'] ?? 0),
                     'criado_em' => $aula['criado_em'],
                     'atualizado_em' => $aula['atualizado_em'],
+                    'videos' => $videos,
                 ]
             ]);
         } elseif ($moduloId) {
             // Listar aulas de um módulo
             $stmt = $pdo->prepare("
-                SELECT a.*
+                SELECT a.*,
+                       (SELECT COUNT(*) FROM aula_videos av WHERE av.aula_id = a.id AND av.ativo = 1) as total_videos
                 FROM aulas a
                 WHERE a.modulo_id = ?
                 ORDER BY a.ordem ASC, a.criado_em ASC
@@ -127,10 +145,11 @@ try {
                     'modulo_id' => $aula['modulo_id'],
                     'titulo' => $aula['titulo'],
                     'descricao' => $aula['descricao'],
-                    'video_url' => $aula['video_url'],
-                    'duracao_video' => (int)($aula['duracao_video'] ?? 0),
-                    'thumbnail_url' => $aula['thumbnail_url'],
+                    'video_url' => $aula['video_url'], // legado
+                    'duracao_video' => (int)($aula['duracao_video'] ?? 0), // legado
+                    'thumbnail_url' => $aula['thumbnail_url'], // legado
                     'ordem' => (int)($aula['ordem'] ?? 0),
+                    'total_videos' => (int)($aula['total_videos'] ?? 0),
                     'criado_em' => $aula['criado_em'],
                     'atualizado_em' => $aula['atualizado_em'],
                 ];
@@ -153,16 +172,17 @@ try {
         $moduloId = trim((string)($data['modulo_id'] ?? ''));
         $titulo = trim((string)($data['titulo'] ?? ''));
         $descricao = isset($data['descricao']) ? trim((string)$data['descricao']) : null;
-        $videoUrl = trim((string)($data['video_url'] ?? ''));
+        // campos legados (opcionais)
+        $videoUrl = isset($data['video_url']) ? trim((string)($data['video_url'] ?? '')) : '';
         $duracaoVideo = isset($data['duracao_video']) ? (int)$data['duracao_video'] : 0;
         $thumbnailUrl = isset($data['thumbnail_url']) ? trim((string)$data['thumbnail_url']) : null;
         $ordem = isset($data['ordem']) ? (int)$data['ordem'] : 0;
 
         // Validações
-        if (empty($id) || empty($moduloId) || empty($titulo) || empty($videoUrl)) {
+        if (empty($id) || empty($moduloId) || empty($titulo)) {
             json_response_aula(400, [
                 'error' => true,
-                'message' => 'Campos obrigatórios: id, modulo_id, titulo, video_url'
+                'message' => 'Campos obrigatórios: id, modulo_id, titulo'
             ]);
         }
 
@@ -195,6 +215,33 @@ try {
             $id, $cursoId, $moduloId, $titulo, $descricao, $videoUrl,
             $duracaoVideo, $thumbnailUrl, $ordem
         ]);
+
+        // Se veio video_url (legado), criar a Parte 1 automaticamente em aula_videos (se tabela existir)
+        if (!empty($videoUrl)) {
+            try {
+                $videoId = $id . '-parte-001';
+                $checkV = $pdo->prepare("SELECT id FROM aula_videos WHERE id = ?");
+                $checkV->execute([$videoId]);
+                if (!$checkV->fetch()) {
+                    $stmtV = $pdo->prepare("
+                        INSERT INTO aula_videos (id, aula_id, titulo, descricao, video_url, duracao_video, thumbnail_url, ordem, ativo)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    ");
+                    $stmtV->execute([
+                        $videoId,
+                        $id,
+                        $titulo . ' - Parte 1',
+                        $descricao,
+                        $videoUrl,
+                        $duracaoVideo,
+                        $thumbnailUrl,
+                        1
+                    ]);
+                }
+            } catch (PDOException $e) {
+                // tabela ainda não existe, ignorar
+            }
+        }
 
         json_response_aula(201, [
             'error' => false,

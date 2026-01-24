@@ -15,6 +15,7 @@ interface User {
   email: string;
   role: string;
   formacao_continuada?: boolean;
+  can_manage_courses?: boolean;
 }
 
 interface Course {
@@ -58,11 +59,14 @@ export const ManageCoursePermissions = ({ currentPage, onNavigate }: ManageCours
     try {
       const response = await apiService.getUsers();
       if (!response.error && response.users) {
-        // Filtrar apenas o professor habilitado para Formação Continuada
-        const professoresFormacao = response.users.filter(
-          (u: User) => u.role === 'professor' && (u as any).formacao_continuada
-        );
-        setUsers(professoresFormacao);
+        // Usuários habilitados para Formação Continuada (compatível com flag antiga e com can_manage_courses)
+        const enabledUsers = (response.users as User[]).filter((u) => {
+          const role = String(u.role || '').toLowerCase();
+          const isEligibleRole = role === 'professor' || role === 'admin' || role === 'professor_cursos';
+          const enabled = !!(u.can_manage_courses || u.formacao_continuada);
+          return isEligibleRole && enabled;
+        });
+        setUsers(enabledUsers);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar usuários');
@@ -96,7 +100,43 @@ export const ManageCoursePermissions = ({ currentPage, onNavigate }: ManageCours
     }
   };
 
-  const handleAddPermission = async (courseId: string) => {
+  const handlePublishCourse = async (courseId: string, courseTitle: string) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const resp = await apiService.updateCourse(courseId, { status: 'publicado' });
+      if (resp.error) {
+        setError(resp.message || 'Erro ao publicar curso');
+      } else {
+        // Se o curso já tinha permissões atribuídas (quando estava em rascunho),
+        // criar inscrições automaticamente para aparecer em "Meus Cursos" no subdomínio.
+        try {
+          const permsResp = await apiService.getCoursePermissions(undefined, courseId);
+          const perms = (permsResp as any)?.permissions || [];
+          for (const p of perms) {
+            const uid = p?.usuario_id;
+            if (uid) {
+              await apiService.enrollUserInCourse(String(uid), courseId);
+            }
+          }
+        } catch (e) {
+          // best-effort: não bloquear publicação por falha de inscrição
+          console.warn('Falha ao inscrever usuários após publicar curso:', e);
+        }
+
+        setSuccess(`Curso "${courseTitle}" publicado!`);
+        await loadCourses();
+        setTimeout(() => setSuccess(null), 5000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao publicar curso');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddPermission = async (course: Course) => {
     if (!selectedUser) return;
 
     setLoading(true);
@@ -104,11 +144,17 @@ export const ManageCoursePermissions = ({ currentPage, onNavigate }: ManageCours
     setSuccess(null);
 
     try {
-      const response = await apiService.createCoursePermission(selectedUser.id, courseId);
+      const response = await apiService.createCoursePermission(selectedUser.id, course.id);
       if (response.error) {
         setError(response.message || 'Erro ao adicionar permissão');
       } else {
-        setSuccess('Permissão adicionada com sucesso!');
+        // Ao atribuir, inscrever automaticamente para aparecer em "Meus Cursos" (somente se publicado)
+        if (course.status === 'publicado') {
+          await apiService.enrollUserInCourse(selectedUser.id, course.id);
+          setSuccess('Permissão adicionada com sucesso!');
+        } else {
+          setSuccess('Permissão adicionada. Publique o curso para ele aparecer em "Meus Cursos".');
+        }
         await loadUserPermissions(selectedUser.id);
         setTimeout(() => setSuccess(null), 5000);
       }
@@ -155,6 +201,8 @@ export const ManageCoursePermissions = ({ currentPage, onNavigate }: ManageCours
     if (!selectedUser) return true;
     return !userPermissions.some((p) => p.curso_id === c.id);
   });
+  const publishedAvailableCourses = availableCourses.filter((c) => c.status === 'publicado');
+  const draftAvailableCourses = availableCourses.filter((c) => c.status !== 'publicado');
 
   if (user?.role !== 'root') {
     return (
@@ -288,17 +336,16 @@ export const ManageCoursePermissions = ({ currentPage, onNavigate }: ManageCours
                     <div>
                       <h3 className="text-sm font-medium text-gray-700 mb-2">Adicionar Curso</h3>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {availableCourses.length === 0 ? (
+                        {publishedAvailableCourses.length === 0 && draftAvailableCourses.length === 0 ? (
                           <div className="text-center py-4 text-gray-500 text-sm">
                             Todos os cursos já foram atribuídos
                           </div>
                         ) : (
-                          availableCourses
-                            .filter((c) => c.status === 'publicado')
-                            .map((course) => (
+                          <>
+                            {publishedAvailableCourses.map((course) => (
                               <button
                                 key={course.id}
-                                onClick={() => handleAddPermission(course.id)}
+                                onClick={() => handleAddPermission(course)}
                                 className="w-full flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
                                 disabled={loading}
                               >
@@ -311,7 +358,39 @@ export const ManageCoursePermissions = ({ currentPage, onNavigate }: ManageCours
                                 </div>
                                 <Check className="w-5 h-5 text-green-600" />
                               </button>
-                            ))
+                            ))}
+
+                            {draftAvailableCourses.length > 0 && (
+                              <div className="pt-2">
+                                <div className="text-xs font-medium text-gray-500 mb-2">
+                                  Cursos em rascunho (publique para poder atribuir)
+                                </div>
+                                {draftAvailableCourses.map((course) => (
+                                  <div
+                                    key={course.id}
+                                    className="w-full flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <BookOpen className="w-5 h-5 text-yellow-700" />
+                                      <div className="text-left">
+                                        <div className="font-medium text-gray-900">{course.titulo}</div>
+                                        <div className="text-xs text-gray-600">
+                                          ID: {course.id} · Status: {course.status}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handlePublishCourse(course.id, course.titulo)}
+                                      className="text-sm bg-[#044982] text-white px-3 py-1 rounded hover:bg-[#005a93] transition disabled:opacity-50"
+                                      disabled={loading}
+                                    >
+                                      Publicar
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

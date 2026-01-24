@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2 } from 'lucide-react';
+import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2, Book, Calculator, MapPin, FlaskConical, Dumbbell, Church, Code, Languages } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
@@ -10,7 +10,7 @@ interface Trilha {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo: 'eixo_bncc' | 'etapa';
+  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
   valor: string;
   thumbnail_url?: string;
   ordem: number;
@@ -35,6 +35,7 @@ export const TrilhasPedagogicas = () => {
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [trilhasEixo, setTrilhasEixo] = useState<Trilha[]>([]);
   const [trilhasEtapa, setTrilhasEtapa] = useState<Trilha[]>([]);
+  const [trilhasDisciplinas, setTrilhasDisciplinas] = useState<Trilha[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrilha, setSelectedTrilha] = useState<Trilha | null>(null);
   const [atividadesTrilha, setAtividadesTrilha] = useState<Atividade[]>([]);
@@ -51,9 +52,10 @@ export const TrilhasPedagogicas = () => {
   const loadTrilhas = async () => {
     setLoading(true);
     try {
-      const [responseEixo, responseEtapa] = await Promise.all([
+      const [responseEixo, responseEtapa, responseDisciplinas] = await Promise.all([
         apiService.getTrilhas('eixo_bncc'),
         apiService.getTrilhas('etapa'),
+        apiService.getTrilhas('disciplina_transversal'),
       ]);
 
       if (!responseEixo.error) {
@@ -62,8 +64,15 @@ export const TrilhasPedagogicas = () => {
       if (!responseEtapa.error) {
         setTrilhasEtapa(responseEtapa.trilhas || []);
       }
+      if (!responseDisciplinas.error) {
+        setTrilhasDisciplinas(responseDisciplinas.trilhas || []);
+      }
 
-      setTrilhas([...(responseEixo.trilhas || []), ...(responseEtapa.trilhas || [])]);
+      setTrilhas([
+        ...(responseEixo.trilhas || []), 
+        ...(responseEtapa.trilhas || []),
+        ...(responseDisciplinas.trilhas || [])
+      ]);
     } catch (error) {
       console.error('Erro ao carregar trilhas:', error);
     } finally {
@@ -92,12 +101,25 @@ export const TrilhasPedagogicas = () => {
   const filteredTrilhasEtapa = trilhasEtapa.filter((trilha) =>
     trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const filteredTrilhasDisciplinas = trilhasDisciplinas.filter((trilha) =>
+    trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const getTrilhaIcon = (tipo: string, valor: string) => {
     if (tipo === 'eixo_bncc') {
       if (valor.includes('Pensamento')) return Brain;
       if (valor.includes('Mundo')) return Globe;
       if (valor.includes('Cultura')) return Users;
+    } else if (tipo === 'disciplina_transversal') {
+      if (valor.includes('Português')) return Book;
+      if (valor.includes('Matemática')) return Calculator;
+      if (valor.includes('História')) return BookOpen;
+      if (valor.includes('Geografia')) return MapPin;
+      if (valor.includes('Ciências')) return FlaskConical;
+      if (valor.includes('Educação Física')) return Dumbbell;
+      if (valor.includes('Ensino Religioso')) return Church;
+      if (valor.includes('Computação')) return Code;
+      if (valor.includes('Inglês')) return Languages;
     }
     return GraduationCap;
   };
@@ -156,7 +178,11 @@ export const TrilhasPedagogicas = () => {
             )}
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
-                {selectedTrilha.tipo === 'eixo_bncc' ? 'Eixo BNCC' : 'Etapa'}
+                {selectedTrilha.tipo === 'eixo_bncc'
+                  ? 'Eixo BNCC'
+                  : selectedTrilha.tipo === 'etapa'
+                    ? 'Etapa'
+                    : 'Disciplina Transversal'}
               </span>
               <span>{atividadesTrilha.length} atividades</span>
             </div>
@@ -183,8 +209,9 @@ export const TrilhasPedagogicas = () => {
                   whileHover={{ scale: 1.02 }}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => {
-                    // Navegar para a página de atividades (ajustar conforme necessário)
-                    window.location.href = `#activities`;
+                    if (atividade.video_url) {
+                      setSelectedVideo({ url: atividade.video_url, title: atividade.nome_atividade });
+                    }
                   }}
                 >
                   <div className="relative">
@@ -272,8 +299,8 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Atividades BNCC Computacional</h1>
-          <p className="text-gray-600 text-lg mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Atividades BNCC Computacional</h1>
+          <p className="text-gray-600 text-base md:text-lg mb-5">
             Atividades plugadas e desplugadas organizadas para aplicar em sala, sem complicação.
           </p>
           
@@ -283,7 +310,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
             whileTap={{ scale: 0.98 }}
             onClick={handleAISuggestion}
             disabled={loadingAISuggestion}
-            className="inline-flex items-center gap-3 px-6 py-4 bg-[#044982] text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-[#033a6b] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-3 px-5 py-3 bg-[#044982] text-white rounded-xl font-semibold text-base md:text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-[#033a6b] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loadingAISuggestion ? (
               <>
@@ -292,11 +319,11 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               </>
             ) : (
               <>
-                <div className="relative">
+                <div className="relative flex items-center justify-center">
                   <img 
                     src="/logo/Logo Nova Edu (Oficial)-10.png" 
                     alt="BNCC Logo" 
-                    className="w-10 h-10 object-contain filter brightness-0 invert"
+                    className="w-8 h-8 md:w-9 md:h-9 object-contain"
                     style={{ filter: 'brightness(0) invert(1)' }}
                   />
                 </div>
@@ -319,7 +346,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                 <Sparkles className="w-6 h-6 text-purple-600" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
                   <span>Sugestão de Atividade para Hoje</span>
                   <span className="text-sm font-normal text-purple-600 bg-purple-100 px-2 py-1 rounded">Powered by IA</span>
                 </h3>
@@ -346,8 +373,8 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Trilhas Pedagógicas</h2>
-          <p className="text-gray-600 text-lg">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Trilhas Pedagógicas</h2>
+          <p className="text-gray-600 text-base md:text-lg">
             Sequências prontas alinhadas à BNCC. Explore atividades organizadas por eixo ou etapa.
           </p>
         </motion.div>
@@ -423,7 +450,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
 
             {/* Trilhas por Etapa */}
             {filteredTrilhasEtapa.length > 0 && (
-              <div>
+              <div className="mb-12">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Por Etapa</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {filteredTrilhasEtapa.map((trilha) => {
@@ -470,7 +497,60 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               </div>
             )}
 
-            {filteredTrilhasEixo.length === 0 && filteredTrilhasEtapa.length === 0 && (
+            {/* Trilhas por Disciplinas Transversais */}
+            {filteredTrilhasDisciplinas.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Por Disciplina Transversal</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {filteredTrilhasDisciplinas.map((trilha) => {
+                    const Icon = getTrilhaIcon(trilha.tipo, trilha.valor);
+                    return (
+                      <motion.div
+                        key={trilha.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-all"
+                        onClick={() => handleTrilhaClick(trilha)}
+                      >
+                        <div className="relative h-48 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                          {trilha.thumbnail_url ? (
+                            <img
+                              src={resolvePublicAssetUrl(trilha.thumbnail_url) || ''}
+                              alt={trilha.titulo}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Icon className="w-16 h-16 text-white opacity-80" />
+                          )}
+                          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                            <span className="px-4 py-2 bg-white bg-opacity-90 text-gray-900 rounded-lg font-semibold">
+                              Ver trilha
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-lg text-gray-900 mb-1">{trilha.titulo}</h3>
+                          {trilha.descricao && (
+                            <p className="text-sm text-gray-600 line-clamp-2">{trilha.descricao}</p>
+                          )}
+                          <div className="mt-3 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">{trilha.valor}</span>
+                            <ArrowRight className="w-5 h-5 text-[#044982]" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {filteredTrilhasEixo.length === 0 && filteredTrilhasEtapa.length === 0 && filteredTrilhasDisciplinas.length === 0 && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma trilha encontrada</h3>

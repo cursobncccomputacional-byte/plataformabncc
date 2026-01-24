@@ -8,7 +8,7 @@ interface Trilha {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo: 'eixo_bncc' | 'etapa';
+  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
   valor: string;
   thumbnail_url?: string;
   ordem: number;
@@ -20,6 +20,7 @@ interface Trilha {
 const TIPOS_TRILHA = [
   { value: 'eixo_bncc', label: 'Eixo BNCC' },
   { value: 'etapa', label: 'Etapa' },
+  { value: 'disciplina_transversal', label: 'Disciplina Transversal' },
 ];
 
 const VALORES_EIXO_BNCC = [
@@ -32,6 +33,18 @@ const VALORES_ETAPA = [
   'Educação Infantil',
   'Anos Iniciais',
   'Anos Finais',
+];
+
+const VALORES_DISCIPLINAS_TRANSVERSAIS = [
+  'Português',
+  'Matemática',
+  'História',
+  'Geografia',
+  'Ciências',
+  'Educação Física',
+  'Ensino Religioso',
+  'Computação',
+  'Inglês',
 ];
 
 export const ManageTrilhas = () => {
@@ -202,7 +215,11 @@ export const ManageTrilhas = () => {
     return matchesSearch && matchesTipo;
   });
 
-  const valoresDisponiveis = formData.tipo === 'eixo_bncc' ? VALORES_EIXO_BNCC : VALORES_ETAPA;
+  const valoresDisponiveis = 
+    formData.tipo === 'eixo_bncc' ? VALORES_EIXO_BNCC :
+    formData.tipo === 'etapa' ? VALORES_ETAPA :
+    formData.tipo === 'disciplina_transversal' ? VALORES_DISCIPLINAS_TRANSVERSAIS :
+    [];
 
   return (
     <div className="p-6">
@@ -245,6 +262,7 @@ export const ManageTrilhas = () => {
             <option value="all">Todos os Tipos</option>
             <option value="eixo_bncc">Eixo BNCC</option>
             <option value="etapa">Etapa</option>
+            <option value="disciplina_transversal">Disciplina Transversal</option>
           </select>
         </div>
 
@@ -362,7 +380,7 @@ export const ManageTrilhas = () => {
                     onChange={(e) => {
                       setFormData({
                         ...formData,
-                        tipo: e.target.value as 'eixo_bncc' | 'etapa',
+                        tipo: e.target.value as 'eixo_bncc' | 'etapa' | 'disciplina_transversal',
                         valor: '', // Reset valor ao mudar tipo
                       });
                     }}

@@ -29,21 +29,19 @@ if (empty($origin) && isset($_SERVER['HTTP_REFERER'])) {
     }
 }
 
-// SIMPLIFICADO: Seguir padrão do projeto que funciona
-// Usar * para permitir qualquer origem (funciona em same-origin com credentials)
 if (!empty($origin) && in_array($origin, $knownOrigins)) {
     // Para origens conhecidas, usar origem específica (melhor para credentials)
     header("Access-Control-Allow-Origin: $origin");
     header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
 } else {
-    // Para outras origens, usar * (como no projeto que funciona)
-    // Isso funciona porque em same-origin, o navegador não bloqueia
-    header('Access-Control-Allow-Origin: *');
+    // Para outras origens, não liberar CORS (evita quebra com credentials)
+    // Requests same-origin não precisam destes headers.
 }
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Session-ID, X-User-Id, X-User-Role');
 // REMOVIDO: Access-Control-Allow-Credentials: true
 // O projeto que funciona usa Access-Control-Allow-Origin: * SEM credentials
 // Mas o frontend usa credentials: 'include' - isso funciona em same-origin

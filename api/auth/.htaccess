@@ -25,8 +25,15 @@
 
 # Headers CORS
 <IfModule mod_headers.c>
-  Header set Access-Control-Allow-Origin "*"
-  Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-  Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID"
-  Header set Access-Control-Allow-Credentials "true"
+  # IMPORTANTE:
+  # Com credentials (cookies), NÃO pode usar Access-Control-Allow-Origin: *
+  # Aqui refletimos a origem apenas para origens permitidas.
+  SetEnvIfNoCase Origin "^https://(cursos\.novaedubncc\.com\.br|novaedubncc\.com\.br|www\.novaedubncc\.com\.br)$" ACAO=$0
+
+  Header always set Access-Control-Allow-Origin "%{ACAO}e" env=ACAO
+  Header always set Access-Control-Allow-Credentials "true" env=ACAO
+  Header always set Vary "Origin" env=ACAO
+
+  Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID, X-User-Id, X-User-Role"
 </IfModule>

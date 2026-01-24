@@ -55,6 +55,13 @@ try {
     }
 
     if ($method === 'GET') {
+        // Root pode buscar cursos de qualquer usuário (via query user_id)
+        $targetUserId = $userId;
+        $queryUserId = $_GET['user_id'] ?? null;
+        if ($queryUserId && strtolower((string)($currentUser['role'] ?? '')) === 'root') {
+            $targetUserId = $queryUserId;
+        }
+
         // Buscar cursos do usuário
         $stmt = $pdo->prepare("
             SELECT 
@@ -69,7 +76,7 @@ try {
             WHERE i.usuario_id = ?
             ORDER BY i.inscrito_em DESC
         ");
-        $stmt->execute([$userId]);
+        $stmt->execute([$targetUserId]);
         $enrollments = $stmt->fetchAll();
 
         $enrollmentsData = [];
@@ -98,16 +105,34 @@ try {
         // Inscrever em curso
         $data = read_json_body();
         $courseId = $data['course_id'] ?? null;
+        $requestedUserId = $data['user_id'] ?? null;
+        $targetUserId = $userId;
+
+        // Root pode inscrever qualquer usuário (para aparecer em "Meus Cursos")
+        if ($requestedUserId && strtolower((string)($currentUser['role'] ?? '')) === 'root') {
+            $targetUserId = $requestedUserId;
+        }
 
         if (!$courseId) {
             json_response(400, ['error' => true, 'message' => 'course_id é obrigatório']);
         }
 
+        // Para admin/professor_cursos: exigir permissão específica no curso
+        $role = strtolower((string)($currentUser['role'] ?? ''));
+        if ($role === 'admin' || $role === 'professor_cursos') {
+            $stmt = $pdo->prepare("SELECT id FROM permissoes_cursos WHERE usuario_id = ? AND curso_id = ?");
+            $stmt->execute([$targetUserId, $courseId]);
+            if (!$stmt->fetch()) {
+                json_response(403, ['error' => true, 'message' => 'Você não tem permissão para se inscrever neste curso']);
+            }
+        }
+
         // Verificar se já está inscrito
         $stmt = $pdo->prepare("SELECT id FROM inscricoes WHERE usuario_id = ? AND curso_id = ?");
-        $stmt->execute([$userId, $courseId]);
+        $stmt->execute([$targetUserId, $courseId]);
         if ($stmt->fetch()) {
-            json_response(400, ['error' => true, 'message' => 'Já inscrito neste curso']);
+            // Idempotente: se já existe, retornar OK
+            json_response(200, ['error' => false, 'message' => 'Já inscrito neste curso']);
         }
 
         // Verificar se curso existe e está publicado
@@ -122,7 +147,7 @@ try {
             INSERT INTO inscricoes (usuario_id, curso_id, inscrito_em)
             VALUES (?, ?, NOW())
         ");
-        $stmt->execute([$userId, $courseId]);
+        $stmt->execute([$targetUserId, $courseId]);
 
         // Atualizar contador de inscritos
         $stmt = $pdo->prepare("
