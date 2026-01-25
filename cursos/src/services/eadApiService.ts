@@ -123,6 +123,18 @@ class EADApiService {
     return this.request(`/courses/index.php${query}`);
   }
 
+  /**
+   * Lista pública de cursos publicados (catálogo).
+   * Útil para exibir cursos "bloqueados" (sem expor aulas).
+   */
+  async getPublicCourses(category?: string, search?: string): Promise<ApiResponse> {
+    const params = new URLSearchParams();
+    params.append('public', '1');
+    if (category) params.append('category', category);
+    if (search) params.append('search', search);
+    return this.request(`/courses/index.php?${params.toString()}`);
+  }
+
   async getCourse(courseId: string): Promise<ApiResponse> {
     return this.request(`/courses/index.php?id=${courseId}`);
   }

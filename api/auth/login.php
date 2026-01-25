@@ -58,6 +58,63 @@ try {
     $_SESSION['user_usuario'] = $user['usuario'];
     $_SESSION['user_role'] = $user['nivel_acesso'];
     
+    // Registrar sessão no banco de dados
+    try {
+        $sessaoId = bin2hex(random_bytes(16));
+        $sessionId = session_id();
+        
+        // Obter IP e User Agent
+        $ipKeys = ['HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR'];
+        $ipAddress = '0.0.0.0';
+        foreach ($ipKeys as $key) {
+            if (array_key_exists($key, $_SERVER) === true) {
+                foreach (explode(',', $_SERVER[$key]) as $ip) {
+                    $ip = trim($ip);
+                    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
+                        $ipAddress = $ip;
+                        break 2;
+                    }
+                }
+            }
+        }
+        if ($ipAddress === '0.0.0.0') {
+            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        }
+        
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        $criadoPor = $user['criado_por'] ?? null;
+        
+        // Verificar se a tabela sessoes existe antes de inserir
+        $checkTable = $pdo->query("SHOW TABLES LIKE 'sessoes'");
+        if ($checkTable->rowCount() > 0) {
+            // Verificar se já existe uma sessão ativa para este usuário
+            $checkSessaoAtiva = $pdo->prepare("
+                SELECT id FROM sessoes 
+                WHERE usuario_id = ? AND data_logout IS NULL 
+                ORDER BY data_login DESC LIMIT 1
+            ");
+            $checkSessaoAtiva->execute([$user['id']]);
+            $sessaoAtiva = $checkSessaoAtiva->fetch();
+            
+            if (!$sessaoAtiva) {
+                // Só criar nova sessão se não houver uma ativa
+                $stmtSessao = $pdo->prepare("
+                    INSERT INTO sessoes (id, usuario_id, session_id, ip_address, user_agent, criado_por)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmtSessao->execute([$sessaoId, $user['id'], $sessionId, $ipAddress, $userAgent, $criadoPor]);
+                $_SESSION['sessao_id'] = $sessaoId; // Guardar para usar no logout
+            } else {
+                // Usar sessão existente
+                $_SESSION['sessao_id'] = $sessaoAtiva['id'];
+            }
+        }
+    } catch(PDOException $e) {
+        // Log do erro mas não interromper o login
+        error_log("Erro ao registrar sessão no login: " . $e->getMessage());
+        error_log("SQL Error: " . print_r($e->errorInfo, true));
+    }
+    
     // Converter dados para formato inglês (para o frontend)
     $response = [
         'error' => false,
@@ -72,7 +129,8 @@ try {
             'last_login' => $user['ultimo_login'],
             'is_active' => (bool)$user['ativo']
         ],
-        'session_id' => session_id()
+        'session_id' => session_id(),
+        'sessao_id' => $sessaoId ?? null
     ];
     
     http_response_code(200);

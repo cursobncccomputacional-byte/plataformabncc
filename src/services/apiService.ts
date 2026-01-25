@@ -344,6 +344,29 @@ class ApiService {
   }
 
   /**
+   * Atualizar limites de admin (root apenas)
+   */
+  async updateAdminLimits(
+    userId: string,
+    limits: {
+      max_professores?: number | null;
+      max_alunos?: number | null;
+      pacote?: string | null;
+      data_contratacao?: string | null;
+      data_expiracao?: string | null;
+    }
+  ): Promise<ApiResponse> {
+    return this.request('/users/index.php', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        user_id: userId,
+        update_limits: true,
+        ...limits,
+      }),
+    });
+  }
+
+  /**
    * Atualizar permissões de um usuário (root apenas)
    */
   async updateUserPermissions(

@@ -161,6 +161,38 @@ try {
             'error' => false,
             'message' => 'Inscrição realizada com sucesso'
         ]);
+    } elseif ($method === 'DELETE') {
+        $data = read_json_body();
+        $courseId = $data['course_id'] ?? null;
+        $requestedUserId = $data['user_id'] ?? null;
+        $targetUserId = $userId;
+
+        // Root pode remover inscrição de qualquer usuário
+        if ($requestedUserId && strtolower((string)($currentUser['role'] ?? '')) === 'root') {
+            $targetUserId = $requestedUserId;
+        }
+
+        if (!$courseId) {
+            json_response(400, ['error' => true, 'message' => 'course_id é obrigatório']);
+        }
+
+        // Verificar se está inscrito
+        $stmt = $pdo->prepare("SELECT id FROM inscricoes WHERE usuario_id = ? AND curso_id = ?");
+        $stmt->execute([$targetUserId, $courseId]);
+        $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$enrollment) {
+            json_response(200, ['error' => false, 'message' => 'Usuário não estava inscrito neste curso']);
+        }
+
+        // Remover inscrição
+        $stmt = $pdo->prepare("DELETE FROM inscricoes WHERE usuario_id = ? AND curso_id = ?");
+        $stmt->execute([$targetUserId, $courseId]);
+
+        // Atualizar contador (evitar negativo)
+        $stmt = $pdo->prepare("UPDATE cursos SET alunos_inscritos = GREATEST(alunos_inscritos - 1, 0) WHERE id = ?");
+        $stmt->execute([$courseId]);
+
+        json_response(200, ['error' => false, 'message' => 'Inscrição removida com sucesso']);
     } else {
         json_response(405, ['error' => true, 'message' => 'Método não permitido']);
     }

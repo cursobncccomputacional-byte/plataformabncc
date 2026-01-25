@@ -8,7 +8,7 @@ import { Activities } from './Activities';
 import { ManageActivities } from './ManageActivities';
 import { ManageFormacaoContinuada } from './ManageFormacaoContinuada';
 import { TrilhasPedagogicas } from './TrilhasPedagogicas';
-import { Users, Settings, BarChart3 } from 'lucide-react';
+import { Users, Settings, BarChart3, Monitor } from 'lucide-react';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
 import { useAuth } from '../contexts/LocalAuthContext';
 
@@ -18,7 +18,7 @@ interface DashboardProps {
   userRole: 'admin' | 'professor';
 }
 
-export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, userRole }: DashboardProps) => {
+export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, onNavigateToSessions, userRole }: DashboardProps) => {
   const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState<'activities' | 'videos' | 'documents' | 'profile' | 'plataforma' | 'formacao-continuada' | 'trilhas'>('trilhas');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -63,6 +63,15 @@ export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, use
                   <BarChart3 className="h-4 w-4" />
                   Relatórios
                 </button>
+                {onNavigateToSessions && (
+                  <button
+                    onClick={onNavigateToSessions}
+                    className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
+                  >
+                    <Monitor className="h-4 w-4" />
+                    Sessões
+                  </button>
+                )}
               </div>
             </div>
           </div>

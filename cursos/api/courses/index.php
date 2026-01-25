@@ -85,20 +85,19 @@ try {
 
         // Verificar permissão de acesso ao curso
         $userRole = strtolower($currentUser['role'] ?? '');
-        
-        // Root e professor têm acesso a todos os cursos publicados.
-        // Admin e professor_cursos precisam de permissão específica (a menos que tenham can_manage_courses).
         $canManageCourses = (bool)($currentUser['can_manage_courses'] ?? false);
-        if ($userRole !== 'root' && $userRole !== 'professor' && !$canManageCourses) {
-            if ($userRole === 'admin' || $userRole === 'professor_cursos') {
-                $stmt = $pdo->prepare("
-                    SELECT id FROM permissoes_cursos 
-                    WHERE usuario_id = ? AND curso_id = ?
-                ");
-                $stmt->execute([$currentUser['id'], $courseId]);
-                if (!$stmt->fetch()) {
-                    json_response(403, ['error' => true, 'message' => 'Você não tem permissão para acessar este curso']);
-                }
+
+        // Regra (pedido): usuários comuns (professor/admin/professor_cursos) só acessam cursos atribuídos.
+        // Root e can_manage_courses continuam com acesso total.
+        if ($userRole !== 'root' && !$canManageCourses) {
+            $stmt = $pdo->prepare("
+                SELECT id
+                FROM permissoes_cursos
+                WHERE usuario_id = ? AND curso_id = ?
+            ");
+            $stmt->execute([$currentUser['id'], $courseId]);
+            if (!$stmt->fetch()) {
+                json_response(403, ['error' => true, 'message' => 'Curso bloqueado para este usuário. Solicite acesso ao administrador.']);
             }
         }
 
@@ -198,63 +197,51 @@ try {
             'lessons' => $lessonsData
         ]);
     } else {
-        // Verificar autenticação
-        $currentUser = getCurrentUser();
-        if (!$currentUser) {
-            json_response(401, ['error' => true, 'message' => 'Não autenticado']);
-        }
-
-        // Listar cursos (filtrar por permissão se for professor_cursos)
+        // Listagem pública (somente publicados) para exibir catálogo e "cursos bloqueados"
+        // sem expor aulas/conteúdo.
+        $isPublicList = isset($_GET['public']) && (string)$_GET['public'] === '1';
         $category = $_GET['category'] ?? null;
         $search = $_GET['search'] ?? null;
-        $userRole = strtolower($currentUser['role'] ?? '');
 
-        // Root e usuários com can_manage_courses veem todos os cursos (incluindo rascunhos para gerenciamento)
-        // Professor vê apenas cursos publicados
-        // Admin e professor_cursos veem apenas cursos permitidos (publicados)
-        $canManageCourses = (bool)($currentUser['can_manage_courses'] ?? false);
-        if ($userRole === 'root' || $canManageCourses) {
-            $sql = "SELECT 
-                        c.*,
-                        COUNT(DISTINCT i.id) as alunos_inscritos
-                    FROM cursos c
-                    LEFT JOIN inscricoes i ON i.curso_id = c.id
-                    WHERE 1=1"; // Root vê todos os cursos
-        } elseif ($userRole === 'professor') {
-            $sql = "SELECT 
+        if ($isPublicList) {
+            $sql = "SELECT
                         c.*,
                         COUNT(DISTINCT i.id) as alunos_inscritos
                     FROM cursos c
                     LEFT JOIN inscricoes i ON i.curso_id = c.id
                     WHERE c.status = 'publicado'";
-        } else {
-            // admin / professor_cursos vê apenas cursos permitidos
-            $sql = "SELECT 
-                        c.*,
-                        COUNT(DISTINCT i.id) as alunos_inscritos
-                    FROM cursos c
-                    INNER JOIN permissoes_cursos pc ON pc.curso_id = c.id
-                    LEFT JOIN inscricoes i ON i.curso_id = c.id
-                    WHERE c.status = 'publicado' 
-                    AND pc.usuario_id = ?";
-        }
-
-        $params = [];
-
-        // Se for admin/professor_cursos (no modo restrito), adicionar user_id aos parâmetros
-        if ($userRole !== 'root' && !$canManageCourses && $userRole !== 'professor') {
-            $params[] = $currentUser['id'];
-        }
-        
-        // Se tiver can_manage_courses, ver todos os cursos (incluindo rascunhos)
-        if ($canManageCourses && $userRole !== 'root') {
-            $sql = "SELECT 
-                        c.*,
-                        COUNT(DISTINCT i.id) as alunos_inscritos
-                    FROM cursos c
-                    LEFT JOIN inscricoes i ON i.curso_id = c.id
-                    WHERE 1=1";
             $params = [];
+        } else {
+            // Verificar autenticação (para lista "privada" do usuário)
+            $currentUser = getCurrentUser();
+            if (!$currentUser) {
+                json_response(401, ['error' => true, 'message' => 'Não autenticado']);
+            }
+
+            $userRole = strtolower($currentUser['role'] ?? '');
+            $canManageCourses = (bool)($currentUser['can_manage_courses'] ?? false);
+
+            // Root/can_manage_courses: todos (inclusive rascunhos, para gerenciamento)
+            if ($userRole === 'root' || $canManageCourses) {
+                $sql = "SELECT
+                            c.*,
+                            COUNT(DISTINCT i.id) as alunos_inscritos
+                        FROM cursos c
+                        LEFT JOIN inscricoes i ON i.curso_id = c.id
+                        WHERE 1=1";
+                $params = [];
+            } else {
+                // Qualquer usuário comum: somente cursos atribuídos (publicados)
+                $sql = "SELECT
+                            c.*,
+                            COUNT(DISTINCT i.id) as alunos_inscritos
+                        FROM cursos c
+                        INNER JOIN permissoes_cursos pc ON pc.curso_id = c.id
+                        LEFT JOIN inscricoes i ON i.curso_id = c.id
+                        WHERE c.status = 'publicado'
+                          AND pc.usuario_id = ?";
+                $params = [$currentUser['id']];
+            }
         }
 
         if ($category) {

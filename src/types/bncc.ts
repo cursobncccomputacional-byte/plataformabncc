@@ -90,6 +90,24 @@ export interface User {
   is_active: boolean;
   can_manage_activities?: boolean;
   can_manage_courses?: boolean;
+  // Campos de limite para admins
+  max_professores?: number | null;
+  max_alunos?: number | null;
+  professores_criados?: number;
+  alunos_criados?: number;
+  pacote?: string | null;
+  data_contratacao?: string | null;
+  data_expiracao?: string | null;
+  criado_por?: string | null;
+}
+
+export interface AdminPackage {
+  id: string;
+  name: string;
+  max_professores: number;
+  max_alunos: number;
+  price?: number;
+  description?: string;
 }
 
 export interface LoginCredentials {

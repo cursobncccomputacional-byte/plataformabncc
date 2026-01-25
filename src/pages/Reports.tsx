@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { UserAnalytics, UserActivityLog } from '../types/bncc';
-import { activityLogger } from '../services/ActivityLogger';
+import { sessionService } from '../services/sessionService';
 
 interface ReportsProps {
   onBackToDashboard: () => void;
@@ -32,21 +32,88 @@ export const Reports = ({ onBackToDashboard }: ReportsProps) => {
 
   useEffect(() => {
     loadReports();
-  }, [dateFilter, selectedUser]);
+  }, [dateFilter, selectedUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadReports = () => {
+  const loadReports = async () => {
     setLoading(true);
     
-    // Carregar analytics de todos os usuários
-    const allAnalytics = activityLogger.getAllUsersAnalytics();
-    setAnalytics(allAnalytics);
+    try {
+      // Calcular datas para filtro
+      let dataInicio: string | undefined = undefined;
+      let dataFim: string | undefined = undefined;
+      
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        const days = dateFilter === '7d' ? 7 : dateFilter === '30d' ? 30 : 90;
+        const cutoffDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        dataInicio = cutoffDate.toISOString().split('T')[0];
+        dataFim = now.toISOString().split('T')[0];
+      }
 
-    // Carregar logs recentes
-    const allLogs = activityLogger.getActivityLogs();
-    const filteredLogs = filterLogsByDate(allLogs, dateFilter);
-    setRecentLogs(filteredLogs.slice(-50)); // Últimos 50 logs
+      // Carregar analytics de usuários gerenciados
+      const analyticsData = await sessionService.getAnalytics({
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+      });
 
-    setLoading(false);
+      // Converter formato da API para formato UserAnalytics
+      const formattedAnalytics: UserAnalytics[] = analyticsData.map((item: any) => ({
+        userId: item.userId,
+        userName: item.userName,
+        userEmail: item.userEmail,
+        totalSessions: item.totalSessions || 0,
+        totalTimeSpent: item.totalTimeSpent || 0,
+        totalActivities: item.totalActivities || 0,
+        totalDocuments: item.totalDocuments || 0,
+        totalVideos: item.totalVideos || 0,
+        lastLogin: item.lastLogin || '',
+        averageSessionDuration: 0, // Será calculado se necessário
+        mostViewedActivities: [],
+        mostViewedDocuments: [],
+        loginFrequency: 0,
+        activityFrequency: 0,
+      }));
+
+      setAnalytics(formattedAnalytics);
+
+      // Carregar atividades recentes
+      const activitiesData = await sessionService.getActivities({
+        limit: 50,
+        offset: 0,
+      });
+
+      // Converter formato da API para formato UserActivityLog
+      const formattedLogs: UserActivityLog[] = activitiesData
+        .filter((act: any) => {
+          if (dateFilter === 'all') return true;
+          const actDate = new Date(act.data_atividade);
+          const now = new Date();
+          const days = dateFilter === '7d' ? 7 : dateFilter === '30d' ? 30 : 90;
+          const cutoffDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+          return actDate >= cutoffDate;
+        })
+        .map((act: any) => ({
+          id: act.id,
+          userId: act.usuario_id,
+          userName: act.usuario_nome,
+          userEmail: act.usuario_email,
+          activity: act.tipo_atividade,
+          resourceType: act.recurso_id ? 'activity' : undefined,
+          resourceId: act.recurso_id,
+          resourceTitle: act.recurso_titulo,
+          details: act.detalhes,
+          timestamp: act.data_atividade,
+          sessionId: act.sessao_id,
+        }));
+
+      setRecentLogs(formattedLogs);
+    } catch (error) {
+      console.error('Erro ao carregar relatórios:', error);
+      setAnalytics([]);
+      setRecentLogs([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterLogsByDate = (logs: UserActivityLog[], period: string): UserActivityLog[] => {

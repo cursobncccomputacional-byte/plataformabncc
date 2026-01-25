@@ -22,6 +22,7 @@ import {
   documents
 } from '../data/bnccData';
 import { activityLogger } from '../services/ActivityLogger';
+import { sessionService } from '../services/sessionService';
 import { apiService } from '../services/apiService';
 import { loadActivitiesFromXlsxUrl } from '../services/activitiesXlsxLoader';
 
@@ -101,9 +102,31 @@ export const useAuth = () => {
 // Dados BNCC já importados do arquivo bnccData.ts
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<Profile | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [session, setSession] = useState<{ user: Profile } | null>(null);
+  // Inicializar profile do localStorage de forma síncrona para evitar delay no primeiro render
+  const getInitialProfile = (): Profile | null => {
+    try {
+      const saved = localStorage.getItem('plataforma-bncc-user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Garantir que as permissões sempre existam (mesmo que false)
+        return {
+          ...parsed,
+          can_manage_activities: parsed.can_manage_activities ?? false,
+          can_manage_courses: parsed.can_manage_courses ?? false,
+        };
+      }
+    } catch {
+      // Ignorar erros de parse
+    }
+    return null;
+  };
+
+  const [user, setUser] = useState<Profile | null>(getInitialProfile());
+  const [profile, setProfile] = useState<Profile | null>(getInitialProfile());
+  const [session, setSession] = useState<{ user: Profile } | null>(() => {
+    const initial = getInitialProfile();
+    return initial ? { user: initial } : null;
+  });
   const [loading, setLoading] = useState(true);
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
   const [spreadsheetActivities, setSpreadsheetActivities] = useState<Activity[]>([]);
@@ -128,8 +151,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Função para logout por inatividade
-  const handleInactivityLogout = () => {
+  const handleInactivityLogout = async () => {
     setShowInactivityWarning(false);
+    // Registrar logout por inatividade antes de fazer signOut
+    if (user) {
+      await sessionService.registerLogout({ tipo_logout: 'inativo' });
+    }
     signOut();
   };
 
@@ -331,8 +358,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('plataforma-bncc-user', JSON.stringify(userData));
         localStorage.setItem('api_authenticated', 'true');
         
-        // Log do login
+        // Log do login (localStorage)
         activityLogger.logLogin(userData.id, userData.name, userData.email);
+        
+        // Registrar sessão no backend (fallback se o login.php não registrou)
+        try {
+          const sessaoId = await sessionService.registerLogin(userData.id);
+          if (sessaoId) {
+            sessionService.setCurrentSessaoId(sessaoId);
+          }
+        } catch (error) {
+          console.warn('Erro ao registrar sessão no backend (pode ser normal se já foi registrado):', error);
+        }
         
         return { error: null };
       }
@@ -360,6 +397,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Log do logout antes de limpar os dados
     if (user) {
       activityLogger.logLogout(user.id, user.name, user.email);
+      
+      // Registrar logout no backend
+      try {
+        await sessionService.registerLogout({ tipo_logout: 'manual' });
+      } catch (error) {
+        console.warn('Erro ao registrar logout no backend:', error);
+      }
     }
     
     // Tentar fazer logout na API se estiver autenticado via API
@@ -377,6 +421,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     localStorage.removeItem('plataforma-bncc-user');
     localStorage.removeItem('api_authenticated');
+    localStorage.removeItem('plataforma-bncc-sessao-id');
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -459,6 +504,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error('Escola é obrigatória para professores e alunos') };
     }
 
+    // VALIDAÇÃO DE LIMITES PARA ADMINS (frontend - validação prévia)
+    if (user.role === 'admin') {
+      // Verificar limites antes de enviar para API
+      const maxProf = user.max_professores;
+      const maxAlunos = user.max_alunos;
+      const profCriados = user.professores_criados || 0;
+      const alunosCriados = user.alunos_criados || 0;
+
+      // Verificar expiração do pacote
+      if (user.data_expiracao) {
+        const dataExpiracao = new Date(user.data_expiracao);
+        const hoje = new Date();
+        if (dataExpiracao < hoje) {
+          return { error: new Error('Seu pacote expirou. Entre em contato para renovar.') };
+        }
+      }
+
+      // Validar limite de professores
+      if (userData.role === 'professor' && maxProf !== null && maxProf !== undefined) {
+        if (profCriados >= maxProf) {
+          return {
+            error: new Error(
+              `Limite de professores atingido. Você pode criar até ${maxProf} professores. (${profCriados}/${maxProf} utilizados)`
+            ),
+          };
+        }
+      }
+
+      // Validar limite de alunos
+      if (userData.role === 'aluno' && maxAlunos !== null && maxAlunos !== undefined) {
+        if (alunosCriados >= maxAlunos) {
+          return {
+            error: new Error(
+              `Limite de alunos atingido. Você pode criar até ${maxAlunos} alunos. (${alunosCriados}/${maxAlunos} utilizados)`
+            ),
+          };
+        }
+      }
+    }
+
     try {
       console.log('LocalAuthContext: Enviando dados para API:', {
         name: userData.name,
@@ -494,6 +579,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (apiResponse.user && apiResponse.user.id) {
           console.log('LocalAuthContext: Usuário criado com sucesso na API');
           console.log('LocalAuthContext: Dados do usuário criado:', apiResponse.user);
+          
+          // ATUALIZAR CONTADORES DO ADMIN APÓS CRIAR USUÁRIO
+          if (user.role === 'admin' && (userData.role === 'professor' || userData.role === 'aluno')) {
+            const updatedUser = {
+              ...user,
+              professores_criados: userData.role === 'professor' 
+                ? (user.professores_criados || 0) + 1 
+                : user.professores_criados,
+              alunos_criados: userData.role === 'aluno'
+                ? (user.alunos_criados || 0) + 1
+                : user.alunos_criados,
+            };
+            setUser(updatedUser);
+            setProfile(updatedUser);
+            setSession({ user: updatedUser });
+            localStorage.setItem('plataforma-bncc-user', JSON.stringify(updatedUser));
+          }
+          
           return { error: null };
         }
         

@@ -192,13 +192,32 @@ try {
             json_response(400, ['error' => true, 'message' => 'user_id e course_id são obrigatórios']);
         }
 
+        // Buscar se existe inscrição antes de remover (para ajustar contador)
+        $hadEnrollment = false;
+        $stmt = $pdo->prepare("SELECT id FROM inscricoes WHERE usuario_id = ? AND curso_id = ?");
+        $stmt->execute([$userId, $courseId]);
+        if ($stmt->fetch()) {
+            $hadEnrollment = true;
+        }
+
         $stmt = $pdo->prepare("DELETE FROM permissoes_cursos WHERE usuario_id = ? AND curso_id = ?");
         $stmt->execute([$userId, $courseId]);
 
         if ($stmt->rowCount() > 0) {
+            // Remover inscrição também (para o curso sumir de "Meus Cursos")
+            $stmt = $pdo->prepare("DELETE FROM inscricoes WHERE usuario_id = ? AND curso_id = ?");
+            $stmt->execute([$userId, $courseId]);
+
+            if ($hadEnrollment) {
+                // Evitar contador negativo
+                $stmt = $pdo->prepare("UPDATE cursos SET alunos_inscritos = GREATEST(alunos_inscritos - 1, 0) WHERE id = ?");
+                $stmt->execute([$courseId]);
+            }
+
             json_response(200, [
                 'error' => false,
-                'message' => 'Permissão removida com sucesso'
+                'message' => 'Permissão removida com sucesso',
+                'enrollment_removed' => $hadEnrollment
             ]);
         } else {
             json_response(404, ['error' => true, 'message' => 'Permissão não encontrada']);

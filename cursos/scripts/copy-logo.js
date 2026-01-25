@@ -16,6 +16,7 @@ const distDir = path.join(__dirname, '../dist');
 const logosToCopy = [
   'nova-edu-ead.png',
   'nova-edu-ead-branco.png',
+  'bncc-branco.svg',
   'favicon-ead.png',
   'video-ead-hero.mp4',
 ];

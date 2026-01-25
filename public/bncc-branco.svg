@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="90" viewBox="0 0 420 90" role="img" aria-label="BNCC">
+  <title>BNCC</title>
+  <defs>
+    <style>
+      .w { fill: #ffffff; }
+    </style>
+  </defs>
+  <!-- Ícone simples (livro aberto) -->
+  <g transform="translate(18,18)">
+    <path class="w" d="M8 6c10 0 18 3 24 8 6-5 14-8 24-8 4 0 8 .5 12 1.5v42.5c-4-1-8-1.5-12-1.5-10 0-18 3-24 8-6-5-14-8-24-8-4 0-8 .5-12 1.5V7.5C0 6.5 4 6 8 6zm0 6c-1.9 0-3.8.2-5.7.5v31.2c1.9-.3 3.8-.5 5.7-.5 9.2 0 16.9 2.4 22.9 7V19.2C24.9 14.4 17.2 12 8 12zm48 0c-9.2 0-16.9 2.4-22.9 7v31c6-4.6 13.7-7 22.9-7 1.9 0 3.8.2 5.7.5V12.5c-1.9-.3-3.8-.5-5.7-.5z"/>
+  </g>
+  <!-- Texto BNCC -->
+  <text x="110" y="58" class="w" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" letter-spacing="2">
+    BNCC
+  </text>
+</svg>

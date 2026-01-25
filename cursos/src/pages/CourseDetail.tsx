@@ -15,6 +15,7 @@ export const CourseDetail = () => {
   const [loading, setLoading] = useState(true);
   const [enrolled, setEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -30,8 +31,13 @@ export const CourseDetail = () => {
     try {
       const response = await eadApiService.getCourse(id);
       if (!response.error && response.course) {
+        setAccessError(null);
         setCourse(response.course);
         setLessons(response.lessons || []);
+      } else {
+        setCourse(null);
+        setLessons([]);
+        setAccessError(response.message || 'Curso bloqueado para este usuário. Solicite acesso ao administrador.');
       }
     } catch (error) {
       console.error('Erro ao carregar curso:', error);
@@ -86,7 +92,29 @@ export const CourseDetail = () => {
   if (!course) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-[#044982] text-xl">Curso não encontrado</div>
+        <div className="max-w-lg w-full mx-auto bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-3 text-[#044982]">
+            <Lock className="w-6 h-6" />
+            <div className="text-xl font-semibold">Curso indisponível</div>
+          </div>
+          <p className="text-gray-600">
+            {accessError || 'Curso não encontrado.'}
+          </p>
+          <div className="mt-5 flex gap-3">
+            <Link
+              to="/dashboard"
+              className="bg-[#044982] text-white px-5 py-2 rounded-lg font-semibold hover:bg-[#005a93] transition"
+            >
+              Voltar para Meus Cursos
+            </Link>
+            <Link
+              to="/cursos"
+              className="px-5 py-2 rounded-lg font-semibold border border-gray-300 hover:bg-gray-50 transition text-gray-800"
+            >
+              Ver catálogo
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -174,7 +202,7 @@ export const CourseDetail = () => {
                     disabled={enrolling}
                     className="bg-[#044982] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#005a93] transition disabled:opacity-50"
                   >
-                    {enrolling ? 'Inscrevendo...' : course.price > 0 ? `Inscrever-se - R$ ${course.price.toFixed(2)}` : 'Inscrever-se Gratuitamente'}
+                    {enrolling ? 'Inscrevendo...' : course.price > 0 ? `Inscrever-se - R$ ${course.price.toFixed(2)}` : 'Inscrever-se'}
                   </button>
                 )}
               </div>
