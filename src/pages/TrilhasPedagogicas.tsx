@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2, Book, Calculator, MapPin, FlaskConical, Dumbbell, Church, Code, Languages } from 'lucide-react';
+import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2, Book, Calculator, MapPin, FlaskConical, Dumbbell, Church, Code, Languages, X } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
@@ -10,7 +10,7 @@ interface Trilha {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
+  tipo: 'eixo_bncc' | 'etapa' | 'ano_escolar' | 'disciplina_transversal';
   valor: string;
   thumbnail_url?: string;
   ordem: number;
@@ -52,9 +52,10 @@ export const TrilhasPedagogicas = () => {
   const loadTrilhas = async () => {
     setLoading(true);
     try {
-      const [responseEixo, responseEtapa, responseDisciplinas] = await Promise.all([
+      const [responseEixo, responseEtapa, responseAnoEscolar, responseDisciplinas] = await Promise.all([
         apiService.getTrilhas('eixo_bncc'),
         apiService.getTrilhas('etapa'),
+        apiService.getTrilhas('ano_escolar'),
         apiService.getTrilhas('disciplina_transversal'),
       ]);
 
@@ -62,7 +63,13 @@ export const TrilhasPedagogicas = () => {
         setTrilhasEixo(responseEixo.trilhas || []);
       }
       if (!responseEtapa.error) {
-        setTrilhasEtapa(responseEtapa.trilhas || []);
+        // Juntar "etapa" + "ano_escolar" na seção Por Etapa (dedupe por id)
+        const merged = [...(responseEtapa.trilhas || []), ...(responseAnoEscolar.trilhas || [])];
+        const byId = new Map<string, Trilha>();
+        merged.forEach((t: any) => {
+          if (t?.id) byId.set(String(t.id), t);
+        });
+        setTrilhasEtapa(Array.from(byId.values()));
       }
       if (!responseDisciplinas.error) {
         setTrilhasDisciplinas(responseDisciplinas.trilhas || []);
@@ -71,6 +78,7 @@ export const TrilhasPedagogicas = () => {
       setTrilhas([
         ...(responseEixo.trilhas || []), 
         ...(responseEtapa.trilhas || []),
+        ...(responseAnoEscolar.trilhas || []),
         ...(responseDisciplinas.trilhas || [])
       ]);
     } catch (error) {
@@ -85,11 +93,21 @@ export const TrilhasPedagogicas = () => {
     setLoadingAtividades(true);
     try {
       const response = await apiService.getTrilha(trilha.id);
-      if (!response.error && response.atividades) {
-        setAtividadesTrilha(response.atividades);
+      console.log('Resposta da API getTrilha:', response);
+      if (!response.error) {
+        if (response.atividades && Array.isArray(response.atividades)) {
+          setAtividadesTrilha(response.atividades);
+        } else {
+          console.warn('Resposta não contém atividades ou não é um array:', response);
+          setAtividadesTrilha([]);
+        }
+      } else {
+        console.error('Erro na resposta da API:', response.message);
+        setAtividadesTrilha([]);
       }
     } catch (error) {
       console.error('Erro ao carregar atividades da trilha:', error);
+      setAtividadesTrilha([]);
     } finally {
       setLoadingAtividades(false);
     }
@@ -110,6 +128,8 @@ export const TrilhasPedagogicas = () => {
       if (valor.includes('Pensamento')) return Brain;
       if (valor.includes('Mundo')) return Globe;
       if (valor.includes('Cultura')) return Users;
+    } else if (tipo === 'ano_escolar') {
+      return GraduationCap;
     } else if (tipo === 'disciplina_transversal') {
       if (valor.includes('Português')) return Book;
       if (valor.includes('Matemática')) return Calculator;
@@ -180,7 +200,7 @@ export const TrilhasPedagogicas = () => {
               <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
                 {selectedTrilha.tipo === 'eixo_bncc'
                   ? 'Eixo BNCC'
-                  : selectedTrilha.tipo === 'etapa'
+                  : selectedTrilha.tipo === 'etapa' || selectedTrilha.tipo === 'ano_escolar'
                     ? 'Etapa'
                     : 'Disciplina Transversal'}
               </span>
@@ -321,10 +341,9 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               <>
                 <div className="relative flex items-center justify-center">
                   <img 
-                    src="/logo/Logo Nova Edu (Oficial)-10.png" 
-                    alt="BNCC Logo" 
+                    src="/icone-nova-edu-branco.png" 
+                    alt="Nova Edu Logo" 
                     className="w-8 h-8 md:w-9 md:h-9 object-contain"
-                    style={{ filter: 'brightness(0) invert(1)' }}
                   />
                 </div>
                 <span>Quero uma atividade pronta para hoje</span>
@@ -339,9 +358,21 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6 shadow-md"
+            className="mb-8 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6 shadow-md relative"
           >
-            <div className="flex items-start gap-4">
+            {/* Botão de fechar no canto superior direito */}
+            <button
+              onClick={() => {
+                setShowAISuggestion(false);
+                setAiSuggestion(null);
+              }}
+              className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-white rounded-lg transition-all shadow-sm hover:shadow-md"
+              title="Fechar sugestão"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-start gap-4 pr-8">
               <div className="p-3 bg-purple-100 rounded-lg">
                 <Sparkles className="w-6 h-6 text-purple-600" />
               </div>
@@ -358,8 +389,9 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                     setShowAISuggestion(false);
                     setAiSuggestion(null);
                   }}
-                  className="mt-4 text-sm text-purple-600 hover:text-purple-800 font-medium"
+                  className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 text-base font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-all shadow-md hover:shadow-lg"
                 >
+                  <X className="w-5 h-5" />
                   Fechar sugestão
                 </button>
               </div>

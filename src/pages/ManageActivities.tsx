@@ -4,6 +4,13 @@ import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
 
+interface HabilidadeCurriculo {
+  id: number;
+  codigo: string;
+  eixo: string;
+  descricao: string;
+}
+
 interface Activity {
   id: string;
   nome_atividade: string;
@@ -13,6 +20,8 @@ interface Activity {
   anos_escolares?: string[];
   eixos_bncc?: string[];
   disciplinas_transversais?: string[];
+  habilidades_ids?: number[];
+  habilidades?: HabilidadeCurriculo[];
   duracao?: string;
   nivel_dificuldade: 'Fácil' | 'Médio' | 'Difícil';
   thumbnail_url?: string;
@@ -39,6 +48,7 @@ const DISCIPLINAS_TRANSVERSAIS = [
   'Ensino Religioso',
   'Computação',
   'Inglês',
+  'Artes',
 ];
 
 export const ManageActivities = () => {
@@ -62,6 +72,7 @@ export const ManageActivities = () => {
     anos_escolares: [],
     eixos_bncc: [],
     disciplinas_transversais: [],
+    habilidades_ids: [],
     duracao: '',
     nivel_dificuldade: 'Médio',
     thumbnail_url: '',
@@ -69,6 +80,8 @@ export const ManageActivities = () => {
     pdf_estrutura_pedagogica_url: '',
     material_apoio_url: '',
   });
+  const [curriculoHabilidades, setCurriculoHabilidades] = useState<HabilidadeCurriculo[]>([]);
+  const [habilidadesSearch, setHabilidadesSearch] = useState('');
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 
@@ -126,8 +139,29 @@ export const ManageActivities = () => {
     return `atividade-${String(nextNumber).padStart(3, '0')}`;
   };
 
-  const handleOpenModal = (activity?: Activity) => {
+  const loadCurriculoHabilidades = async () => {
+    if (curriculoHabilidades.length > 0) return;
+    try {
+      const res = await apiService.getCurriculoBnccHabilidades({});
+      if (!res.error && res.habilidades?.length) {
+        setCurriculoHabilidades(
+          res.habilidades.map((h: any) => ({
+            id: Number(h.id),
+            codigo: h.codigo || '',
+            eixo: h.eixo || '',
+            descricao: h.descricao || '',
+          }))
+        );
+      }
+    } catch {
+      // ignora se API de currículo não existir
+    }
+  };
+
+  const handleOpenModal = async (activity?: Activity) => {
+    await loadCurriculoHabilidades();
     if (activity) {
+      const habilidadesIds = activity.habilidades_ids ?? activity.habilidades?.map((h) => h.id) ?? [];
       setEditingActivity(activity);
       setFormData({
         id: activity.id,
@@ -138,6 +172,7 @@ export const ManageActivities = () => {
         anos_escolares: activity.anos_escolares || [],
         eixos_bncc: activity.eixos_bncc || [],
         disciplinas_transversais: activity.disciplinas_transversais || [],
+        habilidades_ids: habilidadesIds,
         duracao: activity.duracao || '',
         nivel_dificuldade: activity.nivel_dificuldade,
         thumbnail_url: activity.thumbnail_url || '',
@@ -147,7 +182,6 @@ export const ManageActivities = () => {
       });
     } else {
       setEditingActivity(null);
-      // Gerar ID automaticamente
       const nextId = generateNextActivityId();
       setFormData({
         id: nextId,
@@ -158,6 +192,7 @@ export const ManageActivities = () => {
         anos_escolares: [],
         eixos_bncc: [],
         disciplinas_transversais: [],
+        habilidades_ids: [],
         duracao: '',
         nivel_dificuldade: 'Médio',
         thumbnail_url: '',
@@ -166,6 +201,7 @@ export const ManageActivities = () => {
         material_apoio_url: '',
       });
     }
+    setHabilidadesSearch('');
     setShowModal(true);
   };
 
@@ -180,14 +216,16 @@ export const ManageActivities = () => {
       etapa: 'Anos Iniciais',
       anos_escolares: [],
       eixos_bncc: [],
+      disciplinas_transversais: [],
+      habilidades_ids: [],
       duracao: '',
       nivel_dificuldade: 'Médio',
       thumbnail_url: '',
       video_url: '',
       pdf_estrutura_pedagogica_url: '',
       material_apoio_url: '',
-      disciplinas_transversais: [],
     });
+    setHabilidadesSearch('');
     setThumbnailFile(null);
     setError(null);
     setSuccess(null);
@@ -283,6 +321,40 @@ export const ManageActivities = () => {
       setFormData({ ...formData, disciplinas_transversais: [...current, disciplina] });
     }
   };
+
+  const toggleHabilidade = (habilidadeId: number) => {
+    const current = formData.habilidades_ids || [];
+    const nextIds = current.includes(habilidadeId)
+      ? current.filter((id) => id !== habilidadeId)
+      : [...current, habilidadeId];
+    const nextEixos = curriculoHabilidades
+      .filter((h) => nextIds.includes(h.id))
+      .reduce<string[]>((acc, h) => (h.eixo && !acc.includes(h.eixo) ? [...acc, h.eixo] : acc), []);
+    setFormData({
+      ...formData,
+      habilidades_ids: nextIds,
+      eixos_bncc: nextEixos.length > 0 ? nextEixos : formData.eixos_bncc,
+    });
+  };
+
+  const eixosEnglobados = useMemo(() => {
+    const ids = formData.habilidades_ids || [];
+    if (ids.length === 0) return [];
+    return curriculoHabilidades
+      .filter((h) => ids.includes(h.id))
+      .reduce<string[]>((acc, h) => (h.eixo && !acc.includes(h.eixo) ? [...acc, h.eixo] : acc), []);
+  }, [formData.habilidades_ids, curriculoHabilidades]);
+
+  const filteredCurriculoHabilidades = useMemo(() => {
+    const q = habilidadesSearch.trim().toLowerCase();
+    if (!q) return curriculoHabilidades.slice(0, 80);
+    return curriculoHabilidades.filter(
+      (h) =>
+        h.codigo?.toLowerCase().includes(q) ||
+        h.eixo?.toLowerCase().includes(q) ||
+        h.descricao?.toLowerCase().includes(q)
+    ).slice(0, 80);
+  }, [curriculoHabilidades, habilidadesSearch]);
 
   const filteredActivities = useMemo(() => {
     return activities;
@@ -394,6 +466,7 @@ export const ManageActivities = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ano Escolar</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dificuldade</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Criado em</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -420,6 +493,22 @@ export const ManageActivities = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{activity.etapa}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {activity.anos_escolares && activity.anos_escolares.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {activity.anos_escolares.map((ano, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded"
+                            >
+                              {ano}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -599,7 +688,62 @@ export const ManageActivities = () => {
               )}
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Habilidades BNCC (currículo)</label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Associe as habilidades do currículo de computação. Os eixos da atividade serão definidos automaticamente.
+                </p>
+                <input
+                  type="text"
+                  placeholder="Buscar por código, eixo ou descrição..."
+                  value={habilidadesSearch}
+                  onChange={(e) => setHabilidadesSearch(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2 focus:ring-2 focus:ring-[#044982]"
+                />
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1 bg-gray-50">
+                  {filteredCurriculoHabilidades.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-2">
+                      {curriculoHabilidades.length === 0
+                        ? 'Carregando habilidades... (ou execute os scripts SQL do currículo)'
+                        : 'Nenhuma habilidade encontrada.'}
+                    </p>
+                  ) : (
+                    filteredCurriculoHabilidades.map((h) => (
+                      <label
+                        key={h.id}
+                        className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1.5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(formData.habilidades_ids || []).includes(h.id)}
+                          onChange={() => toggleHabilidade(h.id)}
+                          className="mt-1 rounded border-gray-300 text-[#044982] focus:ring-[#044982]"
+                        />
+                        <span className="text-sm text-gray-700 flex-1">
+                          <strong>{h.codigo}</strong> · {h.eixo}
+                          {h.descricao && (
+                            <span className="block text-gray-500 truncate" title={h.descricao}>
+                              {h.descricao.slice(0, 60)}
+                              {h.descricao.length > 60 ? '…' : ''}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {eixosEnglobados.length > 0 && (
+                  <div className="mt-2 p-2 bg-[#044982]/10 rounded-md">
+                    <span className="text-sm font-medium text-[#044982]">Eixos englobados por esta atividade: </span>
+                    <span className="text-sm text-gray-700">{eixosEnglobados.join(', ')}</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Eixos BNCC</label>
+                <p className="text-xs text-gray-500 mb-1">
+                  Preenchido automaticamente pelas habilidades selecionadas acima (ou marque manualmente).
+                </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {EIXOS_BNCC.map((eixo) => (
                     <label key={eixo} className="flex items-center gap-2 cursor-pointer">

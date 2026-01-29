@@ -202,22 +202,29 @@ export const AIAssistant = ({ isOpen, onClose }: AIAssistantProps) => {
           response = aiResponse.suggestions || generateResponse(messageContent);
         }
       } else {
-        // Para outras perguntas, tentar usar Groq primeiro
-        const prompt = `Você é um assistente educacional especializado em BNCC e pensamento computacional. Responda de forma clara, prática e objetiva. ${messageContent}`;
+        // Para TODAS as outras perguntas, usar Groq (API real)
+        const prompt = `Você é um assistente educacional especializado em BNCC (Base Nacional Comum Curricular) e pensamento computacional. Responda de forma clara, prática e objetiva, sempre relacionando com a BNCC quando relevante. Seja conciso mas completo. ${messageContent}`;
         
         try {
           const aiResponse = await apiService.suggestActivitiesFromAI(prompt);
           
           if (aiResponse.error || !aiResponse.suggestions) {
-            // Fallback para resposta pré-definida
+            // Fallback para resposta pré-definida apenas se houver erro na API
+            console.warn('Erro na API Groq, usando fallback:', aiResponse.message);
             response = generateResponse(messageContent);
+            setApiError(true);
+            setUsingAI(false);
           } else {
             response = aiResponse.suggestions;
+            setUsingAI(true);
+            setApiError(false);
           }
         } catch (error) {
           // Fallback para resposta pré-definida em caso de erro
+          console.error('Erro ao chamar API Groq:', error);
           response = generateResponse(messageContent);
           setApiError(true);
+          setUsingAI(false);
         }
       }
 

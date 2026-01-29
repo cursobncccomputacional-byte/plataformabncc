@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "list-files": "node scripts/listar-arquivos.js",
-    "sync-activities": "node scripts/sync-activities-to-db.js"
+    "sync-activities": "node scripts/sync-activities-to-db.js",
+    "import-bncc": "node scripts/import-bncc-habilidades.js",
+    "bncc-from-docx": "node scripts/docx-to-bncc-sql.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
@@ -22,6 +24,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
+    "mammoth": "^1.8.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

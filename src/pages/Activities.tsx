@@ -8,6 +8,7 @@ import { activityLogger } from '../services/ActivityLogger';
 import { ActivityDuration } from '../components/ActivityDuration';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
 import { apiService } from '../services/apiService';
+import { schoolYears as allSchoolYears, bnccAxes as allBnccAxes } from '../data/bnccData';
 
 const typeIcons = {
   plugada: Monitor,
@@ -191,13 +192,92 @@ export const Activities = () => {
             }
           }
           
+          // Mapear etapa para IDs de anos escolares
+          // Primeiro, tentar usar anos_escolares se existir e for válido
+          let schoolYearsArray = Array.isArray(act.anos_escolares) ? act.anos_escolares : [];
+          
+          // Mapear nomes de anos para IDs (caso venham como "1º Ano" ao invés de "1ano")
+          const nameToIdMap: { [key: string]: string } = {
+            'Educação Infantil': 'ei',
+            '1º Ano': '1ano',
+            '2º Ano': '2ano',
+            '3º Ano': '3ano',
+            '4º Ano': '4ano',
+            '5º Ano': '5ano',
+            '6º Ano': '6ano',
+            '7º Ano': '7ano',
+            '8º Ano': '8ano',
+            '9º Ano': '9ano',
+            'AEE': 'aee',
+          };
+          
+          // Converter nomes para IDs se necessário
+          schoolYearsArray = schoolYearsArray.map(item => {
+            // Se já for um ID válido, retornar como está
+            if (allSchoolYears.some(y => y.id === item)) {
+              return item;
+            }
+            // Se for um nome, converter para ID
+            return nameToIdMap[item] || item;
+          });
+          
+          // Validar se os IDs em anos_escolares são válidos (estão no bnccData)
+          const validIds = allSchoolYears.map(y => y.id);
+          schoolYearsArray = schoolYearsArray.filter(id => validIds.includes(id));
+          
+          // Se não houver anos_escolares válidos mas houver etapa, mapear etapa para IDs
+          if (schoolYearsArray.length === 0 && act.etapa) {
+            const etapaToIds: { [key: string]: string[] } = {
+              'Educação Infantil': ['ei'],
+              '1º Ano': ['1ano'],
+              '2º Ano': ['2ano'],
+              '3º Ano': ['3ano'],
+              '4º Ano': ['4ano'],
+              '5º Ano': ['5ano'],
+              '6º Ano': ['6ano'],
+              '7º Ano': ['7ano'],
+              '8º Ano': ['8ano'],
+              '9º Ano': ['9ano'],
+              'AEE': ['aee'],
+              // Para etapas genéricas, incluir todos os anos daquela etapa
+              'Anos Iniciais': ['1ano', '2ano', '3ano', '4ano', '5ano'],
+              'Anos Finais': ['6ano', '7ano', '8ano', '9ano'],
+            };
+            
+            schoolYearsArray = etapaToIds[act.etapa] || [];
+          }
+          
+          // Mapear nomes de eixos para IDs (caso venham como "Pensamento Computacional" ao invés de "pensamento-computacional")
+          let axisIdsArray = Array.isArray(act.eixos_bncc) ? act.eixos_bncc : [];
+          
+          // Mapear nomes para IDs
+          const axisNameToIdMap: { [key: string]: string } = {
+            'Pensamento Computacional': 'pensamento-computacional',
+            'Mundo Digital': 'mundo-digital',
+            'Cultura Digital': 'cultura-digital',
+          };
+          
+          // Converter nomes para IDs se necessário
+          axisIdsArray = axisIdsArray.map(item => {
+            // Se já for um ID válido, retornar como está
+            if (allBnccAxes.some(a => a.id === item)) {
+              return item;
+            }
+            // Se for um nome, converter para ID
+            return axisNameToIdMap[item] || item;
+          });
+          
+          // Validar se os IDs são válidos
+          const validAxisIds = allBnccAxes.map(a => a.id);
+          axisIdsArray = axisIdsArray.filter(id => validAxisIds.includes(id));
+          
           return {
             id: act.id,
             title: act.nome_atividade,
             description: act.descricao || '',
             type: type,
-            schoolYears: act.anos_escolares || [],
-            axisIds: act.eixos_bncc || [],
+            schoolYears: schoolYearsArray,
+            axisIds: axisIdsArray,
             difficulty: difficulty,
             duration: duration,
             video_url: act.video_url,
@@ -218,22 +298,30 @@ export const Activities = () => {
     }
   };
 
-  // Gerar anos escolares e eixos a partir das atividades
-  const schoolYears: SchoolYear[] = Array.from(
-    new Set(allActivities.flatMap(a => a.schoolYears))
-  ).map((year, index) => ({
-    id: year,
-    name: year,
-    order: index,
-  }));
+  // Gerar anos escolares: usar todos os anos do bnccData, mas ordenar pelos que aparecem nas atividades primeiro
+  const activityYears = Array.from(new Set(allActivities.flatMap(a => a.schoolYears)));
+  const schoolYears: SchoolYear[] = allSchoolYears
+    .sort((a, b) => {
+      // Ordenar: anos que aparecem nas atividades primeiro, depois por order
+      const aInActivities = activityYears.includes(a.id);
+      const bInActivities = activityYears.includes(b.id);
+      if (aInActivities && !bInActivities) return -1;
+      if (!aInActivities && bInActivities) return 1;
+      return a.order - b.order;
+    });
 
-  const axes: BNCCAxis[] = Array.from(
-    new Set(allActivities.flatMap(a => a.axisIds || []))
-  ).map((axis, index) => ({
-    id: axis,
-    name: axis,
-    order: index,
-  }));
+  // Gerar eixos: usar todos os eixos do bnccData, mas ordenar pelos que aparecem nas atividades primeiro
+  const activityAxes = Array.from(new Set(allActivities.flatMap(a => a.axisIds || [])));
+  const axes: BNCCAxis[] = allBnccAxes
+    .sort((a, b) => {
+      // Ordenar: eixos que aparecem nas atividades primeiro, depois por ordem padrão
+      const aInActivities = activityAxes.includes(a.id);
+      const bInActivities = activityAxes.includes(b.id);
+      if (aInActivities && !bInActivities) return -1;
+      if (!aInActivities && bInActivities) return 1;
+      // Manter ordem original do bnccData
+      return 0;
+    });
 
   const isEmpty = allActivities.length === 0;
 
@@ -498,17 +586,17 @@ export const Activities = () => {
               </div>
             </div>
 
-            {/* Ano Escolar */}
+            {/* Etapa Escolar */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ano Escolar
+                Etapa Escolar
               </label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="all">Todos os anos</option>
+                <option value="all">Todas as etapas</option>
                 {schoolYears.map((year) => (
                   <option key={year.id} value={year.id}>
                     {year.name}

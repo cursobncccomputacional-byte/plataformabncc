@@ -29,18 +29,23 @@ export const ActivityDuration = ({ videoUrl, fallbackMinutes, className }: Activ
     let isMounted = true;
     const fetchDuration = async () => {
       if (!vimeoId) return;
-      try {
-        const cacheKey = `vimeo_duration_${vimeoId}`;
-        const cached = sessionStorage.getItem(cacheKey);
-        if (cached) {
-          const seconds = Number(cached);
-          if (!Number.isNaN(seconds) && isMounted) {
-            setDurationSeconds(seconds);
-            return;
-          }
+      const cacheKey = `vimeo_duration_${vimeoId}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        if (cached === '404') return; // Vídeo inexistente ou privado — não tentar de novo
+        const seconds = Number(cached);
+        if (!Number.isNaN(seconds) && isMounted) {
+          setDurationSeconds(seconds);
+          return;
         }
+      }
+      try {
         const resp = await fetch(`https://vimeo.com/api/v2/video/${vimeoId}.json`);
-        if (!resp.ok) throw new Error('Vimeo API error');
+        if (resp.status === 404) {
+          sessionStorage.setItem(cacheKey, '404');
+          return;
+        }
+        if (!resp.ok) return;
         const data = await resp.json();
         const seconds: number | undefined = Array.isArray(data) && data[0]?.duration ? Number(data[0].duration) : undefined;
         if (isMounted && seconds && !Number.isNaN(seconds)) {
@@ -48,7 +53,7 @@ export const ActivityDuration = ({ videoUrl, fallbackMinutes, className }: Activ
           sessionStorage.setItem(cacheKey, String(seconds));
         }
       } catch {
-        // mantém fallback
+        // mantém fallback (rede, CORS, etc.)
       }
     };
     fetchDuration();

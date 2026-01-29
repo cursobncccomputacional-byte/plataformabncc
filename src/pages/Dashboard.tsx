@@ -8,6 +8,8 @@ import { Activities } from './Activities';
 import { ManageActivities } from './ManageActivities';
 import { ManageFormacaoContinuada } from './ManageFormacaoContinuada';
 import { TrilhasPedagogicas } from './TrilhasPedagogicas';
+import { PlanoAula } from './PlanoAula';
+import { BnccDigital } from './BnccDigital';
 import { Users, Settings, BarChart3, Monitor } from 'lucide-react';
 import { FloatingAIAssistant } from '../components/FloatingAIAssistant';
 import { useAuth } from '../contexts/LocalAuthContext';
@@ -20,7 +22,7 @@ interface DashboardProps {
 
 export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, onNavigateToSessions, userRole }: DashboardProps) => {
   const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState<'activities' | 'videos' | 'documents' | 'profile' | 'plataforma' | 'formacao-continuada' | 'trilhas'>('trilhas');
+  const [currentPage, setCurrentPage] = useState<'activities' | 'videos' | 'documents' | 'profile' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'plano-aula' | 'bncc-digital'>('trilhas');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -80,6 +82,8 @@ export const Dashboard = ({ onNavigateToUserManagement, onNavigateToReports, onN
         {currentPage === 'plataforma' && <ManageActivities />}
         {currentPage === 'formacao-continuada' && <ManageFormacaoContinuada />}
         {currentPage === 'trilhas' && <TrilhasPedagogicas />}
+        {currentPage === 'plano-aula' && <PlanoAula />}
+        {currentPage === 'bncc-digital' && <BnccDigital />}
         {currentPage === 'activities' && <Activities />}
         {currentPage === 'videos' && <VideoCourses />}
         {currentPage === 'documents' && <Documents />}

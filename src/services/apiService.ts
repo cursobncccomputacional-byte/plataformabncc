@@ -133,12 +133,19 @@ class ApiService {
     const textResponse = await response.text();
     
     if (!contentType || !contentType.includes('application/json')) {
-      console.error('API retornou HTML em vez de JSON. Status:', response.status);
-      console.error('Content-Type recebido:', contentType);
-      console.error('Primeiros 500 caracteres da resposta:', textResponse.substring(0, 500));
+      const is404 = response.status === 404;
+      const isBncc = endpoint.includes('/bncc/');
+      const message = is404 && isBncc
+        ? 'Endpoint BNCC não encontrado (404). Verifique se a pasta api/bncc foi implantada no servidor e se o script create-bncc-computacional.sql foi executado.'
+        : 'API não está retornando JSON. Verifique se a API está configurada corretamente.';
+      if (!is404) {
+        console.error('API retornou HTML em vez de JSON. Status:', response.status);
+        console.error('Content-Type recebido:', contentType);
+        console.error('Primeiros 500 caracteres da resposta:', textResponse.substring(0, 500));
+      }
       return {
         error: true,
-        message: 'API não está retornando JSON. Verifique se a API está configurada corretamente.',
+        message,
       };
     }
 
@@ -155,9 +162,14 @@ class ApiService {
     }
 
     if (!response.ok) {
+      const is404 = response.status === 404;
+      const isBncc = endpoint.includes('/bncc/');
+      const message = is404 && isBncc
+        ? 'Endpoint BNCC não encontrado (404). Verifique se a pasta api/bncc foi implantada no servidor.'
+        : (data?.message || 'Erro na requisição');
       return {
         error: true,
-        message: data.message || 'Erro na requisição',
+        message,
       };
     }
 
@@ -568,7 +580,7 @@ class ApiService {
   /**
    * Trilhas Pedagógicas
    */
-  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa' | 'disciplina_transversal'): Promise<ApiResponse & { trilhas?: any[] }> {
+  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar'): Promise<ApiResponse & { trilhas?: any[] }> {
     const query = tipo ? `?tipo=${tipo}` : '';
     return this.request(`/trilhas/index.php${query}`);
   }
@@ -581,8 +593,9 @@ class ApiService {
     id: string;
     titulo: string;
     descricao?: string;
-    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
+    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar';
     valor: string;
+    criterios_agrupamento?: { tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar'; valor: string }[];
     thumbnail_url?: string;
     ordem?: number;
   }): Promise<ApiResponse> {
@@ -595,8 +608,9 @@ class ApiService {
   async updateTrilha(trilhaId: string, updates: Partial<{
     titulo: string;
     descricao: string;
-    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
+    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar';
     valor: string;
+    criterios_agrupamento: { tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar'; valor: string }[];
     thumbnail_url: string;
     ordem: number;
     ativo: boolean;
@@ -611,6 +625,127 @@ class ApiService {
     return this.request('/trilhas/index.php', {
       method: 'DELETE',
       body: JSON.stringify({ id: trilhaId }),
+    });
+  }
+
+  /**
+   * BNCC Computacional Digital
+   */
+  async getBnccHabilidades(params?: {
+    tipo_nivel?: 'educacao_infantil' | 'fundamental';
+    ano_etapa?: string;
+    eixo?: string;
+    search?: string;
+  }): Promise<ApiResponse & { habilidades?: any[]; total?: number }> {
+    const searchParams = new URLSearchParams();
+    if (params?.tipo_nivel) searchParams.set('tipo_nivel', params.tipo_nivel);
+    if (params?.ano_etapa) searchParams.set('ano_etapa', params.ano_etapa);
+    if (params?.eixo) searchParams.set('eixo', params.eixo);
+    if (params?.search) searchParams.set('search', params.search);
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request(`/bncc/index.php${query}`);
+  }
+
+  async getBnccHabilidade(id: string): Promise<ApiResponse & { habilidade?: any }> {
+    return this.request(`/bncc/index.php?id=${encodeURIComponent(id)}`);
+  }
+
+  async createBnccHabilidade(data: {
+    id?: string;
+    tipo_nivel: 'educacao_infantil' | 'fundamental';
+    ano_etapa: string;
+    codigo_habilidade?: string;
+    habilidade: string;
+    eixo: string;
+    objetivo_aprendizagem?: string;
+    objeto_conhecimento?: string;
+    explicacao_habilidade?: string;
+    exemplos?: string;
+    ordem?: number;
+  }): Promise<ApiResponse & { id?: string }> {
+    return this.request('/bncc/index.php', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBnccHabilidade(id: string, data: Partial<{
+    tipo_nivel: 'educacao_infantil' | 'fundamental';
+    ano_etapa: string;
+    codigo_habilidade: string;
+    habilidade: string;
+    eixo: string;
+    objetivo_aprendizagem: string;
+    objeto_conhecimento: string;
+    explicacao_habilidade: string;
+    exemplos: string;
+    ordem: number;
+  }>): Promise<ApiResponse> {
+    return this.request('/bncc/index.php', {
+      method: 'PUT',
+      body: JSON.stringify({ id, ...data }),
+    });
+  }
+
+  async deleteBnccHabilidade(id: string): Promise<ApiResponse> {
+    return this.request(`/bncc/index.php?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Currículo BNCC (tabelas curriculo_* – Educação Infantil com eixos e exemplos/materiais)
+   */
+  async getCurriculoBnccHabilidades(params?: {
+    etapa_id?: number;
+    eixo?: string;
+    search?: string;
+  }): Promise<ApiResponse & { habilidades?: any[]; etapas?: { id: number; nome: string }[]; total?: number }> {
+    const searchParams = new URLSearchParams();
+    if (params?.etapa_id != null) searchParams.set('etapa_id', String(params.etapa_id));
+    if (params?.eixo) searchParams.set('eixo', params.eixo);
+    if (params?.search) searchParams.set('search', params.search);
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request(`/curriculo-bncc/index.php${query}`);
+  }
+
+  async getCurriculoBnccHabilidade(id: number): Promise<ApiResponse & { habilidade?: any }> {
+    return this.request(`/curriculo-bncc/index.php?id=${id}`);
+  }
+
+  async createCurriculoBnccHabilidade(data: {
+    etapa_id: number;
+    codigo: string;
+    eixo: string;
+    descricao: string;
+    explicacao?: string;
+    exemplos?: { tipo: string; conteudo: string }[];
+    materiais?: { descricao?: string; link?: string }[];
+  }): Promise<ApiResponse & { id?: number }> {
+    return this.request('/curriculo-bncc/index.php', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCurriculoBnccHabilidade(id: number, data: {
+    etapa_id: number;
+    codigo: string;
+    eixo: string;
+    descricao: string;
+    explicacao?: string;
+    exemplos?: { tipo: string; conteudo: string }[];
+    materiais?: { descricao?: string; link?: string }[];
+  }): Promise<ApiResponse> {
+    return this.request('/curriculo-bncc/index.php', {
+      method: 'PUT',
+      body: JSON.stringify({ id, ...data }),
+    });
+  }
+
+  async deleteCurriculoBnccHabilidade(id: number): Promise<ApiResponse> {
+    return this.request(`/curriculo-bncc/index.php?id=${id}`, {
+      method: 'DELETE',
     });
   }
 

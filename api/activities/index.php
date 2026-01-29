@@ -87,6 +87,82 @@ function read_json_body(): array {
     return $data;
 }
 
+/**
+ * Retorna eixos distintos a partir dos IDs de curriculo_habilidades (para derivar eixos_bncc da atividade).
+ * @param PDO $pdo
+ * @param array<int> $habilidadesIds
+ * @return array<string> eixos únicos
+ */
+function eixos_from_habilidades_ids(PDO $pdo, array $habilidadesIds): array {
+    if (empty($habilidadesIds)) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($habilidadesIds), '?'));
+    $stmt = $pdo->prepare("SELECT DISTINCT eixo FROM curriculo_habilidades WHERE id IN ($placeholders)");
+    $stmt->execute(array_values($habilidadesIds));
+    $eixos = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if (!empty($row['eixo'])) {
+            $eixos[] = $row['eixo'];
+        }
+    }
+    return $eixos;
+}
+
+/**
+ * Retorna detalhes das habilidades (curriculo_habilidades) por IDs.
+ * @param PDO $pdo
+ * @param array<int> $habilidadesIds
+ * @return array<array{id:int,codigo:string,eixo:string,descricao:string}>
+ */
+function habilidades_details_by_ids(PDO $pdo, array $habilidadesIds): array {
+    if (empty($habilidadesIds)) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($habilidadesIds), '?'));
+    $stmt = $pdo->prepare("SELECT id, codigo, eixo, descricao FROM curriculo_habilidades WHERE id IN ($placeholders) ORDER BY id");
+    $stmt->execute(array_values($habilidadesIds));
+    $list = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $list[] = [
+            'id' => (int) $row['id'],
+            'codigo' => (string) ($row['codigo'] ?? ''),
+            'eixo' => (string) ($row['eixo'] ?? ''),
+            'descricao' => (string) ($row['descricao'] ?? ''),
+        ];
+    }
+    return $list;
+}
+
+/**
+ * Deriva nomes de etapas (ex: "1º Ano") a partir de habilidades do currículo.
+ * @param PDO $pdo
+ * @param array<int> $habilidadesIds
+ * @return array<string>
+ */
+function anos_escolares_from_habilidades_ids(PDO $pdo, array $habilidadesIds): array {
+    if (empty($habilidadesIds)) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($habilidadesIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT e.nome as etapa_nome
+        FROM curriculo_habilidades h
+        INNER JOIN curriculo_etapas_ensino e ON e.id = h.etapa_id
+        WHERE h.id IN ($placeholders)
+        ORDER BY e.id
+    ");
+    $stmt->execute(array_values($habilidadesIds));
+    $anos = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $nome = (string)($row['etapa_nome'] ?? '');
+        if ($nome !== '') {
+            $anos[] = $nome;
+        }
+    }
+    return $anos;
+}
+
 try {
     global $pdo;
     if (!isset($pdo)) {
@@ -107,6 +183,7 @@ try {
                 anos_escolares,
                 COALESCE(eixos_bncc, JSON_ARRAY(id_eixo)) as eixos_bncc,
                 COALESCE(disciplinas_transversais, '[]') as disciplinas_transversais,
+                COALESCE(habilidades_ids, '[]') as habilidades_ids,
                 duracao,
                 COALESCE(nivel_dificuldade, 
                     CASE 
@@ -158,6 +235,35 @@ try {
                 }
             }
 
+            // disciplinas_transversais
+            $disciplinasTransversais = [];
+            if (isset($activity['disciplinas_transversais'])) {
+                if (is_string($activity['disciplinas_transversais'])) {
+                    $decoded = json_decode($activity['disciplinas_transversais'], true);
+                    $disciplinasTransversais = is_array($decoded) ? $decoded : [];
+                } elseif (is_array($activity['disciplinas_transversais'])) {
+                    $disciplinasTransversais = $activity['disciplinas_transversais'];
+                }
+            }
+
+            // habilidades_ids e detalhes das habilidades (curriculo_habilidades)
+            $habilidadesIds = [];
+            if (isset($activity['habilidades_ids'])) {
+                if (is_string($activity['habilidades_ids'])) {
+                    $decoded = json_decode($activity['habilidades_ids'], true);
+                    $habilidadesIds = is_array($decoded) ? array_map('intval', array_filter($decoded, 'is_numeric')) : [];
+                } elseif (is_array($activity['habilidades_ids'])) {
+                    $habilidadesIds = array_map('intval', array_filter($activity['habilidades_ids'], 'is_numeric'));
+                }
+            }
+            $habilidadesDetails = [];
+            if (!empty($habilidadesIds)) {
+                $tablesExist = $pdo->query("SHOW TABLES LIKE 'curriculo_habilidades'")->rowCount() > 0;
+                if ($tablesExist) {
+                    $habilidadesDetails = habilidades_details_by_ids($pdo, $habilidadesIds);
+                }
+            }
+
             json_response_act(200, [
                 'error' => false,
                 'activity' => [
@@ -168,6 +274,9 @@ try {
                     'etapa' => $activity['etapa'] ?? null,
                     'anos_escolares' => $anosEscolares,
                     'eixos_bncc' => $eixosBncc,
+                    'disciplinas_transversais' => $disciplinasTransversais,
+                    'habilidades_ids' => $habilidadesIds,
+                    'habilidades' => $habilidadesDetails,
                     'duracao' => $activity['duracao'] ?? null,
                     'nivel_dificuldade' => $activity['nivel_dificuldade'] ?? 'Médio',
                     'thumbnail_url' => $activity['thumbnail_url'] ?? null,
@@ -196,6 +305,7 @@ try {
                 anos_escolares,
                 COALESCE(eixos_bncc, JSON_ARRAY(id_eixo)) as eixos_bncc,
                 COALESCE(disciplinas_transversais, '[]') as disciplinas_transversais,
+                COALESCE(habilidades_ids, '[]') as habilidades_ids,
                 duracao,
                 COALESCE(nivel_dificuldade, 
                     CASE 
@@ -301,6 +411,17 @@ try {
                         $disciplinasTransversais = $activity['disciplinas_transversais'];
                     }
                 }
+
+                // Converter habilidades_ids (JSON)
+                $habilidadesIds = [];
+                if (isset($activity['habilidades_ids'])) {
+                    if (is_string($activity['habilidades_ids'])) {
+                        $decoded = json_decode($activity['habilidades_ids'], true);
+                        $habilidadesIds = is_array($decoded) ? array_map('intval', array_filter($decoded, 'is_numeric')) : [];
+                    } elseif (is_array($activity['habilidades_ids'])) {
+                        $habilidadesIds = array_map('intval', array_filter($activity['habilidades_ids'], 'is_numeric'));
+                    }
+                }
                 
                 $activitiesData[] = [
                     'id' => $activity['id'],
@@ -311,6 +432,7 @@ try {
                     'anos_escolares' => $anosEscolares,
                     'eixos_bncc' => $eixosBncc,
                     'disciplinas_transversais' => $disciplinasTransversais,
+                    'habilidades_ids' => $habilidadesIds,
                     'duracao' => $activity['duracao'] ?? null,
                     'nivel_dificuldade' => $activity['nivel_dificuldade'] ?? 'Médio',
                     'thumbnail_url' => $activity['thumbnail_url'] ?? null,
@@ -349,10 +471,38 @@ try {
                 ? json_encode($data['anos_escolares'], JSON_UNESCAPED_UNICODE) 
                 : '[]'; // Array vazio ao invés de null
         }
+        // habilidades_ids: se enviado, derivar eixos_bncc a partir de curriculo_habilidades
+        $habilidadesIds = [];
+        if (isset($data['habilidades_ids']) && is_array($data['habilidades_ids'])) {
+            $habilidadesIds = array_values(array_map('intval', array_filter($data['habilidades_ids'], 'is_numeric')));
+        }
+        $eixosBnccArray = [];
+        if (!empty($habilidadesIds)) {
+            $tablesExist = $pdo->query("SHOW TABLES LIKE 'curriculo_habilidades'")->rowCount() > 0;
+            if ($tablesExist) {
+                $eixosBnccArray = eixos_from_habilidades_ids($pdo, $habilidadesIds);
+            }
+        }
+        // Se houver habilidades, derivar também anos_escolares para que trilhas por ano funcionem automaticamente
+        if (!empty($habilidadesIds) && $etapa !== 'Educação Infantil') {
+            $tablesEtapasExist = $pdo->query("SHOW TABLES LIKE 'curriculo_etapas_ensino'")->rowCount() > 0;
+            if ($tablesExist && $tablesEtapasExist) {
+                $anosDerivados = anos_escolares_from_habilidades_ids($pdo, $habilidadesIds);
+                // remover nomes genéricos que não são anos (ex.: "Ensino Médio", "Educação Infantil")
+                $anosDerivados = array_values(array_filter($anosDerivados, function ($n) {
+                    return preg_match('/\\d+º\\s+Ano/u', (string)$n) === 1 || (string)$n === 'AEE';
+                }));
+                if (!empty($anosDerivados)) {
+                    $anosEscolares = json_encode($anosDerivados, JSON_UNESCAPED_UNICODE);
+                }
+            }
+        }
+        if (empty($eixosBnccArray) && isset($data['eixos_bncc']) && is_array($data['eixos_bncc'])) {
+            $eixosBnccArray = $data['eixos_bncc'];
+        }
         // eixos_bncc sempre deve ser um JSON array, mesmo que vazio
-        $eixosBncc = isset($data['eixos_bncc']) && is_array($data['eixos_bncc'])
-            ? json_encode($data['eixos_bncc'], JSON_UNESCAPED_UNICODE) 
-            : '[]'; // Array vazio ao invés de null
+        $eixosBncc = json_encode($eixosBnccArray, JSON_UNESCAPED_UNICODE);
+        $habilidadesIdsJson = empty($habilidadesIds) ? null : json_encode($habilidadesIds, JSON_UNESCAPED_UNICODE);
         // disciplinas_transversais sempre deve ser um JSON array, mesmo que vazio
         $disciplinasTransversais = isset($data['disciplinas_transversais']) && is_array($data['disciplinas_transversais'])
             ? json_encode($data['disciplinas_transversais'], JSON_UNESCAPED_UNICODE) 
@@ -411,22 +561,36 @@ try {
             json_response_act(409, ['error' => true, 'message' => 'Atividade com este ID já existe']);
         }
 
-        // Criar atividade
+        // Criar atividade (habilidades_ids: coluna opcional; se não existir, use INSERT sem ela)
         try {
-            $stmt = $pdo->prepare("
-                INSERT INTO atividades (
-                    id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais,
-                    duracao, nivel_dificuldade, thumbnail_url, video_url,
-                    pdf_estrutura_pedagogica_url, material_apoio_url, criado_por
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            
-            $params = [
-                $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
-                $duracao, $nivelDificuldade, $thumbnailUrl, $videoUrl,
-                $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
-            ];
-            
+            $hasHabilidadesCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'habilidades_ids'")->rowCount() > 0;
+            if ($hasHabilidadesCol) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO atividades (
+                        id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais, habilidades_ids,
+                        duracao, nivel_dificuldade, thumbnail_url, video_url,
+                        pdf_estrutura_pedagogica_url, material_apoio_url, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $params = [
+                    $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais, $habilidadesIdsJson,
+                    $duracao, $nivelDificuldade, $thumbnailUrl, $videoUrl,
+                    $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
+                ];
+            } else {
+                $stmt = $pdo->prepare("
+                    INSERT INTO atividades (
+                        id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais,
+                        duracao, nivel_dificuldade, thumbnail_url, video_url,
+                        pdf_estrutura_pedagogica_url, material_apoio_url, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $params = [
+                    $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
+                    $duracao, $nivelDificuldade, $thumbnailUrl, $videoUrl,
+                    $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
+                ];
+            }
             $stmt->execute($params);
         } catch (PDOException $e) {
             error_log('Erro no INSERT: ' . $e->getMessage());
@@ -494,6 +658,39 @@ try {
             $params[] = is_array($data['disciplinas_transversais']) 
                 ? json_encode($data['disciplinas_transversais'], JSON_UNESCAPED_UNICODE) 
                 : '[]';
+        }
+        // habilidades_ids: ao enviar, derivar eixos_bncc a partir de curriculo_habilidades
+        if (array_key_exists('habilidades_ids', $data)) {
+            $putHabilidadesIds = is_array($data['habilidades_ids']) 
+                ? array_values(array_map('intval', array_filter($data['habilidades_ids'], 'is_numeric'))) 
+                : [];
+            $putEixosBncc = [];
+            if (!empty($putHabilidadesIds)) {
+                $tablesExist = $pdo->query("SHOW TABLES LIKE 'curriculo_habilidades'")->rowCount() > 0;
+                if ($tablesExist) {
+                    $putEixosBncc = eixos_from_habilidades_ids($pdo, $putHabilidadesIds);
+                }
+            }
+            $updates[] = "eixos_bncc = ?";
+            $params[] = json_encode($putEixosBncc, JSON_UNESCAPED_UNICODE);
+            $hasHabilidadesCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'habilidades_ids'")->rowCount() > 0;
+            if ($hasHabilidadesCol) {
+                $updates[] = "habilidades_ids = ?";
+                $params[] = empty($putHabilidadesIds) ? null : json_encode($putHabilidadesIds, JSON_UNESCAPED_UNICODE);
+            }
+            // Também derivar anos_escolares quando habilidades forem informadas (para trilhas por ano)
+            $hasAnosEscolaresCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'anos_escolares'")->rowCount() > 0;
+            $tablesEtapasExist = $pdo->query("SHOW TABLES LIKE 'curriculo_etapas_ensino'")->rowCount() > 0;
+            if ($hasAnosEscolaresCol && !empty($putHabilidadesIds) && $tablesExist && $tablesEtapasExist) {
+                $anosDerivados = anos_escolares_from_habilidades_ids($pdo, $putHabilidadesIds);
+                $anosDerivados = array_values(array_filter($anosDerivados, function ($n) {
+                    return preg_match('/\\d+º\\s+Ano/u', (string)$n) === 1 || (string)$n === 'AEE';
+                }));
+                if (!empty($anosDerivados)) {
+                    $updates[] = "anos_escolares = ?";
+                    $params[] = json_encode($anosDerivados, JSON_UNESCAPED_UNICODE);
+                }
+            }
         }
         if (isset($data['duracao'])) {
             $updates[] = "duracao = ?";

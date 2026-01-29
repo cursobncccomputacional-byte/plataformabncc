@@ -13,6 +13,9 @@ import { ManageFormacaoContinuada } from './ManageFormacaoContinuada';
 import { ManageTrilhas } from './ManageTrilhas';
 import { ManageAdminPackages } from './ManageAdminPackages';
 import { SessionManagement } from './SessionManagement';
+import { PlanoAula } from './PlanoAula';
+import { BnccDigital } from './BnccDigital';
+import { ManageBncc } from './ManageBncc';
 import type { CreateUserData, User } from '../types/bncc';
 import * as XLSX from 'xlsx';
 
@@ -25,7 +28,7 @@ export const RootManagement = () => {
   const { user, getAllUsers, createUser, changePassword, deleteUser, toggleUserStatus } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc'>('users');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -569,6 +572,9 @@ export const RootManagement = () => {
           {currentPage === 'trilhas' && <ManageTrilhas />}
           {currentPage === 'admin-packages' && <ManageAdminPackages />}
           {currentPage === 'sessions' && <SessionManagement />}
+          {currentPage === 'plano-aula' && <PlanoAula />}
+          {currentPage === 'bncc-digital' && <BnccDigital />}
+          {currentPage === 'manage-bncc' && <ManageBncc />}
           {currentPage === 'users' && (
           <div className="pt-6 px-4 sm:px-6 max-w-[1800px] mx-auto">
 

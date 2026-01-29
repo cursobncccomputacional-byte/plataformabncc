@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import * as React from 'react';
-import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor } from 'lucide-react';
+import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
-type PageType = 'activities' | 'videos' | 'documents' | 'profile' | 'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions';
+type PageType = 'activities' | 'videos' | 'documents' | 'profile' | 'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc';
 
 interface SidebarProps {
   currentPage: PageType;
@@ -86,10 +86,21 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Expandir menu BNCC quando navegar para cadastro ou consulta
+  const [bnccMenuOpen, setBnccMenuOpen] = useState(
+    currentPage === 'bncc-digital' || currentPage === 'manage-bncc'
+  );
+
   // Expandir menu Cursos quando navegar para plataforma, formacao-continuada ou trilhas
   useEffect(() => {
     if (currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas') {
       setCursosMenuOpen(true);
+    }
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage === 'bncc-digital' || currentPage === 'manage-bncc') {
+      setBnccMenuOpen(true);
     }
   }, [currentPage]);
 
@@ -120,6 +131,16 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     return items;
   }, [canManageActivities, canManageCourses, isRoot]);
 
+  // Submenu BNCC Computacional Digital: Cadastro (root) e Consulta (todos)
+  const bnccSubMenuItems = useMemo(() => {
+    const items: { id: 'manage-bncc' | 'bncc-digital'; icon: typeof BookOpen; label: string }[] = [];
+    if (isRoot) {
+      items.push({ id: 'manage-bncc' as const, icon: BookOpen, label: 'Cadastro' });
+    }
+    items.push({ id: 'bncc-digital' as const, icon: BookMarked, label: 'Consulta' });
+    return items;
+  }, [isRoot]);
+
   // Menu para Root
   // Usar useMemo para recalcular quando as permissões mudarem
   const rootMenuItems = useMemo(() => [
@@ -130,6 +151,8 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     // Root sempre vê o menu Cursos expandido se tiver pelo menos uma permissão
     ...(showCursosMenu ? [{ id: 'cursos-menu' as const, icon: BookOpen, label: 'Cursos', isParent: true }] : []),
     { id: 'permissions' as const, icon: UserCheck, label: 'Atribuir Cursos' },
+    { id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' },
+    { id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true },
   ], [showCursosMenu]);
 
   // Menu para não-root (professores, admin, etc)
@@ -163,10 +186,14 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
       items.push({ id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' });
     }
     
-    // SEMPRE adicionar menus básicos (mesmo durante carregamento)
-    // Isso garante que os ícones apareçam desde o início
+    // Plano de Aula - disponível para professores e admins
+    if (isProfessorOrAdmin || !profileRole) {
+      items.push({ id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' });
+      items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true });
+    }
+    
+    // SEMPRE adicionar menus básicos (mesmo durante carregamento) — Vídeo Aulas não disponível para admin/professor
     items.push(
-      { id: 'videos' as const, icon: Video, label: 'Vídeo Aulas' },
       { id: 'documents' as const, icon: FileText, label: 'Documentos' },
       { id: 'profile' as const, icon: User, label: 'Perfil' }
     );
@@ -197,6 +224,10 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
 
   const handleCursosMenuClick = () => {
     setCursosMenuOpen(!cursosMenuOpen);
+  };
+
+  const handleBnccMenuClick = () => {
+    setBnccMenuOpen(!bnccMenuOpen);
   };
 
   return (
@@ -241,7 +272,7 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
         </div>
 
         {/* Scroll Area (menus + links úteis) */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className={`flex-1 min-h-0 overflow-y-auto ${isRoot ? 'no-scrollbar' : ''}`}>
           {/* Navigation */}
           <nav className="p-4 space-y-2">
             {/* Renderizar menus sempre que houver items, mesmo durante carregamento */}
@@ -270,7 +301,6 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
                       `}
                     >
                       <div className="flex items-center gap-3">
-                        {/* Garantir que o ícone seja sempre renderizado */}
                         {IconComponent && <IconComponent size={20} className="flex-shrink-0" />}
                         {sidebarOpen && (
                           <span className="font-medium">{item.label}</span>
@@ -297,7 +327,58 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
                                 }
                               `}
                             >
-                              {/* Garantir que o ícone seja sempre renderizado */}
+                              {SubIconComponent && <SubIconComponent size={18} className="flex-shrink-0" />}
+                              <span>{subItem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (isParent && item.id === 'bncc-menu') {
+                // Menu BNCC Computacional Digital: submenu Cadastro (root) e Consulta
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      onClick={handleBnccMenuClick}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                        ${bnccMenuOpen || currentPage === 'bncc-digital' || currentPage === 'manage-bncc'
+                          ? 'bg-white text-[#005a93] shadow-md' 
+                          : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        {IconComponent && <IconComponent size={20} className="flex-shrink-0" />}
+                        {sidebarOpen && (
+                          <span className="font-medium">{item.label}</span>
+                        )}
+                      </div>
+                      {sidebarOpen && (
+                        bnccMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                      )}
+                    </button>
+                    {bnccMenuOpen && sidebarOpen && (
+                      <div className="ml-4 space-y-1">
+                        {bnccSubMenuItems.map((subItem) => {
+                          const SubIconComponent = subItem.icon;
+                          const isSubActive = currentPage === subItem.id;
+                          return (
+                            <button
+                              key={subItem.id}
+                              onClick={() => handleNavigate(subItem.id)}
+                              className={`
+                                w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                                ${isSubActive 
+                                  ? 'bg-white bg-opacity-30 text-white font-semibold' 
+                                  : 'hover:bg-white hover:bg-opacity-10 text-white text-opacity-80'
+                                }
+                              `}
+                            >
                               {SubIconComponent && <SubIconComponent size={18} className="flex-shrink-0" />}
                               <span>{subItem.label}</span>
                             </button>

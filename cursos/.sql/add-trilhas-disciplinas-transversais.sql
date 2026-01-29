@@ -18,7 +18,8 @@ INSERT INTO trilhas (id, titulo, descricao, tipo, valor, ordem, ativo) VALUES
 ('educacao-fisica', 'Educação Física', 'Trilha de atividades relacionadas à Educação Física', 'disciplina_transversal', 'Educação Física', 12, 1),
 ('ensino-religioso', 'Ensino Religioso', 'Trilha de atividades relacionadas ao Ensino Religioso', 'disciplina_transversal', 'Ensino Religioso', 13, 1),
 ('computacao', 'Computação', 'Trilha de atividades relacionadas à Computação', 'disciplina_transversal', 'Computação', 14, 1),
-('ingles', 'Inglês', 'Trilha de atividades relacionadas ao Inglês', 'disciplina_transversal', 'Inglês', 15, 1)
+('ingles', 'Inglês', 'Trilha de atividades relacionadas ao Inglês', 'disciplina_transversal', 'Inglês', 15, 1),
+('artes', 'Artes', 'Trilha de atividades relacionadas às Artes', 'disciplina_transversal', 'Artes', 16, 1)
 ON DUPLICATE KEY UPDATE titulo = VALUES(titulo), descricao = VALUES(descricao);
 
 SELECT 'Trilhas de disciplinas transversais criadas com sucesso!' AS status;

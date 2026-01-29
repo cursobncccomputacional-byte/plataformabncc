@@ -4,12 +4,20 @@ import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
 
+export type TipoCriterio = 'eixo_bncc' | 'etapa' | 'ano_escolar' | 'disciplina_transversal';
+
+export interface CriterioAgrupamento {
+  tipo: TipoCriterio;
+  valor: string;
+}
+
 interface Trilha {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal';
+  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar';
   valor: string;
+  criterios_agrupamento?: CriterioAgrupamento[];
   thumbnail_url?: string;
   ordem: number;
   ativo: number;
@@ -17,10 +25,11 @@ interface Trilha {
   atualizado_em?: string;
 }
 
-const TIPOS_TRILHA = [
+const TIPOS_CRITERIO: { value: TipoCriterio; label: string }[] = [
   { value: 'eixo_bncc', label: 'Eixo BNCC' },
   { value: 'etapa', label: 'Etapa' },
-  { value: 'disciplina_transversal', label: 'Disciplina Transversal' },
+  { value: 'ano_escolar', label: 'Ano escolar' },
+  { value: 'disciplina_transversal', label: 'Disciplina transversal' },
 ];
 
 const VALORES_EIXO_BNCC = [
@@ -35,6 +44,19 @@ const VALORES_ETAPA = [
   'Anos Finais',
 ];
 
+const VALORES_ANO_ESCOLAR = [
+  '1º Ano',
+  '2º Ano',
+  '3º Ano',
+  '4º Ano',
+  '5º Ano',
+  '6º Ano',
+  '7º Ano',
+  '8º Ano',
+  '9º Ano',
+  'AEE',
+];
+
 const VALORES_DISCIPLINAS_TRANSVERSAIS = [
   'Português',
   'Matemática',
@@ -45,7 +67,23 @@ const VALORES_DISCIPLINAS_TRANSVERSAIS = [
   'Ensino Religioso',
   'Computação',
   'Inglês',
+  'Artes',
 ];
+
+function valoresPorTipo(tipo: TipoCriterio): string[] {
+  switch (tipo) {
+    case 'eixo_bncc':
+      return VALORES_EIXO_BNCC;
+    case 'etapa':
+      return VALORES_ETAPA;
+    case 'ano_escolar':
+      return VALORES_ANO_ESCOLAR;
+    case 'disciplina_transversal':
+      return VALORES_DISCIPLINAS_TRANSVERSAIS;
+    default:
+      return [];
+  }
+}
 
 export const ManageTrilhas = () => {
   const { user } = useAuth();
@@ -63,6 +101,7 @@ export const ManageTrilhas = () => {
     descricao: '',
     tipo: 'eixo_bncc',
     valor: '',
+    criterios_agrupamento: [],
     thumbnail_url: '',
     ordem: 0,
   });
@@ -106,12 +145,16 @@ export const ManageTrilhas = () => {
   const handleOpenModal = (trilha?: Trilha) => {
     if (trilha) {
       setEditingTrilha(trilha);
+      const criterios = Array.isArray(trilha.criterios_agrupamento) && trilha.criterios_agrupamento.length > 0
+        ? trilha.criterios_agrupamento
+        : [{ tipo: trilha.tipo as TipoCriterio, valor: trilha.valor }];
       setFormData({
         id: trilha.id,
         titulo: trilha.titulo,
         descricao: trilha.descricao || '',
         tipo: trilha.tipo,
         valor: trilha.valor,
+        criterios_agrupamento: criterios,
         thumbnail_url: trilha.thumbnail_url || '',
         ordem: trilha.ordem,
       });
@@ -123,6 +166,7 @@ export const ManageTrilhas = () => {
         descricao: '',
         tipo: 'eixo_bncc',
         valor: '',
+        criterios_agrupamento: [{ tipo: 'eixo_bncc', valor: '' }],
         thumbnail_url: '',
         ordem: 0,
       });
@@ -140,6 +184,7 @@ export const ManageTrilhas = () => {
       descricao: '',
       tipo: 'eixo_bncc',
       valor: '',
+      criterios_agrupamento: [],
       thumbnail_url: '',
       ordem: 0,
     });
@@ -148,24 +193,63 @@ export const ManageTrilhas = () => {
     setSuccess(null);
   };
 
+  const addCriterio = () => {
+    const current = formData.criterios_agrupamento || [];
+    setFormData({
+      ...formData,
+      criterios_agrupamento: [...current, { tipo: 'eixo_bncc', valor: '' }],
+    });
+  };
+
+  const removeCriterio = (index: number) => {
+    const current = formData.criterios_agrupamento || [];
+    setFormData({
+      ...formData,
+      criterios_agrupamento: current.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateCriterio = (index: number, field: 'tipo' | 'valor', value: string) => {
+    const current = formData.criterios_agrupamento || [];
+    const next = [...current];
+    if (!next[index]) return;
+    next[index] = { ...next[index], [field]: value };
+    if (field === 'tipo') next[index].valor = '';
+    setFormData({ ...formData, criterios_agrupamento: next });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setSuccess(null);
 
-    if (!formData.id || !formData.titulo || !formData.valor) {
-      setError('ID, Título e Valor são obrigatórios');
+    const criterios = (formData.criterios_agrupamento || []).filter((c) => c.tipo && c.valor?.trim());
+    const temCriterios = criterios.length > 0;
+    if (!formData.id || !formData.titulo) {
+      setError('ID e Título são obrigatórios');
+      setLoading(false);
+      return;
+    }
+    if (!temCriterios && !formData.valor?.trim()) {
+      setError('Adicione ao menos um critério de agrupamento (ex.: eixo, etapa, ano ou disciplina) com valor selecionado.');
       setLoading(false);
       return;
     }
 
+    const payload = {
+      ...formData,
+      criterios_agrupamento: temCriterios ? criterios : undefined,
+      tipo: temCriterios ? criterios[0].tipo : formData.tipo,
+      valor: temCriterios ? criterios[0].valor : formData.valor,
+    };
+
     try {
       let response;
       if (editingTrilha) {
-        response = await apiService.updateTrilha(formData.id, formData as any);
+        response = await apiService.updateTrilha(formData.id, payload as any);
       } else {
-        response = await apiService.createTrilha(formData as any);
+        response = await apiService.createTrilha(payload as any);
       }
 
       if (response.error) {
@@ -215,11 +299,7 @@ export const ManageTrilhas = () => {
     return matchesSearch && matchesTipo;
   });
 
-  const valoresDisponiveis = 
-    formData.tipo === 'eixo_bncc' ? VALORES_EIXO_BNCC :
-    formData.tipo === 'etapa' ? VALORES_ETAPA :
-    formData.tipo === 'disciplina_transversal' ? VALORES_DISCIPLINAS_TRANSVERSAIS :
-    [];
+  const labelTipo = (t: string) => TIPOS_CRITERIO.find((x) => x.value === t)?.label ?? t;
 
   return (
     <div className="p-6">
@@ -262,6 +342,7 @@ export const ManageTrilhas = () => {
             <option value="all">Todos os Tipos</option>
             <option value="eixo_bncc">Eixo BNCC</option>
             <option value="etapa">Etapa</option>
+            <option value="ano_escolar">Ano escolar</option>
             <option value="disciplina_transversal">Disciplina Transversal</option>
           </select>
         </div>
@@ -287,12 +368,21 @@ export const ManageTrilhas = () => {
                   />
                 )}
                 <h3 className="font-semibold text-lg text-gray-900 mb-1">{trilha.titulo}</h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  <span className="font-medium">Tipo:</span> {trilha.tipo === 'eixo_bncc' ? 'Eixo BNCC' : 'Etapa'}
-                </p>
-                <p className="text-sm text-gray-600 mb-2">
-                  <span className="font-medium">Valor:</span> {trilha.valor}
-                </p>
+                {Array.isArray(trilha.criterios_agrupamento) && trilha.criterios_agrupamento.length > 0 ? (
+                  <div className="text-sm text-gray-600 mb-2">
+                    <span className="font-medium">Critérios:</span>{' '}
+                    {trilha.criterios_agrupamento.map((c) => `${labelTipo(c.tipo)}: ${c.valor}`).join(' · ')}
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600 mb-2">
+                      <span className="font-medium">Tipo:</span> {labelTipo(trilha.tipo)}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      <span className="font-medium">Valor:</span> {trilha.valor}
+                    </p>
+                  </>
+                )}
                 {trilha.descricao && (
                   <p className="text-sm text-gray-500 mb-3 line-clamp-2">{trilha.descricao}</p>
                 )}
@@ -371,44 +461,57 @@ export const ManageTrilhas = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                  <select
-                    required
-                    value={formData.tipo}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        tipo: e.target.value as 'eixo_bncc' | 'etapa' | 'disciplina_transversal',
-                        valor: '', // Reset valor ao mudar tipo
-                      });
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Critérios de agrupamento *</label>
+                <p className="text-xs text-gray-500 mb-2">
+                  A trilha exibirá atividades que atendam a todos os critérios (AND). Adicione um ou mais: eixo, etapa, ano escolar ou disciplina.
+                </p>
+                <div className="space-y-3">
+                  {(formData.criterios_agrupamento || []).map((criterio, index) => (
+                    <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-md border border-gray-200">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <select
+                          value={criterio.tipo}
+                          onChange={(e) => updateCriterio(index, 'tipo', e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982] text-sm"
+                        >
+                          {TIPOS_CRITERIO.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={criterio.valor}
+                          onChange={(e) => updateCriterio(index, 'valor', e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982] text-sm"
+                        >
+                          <option value="">Selecione...</option>
+                          {valoresPorTipo(criterio.tipo).map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCriterio(index)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Remover critério"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addCriterio}
+                    className="flex items-center gap-2 px-3 py-2 text-sm border border-dashed border-gray-400 text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
                   >
-                    {TIPOS_TRILHA.map((tipo) => (
-                      <option key={tipo.value} value={tipo.value}>
-                        {tipo.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Valor *</label>
-                  <select
-                    required
-                    value={formData.valor}
-                    onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
-                  >
-                    <option value="">Selecione...</option>
-                    {valoresDisponiveis.map((valor) => (
-                      <option key={valor} value={valor}>
-                        {valor}
-                      </option>
-                    ))}
-                  </select>
+                    <Plus className="w-4 h-4" />
+                    Adicionar critério
+                  </button>
                 </div>
               </div>
 

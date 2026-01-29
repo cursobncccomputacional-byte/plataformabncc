@@ -1,0 +1,5 @@
+# Permitir acesso ao endpoint Currículo BNCC (curriculo_*)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/curriculo-bncc/
+</IfModule>
