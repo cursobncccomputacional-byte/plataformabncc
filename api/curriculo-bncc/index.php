@@ -19,6 +19,13 @@ require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/auth.php';
 
+// Preflight CORS (OPTIONS): responder 200 antes de qualquer auth/validação.
+// Sem isso, navegadores bloqueiam chamadas cross-origin (erro 405 no preflight).
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
