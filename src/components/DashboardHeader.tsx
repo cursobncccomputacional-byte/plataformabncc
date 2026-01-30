@@ -1,7 +1,11 @@
 import { useAuth } from '../contexts/LocalAuthContext';
-import { LogOut, User, Shield, GraduationCap, BookOpen } from 'lucide-react';
+import { LogOut, User, Shield, GraduationCap, BookOpen, Menu } from 'lucide-react';
 
-export const DashboardHeader = () => {
+interface DashboardHeaderProps {
+  onToggleSidebar?: () => void;
+}
+
+export const DashboardHeader = ({ onToggleSidebar }: DashboardHeaderProps) => {
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -32,30 +36,45 @@ export const DashboardHeader = () => {
   if (!user) return null;
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Formação Continuada Link */}
-          <a
+    <header className="bg-white shadow-sm border-b border-gray-200 safe-area-top sticky top-0 z-20">
+      <div className="max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-14 sm:h-16 gap-2 min-h-[3.5rem]">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {/* Botão menu mobile - abre a sidebar */}
+            {onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="md:hidden p-2 -ml-1 rounded-lg text-gray-600 hover:bg-gray-100 touch-target flex-shrink-0"
+                aria-label="Abrir menu"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            )}
+            {/* Formação Continuada Link */}
+            <a
             href="https://ead.novaedubncc.com.br"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-[#044982] hover:text-[#005a93] transition-colors font-medium"
+            className="flex items-center gap-2 text-[#044982] hover:text-[#005a93] transition-colors font-medium touch-target-inline min-w-0"
           >
-            <BookOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">Formação Continuada</span>
+            <BookOpen className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Formação Continuada</span>
           </a>
+          </div>
 
           {/* User Info */}
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <div className="text-sm font-medium text-gray-900">{user.name}</div>
-              <div className="text-xs text-gray-500">{user.school || 'Sistema Educacional BNCC'}</div>
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink">
+            <div className="text-right min-w-0 hidden xs:block">
+              <div className="text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-[180px]" title={user.name}>{user.name}</div>
+              <div className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[180px]" title={user.school || 'Sistema Educacional BNCC'}>{user.school || 'Sistema Educacional BNCC'}</div>
             </div>
-            
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${getRoleColor(user.role)}`}>
+            <div className="text-right min-w-0 xs:hidden">
+              <div className="text-xs font-medium text-gray-900 truncate max-w-[100px]" title={user.name}>{user.name}</div>
+            </div>
+            <div className={`flex items-center gap-1 px-2 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 ${getRoleColor(user.role)}`}>
               {getRoleIcon(user.role)}
-              {getRoleLabel(user.role)}
+              <span className="hidden sm:inline">{getRoleLabel(user.role)}</span>
             </div>
           </div>
         </div>

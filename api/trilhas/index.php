@@ -43,6 +43,15 @@ register_shutdown_function(function (): void {
 });
 
 require_once __DIR__ . '/../config/cors.php';
+
+// Responder ao preflight OPTIONS aqui (após CORS) e marcar resposta enviada
+// para o shutdown não interpretar como erro e enviar 500
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    $trilhas_json_sent = true;
+    http_response_code(200);
+    exit;
+}
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/auth.php';
 
@@ -120,23 +129,39 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
         } elseif ($tipo === 'etapa') {
             if (in_array($valor, ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano', 'AEE'], true)) {
                 $anoId = $anoEscolarMap[$valor] ?? $valor;
-                $conditions[] = "(JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?) OR JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?))";
-                $params[] = json_encode($anoId);
-                $params[] = json_encode($valor);
+                $variants = [json_encode($anoId), json_encode($valor), json_encode(str_replace('º', '°', $valor)), json_encode(preg_replace('/\s*[º°]\s*/u', ' ', $valor))];
+                $orConds = [];
+                foreach ($variants as $v) {
+                    $orConds[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
+                    $params[] = $v;
+                    $decoded = json_decode($v, true);
+                    $params[] = '%' . (is_string($decoded) ? $decoded : '') . '%';
+                }
+                $conditions[] = '(' . implode(' OR ', $orConds) . ')';
             } elseif ($valor === 'Anos Iniciais') {
                 $conds = ["etapa = ?"];
                 $params[] = $valor;
-                foreach (['1ano', '2ano', '3ano', '4ano', '5ano'] as $a) {
-                    $conds[] = "JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?)";
+                $anosIniciaisId = ['1ano', '2ano', '3ano', '4ano', '5ano'];
+                $anosIniciaisNome = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
+                $anosIniciaisNomeAlt = ['1° Ano', '2° Ano', '3° Ano', '4° Ano', '5° Ano'];
+                $anosIniciaisNomeSem = ['1 Ano', '2 Ano', '3 Ano', '4 Ano', '5 Ano'];
+                foreach (array_merge($anosIniciaisId, $anosIniciaisNome, $anosIniciaisNomeAlt, $anosIniciaisNomeSem) as $a) {
+                    $conds[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
                     $params[] = json_encode($a);
+                    $params[] = '%' . $a . '%';
                 }
                 $conditions[] = '(' . implode(' OR ', $conds) . ')';
             } elseif ($valor === 'Anos Finais') {
                 $conds = ["etapa = ?"];
                 $params[] = $valor;
-                foreach (['6ano', '7ano', '8ano', '9ano'] as $a) {
-                    $conds[] = "JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?)";
+                $anosFinaisId = ['6ano', '7ano', '8ano', '9ano'];
+                $anosFinaisNome = ['6º Ano', '7º Ano', '8º Ano', '9º Ano'];
+                $anosFinaisNomeAlt = ['6° Ano', '7° Ano', '8° Ano', '9° Ano'];
+                $anosFinaisNomeSem = ['6 Ano', '7 Ano', '8 Ano', '9 Ano'];
+                foreach (array_merge($anosFinaisId, $anosFinaisNome, $anosFinaisNomeAlt, $anosFinaisNomeSem) as $a) {
+                    $conds[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
                     $params[] = json_encode($a);
+                    $params[] = '%' . $a . '%';
                 }
                 $conditions[] = '(' . implode(' OR ', $conds) . ')';
             } else {
@@ -145,19 +170,30 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
             }
         } elseif ($tipo === 'ano_escolar') {
             $anoId = $anoEscolarMap[$valor] ?? $valor;
-            $conditions[] = "(JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?) OR JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?))";
-            $params[] = json_encode($anoId);
-            $params[] = json_encode($valor);
+            $variants = [json_encode($anoId), json_encode($valor), json_encode(str_replace('º', '°', $valor)), json_encode(preg_replace('/\s*[º°]\s*/u', ' ', $valor))];
+            $orConds = [];
+            foreach ($variants as $v) {
+                $orConds[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
+                $params[] = $v;
+                $decoded = json_decode($v, true);
+                $params[] = '%' . (is_string($decoded) ? $decoded : '') . '%';
+            }
+            $conditions[] = '(' . implode(' OR ', $orConds) . ')';
         } elseif ($tipo === 'disciplina_transversal') {
-            $conditions[] = "JSON_CONTAINS(COALESCE(disciplinas_transversais, '[]'), ?)";
-            $params[] = json_encode($valor);
+            $disciplinaJson = json_encode($valor, JSON_UNESCAPED_UNICODE);
+            $conditions[] = "(IF(JSON_VALID(disciplinas_transversais), JSON_CONTAINS(disciplinas_transversais, ?), 0) = 1 OR COALESCE(disciplinas_transversais, '') LIKE ?)";
+            $params[] = $disciplinaJson;
+            $params[] = '%' . $valor . '%';
         }
     }
     if (empty($conditions)) {
         return [];
     }
     $where = implode(' AND ', $conditions);
-    $sql = "SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+    $sql = "SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+        COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+        material_apoio_url,
+        COALESCE(bloqueada, 0) as bloqueada
         FROM atividades WHERE $where ORDER BY COALESCE(criado_em, data_criacao) DESC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -238,7 +274,9 @@ try {
                 // Buscar por nome OU por ID
                 if ($eixoId) {
                     $stmtAtiv = $pdo->prepare("
-                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                        COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                         FROM atividades 
                         WHERE (
                             JSON_CONTAINS(COALESCE(eixos_bncc, '[]'), ?) 
@@ -252,7 +290,9 @@ try {
                 } else {
                     // Se não tiver mapeamento, buscar apenas por nome
                     $stmtAtiv = $pdo->prepare("
-                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                        COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                         FROM atividades 
                         WHERE JSON_CONTAINS(COALESCE(eixos_bncc, '[]'), ?)
                         ORDER BY COALESCE(criado_em, data_criacao) DESC
@@ -284,57 +324,61 @@ try {
                 $anoEscolarId = $anoEscolarMap[$valorTrilha] ?? null;
                 
                 if ($anoEscolarId) {
-                    // Para anos específicos (1º Ano, 2º Ano, etc.), buscar APENAS por anos_escolares
-                    // porque o campo etapa geralmente contém valores genéricos como "Anos Iniciais" ou "Anos Finais"
-                    // Buscar tanto pelo ID (ex: "1ano") quanto pelo nome (ex: "1º Ano") caso esteja salvo de forma diferente
-                    // Também buscar variações possíveis
-                    $anoEscolarJson = json_encode($anoEscolarId); // Ex: "1ano"
-                    $anoEscolarNomeJson = json_encode($valorTrilha); // Ex: "1º Ano"
+                    // Para anos específicos (1º Ano, 2º Ano, etc.), buscar por anos_escolares
+                    // Para "Educação Infantil", também buscar por etapa = 'Educação Infantil' (atividades de EI costumam ter só etapa, sem anos_escolares)
+                    $anoEscolarJson = json_encode($anoEscolarId); // Ex: "1ano" ou "ei"
+                    $anoEscolarNomeJson = json_encode($valorTrilha); // Ex: "1º Ano" ou "Educação Infantil"
+                    $anoEscolarNomeAltJson = json_encode(str_replace('º', '°', $valorTrilha)); // Ex: "1° Ano"
+                    $anoEscolarNomeSemJson = json_encode(preg_replace('/\s*[º°]\s*/u', ' ', $valorTrilha)); // Ex: "1 Ano" ou "Educação Infantil" (sem alteração)
                     
-                    // Log para debug
-                    if (isset($_GET['debug'])) {
-                        error_log("Buscando trilha de etapa: " . $valorTrilha);
-                        error_log("Ano ID mapeado: " . $anoEscolarId);
-                        error_log("Buscando por JSON: " . $anoEscolarJson . " ou " . $anoEscolarNomeJson);
+                    $conds = [];
+                    $params = [];
+                    if ($valorTrilha === 'Educação Infantil') {
+                        $conds[] = "etapa = ?";
+                        $params[] = $valorTrilha;
                     }
-                    
-                    // Buscar atividades que tenham o ano escolar no array anos_escolares
-                    // Tentar tanto pelo ID quanto pelo nome completo
+                    foreach ([$anoEscolarJson, $anoEscolarNomeJson, $anoEscolarNomeAltJson, $anoEscolarNomeSemJson] as $j) {
+                        $conds[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
+                        $params[] = $j;
+                        $decoded = json_decode($j, true);
+                        $params[] = '%' . (is_string($decoded) ? $decoded : '') . '%';
+                    }
                     $stmtAtiv = $pdo->prepare("
-                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                        COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                         FROM atividades 
-                        WHERE (
-                            (anos_escolares IS NOT NULL AND anos_escolares != '' AND anos_escolares != '[]')
-                            AND (
-                                JSON_CONTAINS(anos_escolares, ?)
-                                OR JSON_CONTAINS(anos_escolares, ?)
-                            )
-                        )
+                        WHERE (" . implode(' OR ', $conds) . ")
                         ORDER BY COALESCE(criado_em, data_criacao) DESC
                     ");
-                    $stmtAtiv->execute([$anoEscolarJson, $anoEscolarNomeJson]);
+                    $stmtAtiv->execute($params);
                     
                     // Log resultado (após fetchAll será feito mais abaixo)
                     if (isset($_GET['debug'])) {
-                        error_log("Query executada. Buscando por: " . $anoEscolarJson . " ou " . $anoEscolarNomeJson);
+                        error_log("Query executada. Buscando por: " . $anoEscolarJson . " / " . $anoEscolarNomeJson . " / " . $anoEscolarNomeAltJson . " / " . $anoEscolarNomeSemJson);
                     }
                 } else {
                     // Buscar apenas por etapa (para etapas como "Anos Iniciais", "Anos Finais")
                     // Para etapas genéricas, também buscar por anos_escolares que correspondam
                     if ($valorTrilha === 'Anos Iniciais') {
-                        // Buscar atividades de Anos Iniciais (1º ao 5º ano)
-                        $anosIniciais = ['1ano', '2ano', '3ano', '4ano', '5ano'];
+                        // Buscar atividades de Anos Iniciais (1º ao 5º ano) - aceitar múltiplos formatos
+                        $anosIniciais = [
+                            '1ano', '2ano', '3ano', '4ano', '5ano',
+                            '1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano',
+                            '1° Ano', '2° Ano', '3° Ano', '4° Ano', '5° Ano',
+                            '1 Ano', '2 Ano', '3 Ano', '4 Ano', '5 Ano',
+                        ];
                         $conditions = [];
                         $params = [$valorTrilha];
-                        
-                        // Adicionar condições para cada ano
                         foreach ($anosIniciais as $ano) {
-                            $conditions[] = "JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?)";
+                            $conditions[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
                             $params[] = json_encode($ano);
+                            $params[] = '%' . $ano . '%';
                         }
-                        
                         $stmtAtiv = $pdo->prepare("
-                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                            COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                             FROM atividades 
                             WHERE (
                                 etapa = ?
@@ -344,19 +388,24 @@ try {
                         ");
                         $stmtAtiv->execute($params);
                     } elseif ($valorTrilha === 'Anos Finais') {
-                        // Buscar atividades de Anos Finais (6º ao 9º ano)
-                        $anosFinais = ['6ano', '7ano', '8ano', '9ano'];
+                        // Buscar atividades de Anos Finais (6º ao 9º ano) - aceitar múltiplos formatos
+                        $anosFinais = [
+                            '6ano', '7ano', '8ano', '9ano',
+                            '6º Ano', '7º Ano', '8º Ano', '9º Ano',
+                            '6° Ano', '7° Ano', '8° Ano', '9° Ano',
+                            '6 Ano', '7 Ano', '8 Ano', '9 Ano',
+                        ];
                         $conditions = [];
                         $params = [$valorTrilha];
-                        
-                        // Adicionar condições para cada ano
                         foreach ($anosFinais as $ano) {
-                            $conditions[] = "JSON_CONTAINS(COALESCE(anos_escolares, '[]'), ?)";
+                            $conditions[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
                             $params[] = json_encode($ano);
+                            $params[] = '%' . $ano . '%';
                         }
-                        
                         $stmtAtiv = $pdo->prepare("
-                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                            COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                             FROM atividades 
                             WHERE (
                                 etapa = ?
@@ -368,7 +417,9 @@ try {
                     } else {
                         // Buscar apenas por etapa
                         $stmtAtiv = $pdo->prepare("
-                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                            COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                             FROM atividades 
                             WHERE etapa = ?
                             ORDER BY COALESCE(criado_em, data_criacao) DESC
@@ -378,15 +429,22 @@ try {
                 }
                 $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
             } elseif ($trilha['tipo'] === 'disciplina_transversal') {
-                // Buscar atividades que têm esta disciplina transversal no array JSON
+                // Buscar atividades que têm esta disciplina transversal (JSON ou texto legado)
+                $valorDisc = $trilha['valor'];
+                $disciplinaJson = json_encode($valorDisc, JSON_UNESCAPED_UNICODE);
+                $likeDisc = '%' . $valorDisc . '%';
                 $stmtAtiv = $pdo->prepare("
-                    SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao, nivel_dificuldade
+                    SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                    COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                    material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
                     FROM atividades 
-                    WHERE JSON_CONTAINS(COALESCE(disciplinas_transversais, '[]'), ?)
+                    WHERE (
+                        (IF(JSON_VALID(disciplinas_transversais), JSON_CONTAINS(disciplinas_transversais, ?), 0) = 1)
+                        OR (COALESCE(disciplinas_transversais, '') LIKE ?)
+                    )
                     ORDER BY COALESCE(criado_em, data_criacao) DESC
                 ");
-                $disciplinaJson = json_encode($trilha['valor']);
-                $stmtAtiv->execute([$disciplinaJson]);
+                $stmtAtiv->execute([$disciplinaJson, $likeDisc]);
                 $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
             }
             
@@ -422,11 +480,14 @@ try {
                     'tipo' => $atividade['tipo'] ?? null,
                     'etapa' => $atividade['etapa'] ?? null,
                     'eixos_bncc' => $eixosBncc,
-                    'anos_escolares' => $anosEscolares, // Adicionar para debug
+                    'anos_escolares' => $anosEscolares,
                     'thumbnail_url' => $atividade['thumbnail_url'] ?? null,
                     'video_url' => $atividade['video_url'] ?? null,
                     'duracao' => $atividade['duracao'] ?? null,
-                    'nivel_dificuldade' => $atividade['nivel_dificuldade'] ?? null,
+                    'material_pdf_url' => $atividade['material_apoio_url'] ?? null,
+                    'pedagogical_pdf_url' => $atividade['pdf_estrutura_pedagogica_url'] ?? null,
+                    'document_url' => $atividade['pdf_estrutura_pedagogica_url'] ?? null,
+                    'bloqueada' => (int)($atividade['bloqueada'] ?? 0) === 1,
                 ];
             }
             

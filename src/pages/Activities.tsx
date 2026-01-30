@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Monitor, Smartphone, Filter, Search, Brain, Globe, Users, Eye, Download } from 'lucide-react';
+import { BookOpen, Monitor, Smartphone, Filter, Search, Brain, Globe, Users, Eye, Download, Play, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { Activity, SchoolYear, BNCCAxis } from '../types/bncc';
 import { SecurePDFViewer } from '../components/SecurePDFViewer';
@@ -23,18 +23,6 @@ const typeLabels = {
 const typeColors = {
   plugada: 'bg-blue-100 text-blue-700',
   desplugada: 'bg-green-100 text-green-700',
-};
-
-const difficultyColors = {
-  facil: 'bg-green-100 text-green-700',
-  medio: 'bg-yellow-100 text-yellow-700',
-  dificil: 'bg-red-100 text-red-700',
-};
-
-const difficultyLabels = {
-  facil: 'Fácil',
-  medio: 'Médio',
-  dificil: 'Difícil',
 };
 
 const svgPlaceholderDataUri = (title: string) => {
@@ -174,12 +162,6 @@ export const Activities = () => {
           // Converter tipo: "Plugada" -> "plugada", "Desplugada" -> "desplugada"
           const type = act.tipo === 'Plugada' ? 'plugada' : 'desplugada';
           
-          // Converter dificuldade: "Fácil" -> "facil", "Médio" -> "medio", "Difícil" -> "dificil"
-          let difficulty = 'medio';
-          if (act.nivel_dificuldade === 'Fácil') difficulty = 'facil';
-          else if (act.nivel_dificuldade === 'Médio') difficulty = 'medio';
-          else if (act.nivel_dificuldade === 'Difícil') difficulty = 'dificil';
-          
           // Converter duração (pode ser string como "15 minutos" ou número)
           let duration = 0;
           if (act.duracao) {
@@ -278,7 +260,6 @@ export const Activities = () => {
             type: type,
             schoolYears: schoolYearsArray,
             axisIds: axisIdsArray,
-            difficulty: difficulty,
             duration: duration,
             video_url: act.video_url,
             pedagogical_pdf_url: act.pdf_estrutura_pedagogica_url,
@@ -286,6 +267,7 @@ export const Activities = () => {
             document_url: act.link_video,
             thumbnail_url: act.thumbnail_url,
             etapa: act.etapa,
+            bloqueada: act.bloqueada === true,
           };
         });
         setAllActivities(activities);
@@ -356,17 +338,17 @@ export const Activities = () => {
   }
 
   const handleViewPDF = (activity: Activity, url: string, label: string) => {
+    if (activity.bloqueada) return;
     if (url && user) {
       setSelectedPDF({ url, title: `${activity.title} — ${label}` });
-      // Log da visualização da atividade
       activityLogger.logViewActivity(user.id, user.name, user.email, activity.id, activity.title);
     }
   };
 
   const handleViewVideo = (activity: Activity) => {
+    if (activity.bloqueada) return;
     if (activity.video_url && user) {
       setSelectedVideo({ url: activity.video_url, title: activity.title });
-      // Log da visualização do vídeo
       activityLogger.logViewActivity(user.id, user.name, user.email, activity.id, activity.title);
     }
   };
@@ -428,18 +410,18 @@ export const Activities = () => {
   };
 
   const handleDownloadPDF = (activity: Activity, url: string) => {
-    if (url && (user?.role === 'admin' || user?.role === 'professor')) {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = activity.title;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Log do download
-      activityLogger.logDownload(user.id, user.name, user.email, 'activity', activity.id, activity.title);
-    }
+    if (activity.bloqueada) return;
+    if (!url || !(user?.role === 'admin' || user?.role === 'professor')) return;
+    const filename = `${activity.title.replace(/[^\w\s-]/g, '')}.pdf`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    activityLogger.logDownload(user.id, user.name, user.email, 'activity', activity.id, activity.title);
   };
 
   const getAxisName = (axisId: string) => {
@@ -532,12 +514,12 @@ export const Activities = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6 sm:mb-8"
         >
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
             Atividades BNCC
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             Explore atividades plugadas e desplugadas organizadas por anos escolares
           </p>
         </motion.div>
@@ -561,27 +543,27 @@ export const Activities = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-sm p-6 mb-8"
+          className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8"
         >
           <div className="flex items-center gap-2 mb-4">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
+            <Filter className="w-5 h-5 text-gray-500 flex-shrink-0" />
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Filtros</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Busca */}
-            <div>
+            <div className="sm:col-span-2 lg:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Buscar atividades..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-target-inline"
                 />
               </div>
             </div>
@@ -613,7 +595,7 @@ export const Activities = () => {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-target-inline"
               >
                 <option value="all">Todos os tipos</option>
                 <option value="plugada">Plugada</option>
@@ -629,7 +611,7 @@ export const Activities = () => {
               <select
                 value={selectedAxis}
                 onChange={(e) => setSelectedAxis(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-target-inline"
               >
                 <option value="all">Todos os eixos</option>
                 {axes.map((axis) => (
@@ -687,13 +669,17 @@ export const Activities = () => {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   
+                  {/* Cadeado: à direita da thumb quando atividade bloqueada */}
+                  {activity.bloqueada && (
+                    <div className="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full bg-gray-800/90 text-white" title="Atividade bloqueada">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                  )}
+                  
                   {/* Badges compactos no topo */}
                   <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-1">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold backdrop-blur-sm ${typeColors[activity.type]} border border-white/20`}>
                       {typeLabels[activity.type]}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold backdrop-blur-sm ${difficultyColors[activity.difficulty]} border border-white/20`}>
-                      {difficultyLabels[activity.difficulty]}
                     </span>
                   </div>
                   
@@ -722,36 +708,33 @@ export const Activities = () => {
                     {activity.title}
                   </h3>
                   
-                  {/* Duração e eixo em linha compacta */}
-                  <div className="flex items-center gap-2 mb-3 text-xs text-gray-500">
+                  {/* Apenas duração (minutos) abaixo do nome */}
+                  <div className="mb-3 text-xs text-gray-500">
                     <ActivityDuration
                       videoUrl={activity.video_url}
                       fallbackMinutes={activity.duration}
                       className="text-xs"
                     />
-                    <span>•</span>
-                    <span className="truncate">
-                      {(activity.axisIds || (activity.axisId ? [activity.axisId] : []))
-                        .map(id => getAxisName(id))
-                        .join(', ')}
-                    </span>
                   </div>
 
-                  {/* Botões de ação compactos */}
-                  <div className="flex gap-1.5">
+                  {/* Botões de ação abaixo do vídeo/thumbnail — grid 2 colunas; bloqueada = clique não abre */}
+                  <div className={`grid grid-cols-2 gap-2 ${activity.bloqueada ? 'opacity-60 pointer-events-none' : ''}`}>
                     {activity.video_url && (
                       <button 
+                        type="button"
                         onClick={() => handleViewVideo(activity)}
-                        className="flex-1 text-white px-3 py-1.5 rounded-lg transition-all text-xs font-medium hover:shadow-md" 
+                        className="w-full text-white px-3 py-2 rounded-lg transition-all text-xs font-medium hover:shadow-md flex items-center justify-center gap-1.5" 
                         style={{ backgroundColor: '#005a93' }} 
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#004a7a'} 
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#005a93'}
+                        onMouseEnter={(e) => !activity.bloqueada && (e.currentTarget.style.backgroundColor = '#004a7a')} 
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#005a93')}
                       >
+                        <Play className="w-3.5 h-3.5" />
                         Vídeo
                       </button>
                     )}
                     {(activity.pedagogical_pdf_url || activity.document_url) && (
                       <button 
+                        type="button"
                         onClick={() =>
                           handleViewPDF(
                             activity,
@@ -759,31 +742,31 @@ export const Activities = () => {
                             'Estrutura Pedagógica'
                           )
                         }
-                        className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                        className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                       >
-                        <Eye className="w-3 h-3" />
+                        <Eye className="w-3.5 h-3.5" />
                         Estrutura
                       </button>
                     )}
                     {activity.material_pdf_url && (
                       <button 
+                        type="button"
                         onClick={() => handleViewPDF(activity, activity.material_pdf_url!, 'Material da Aula')}
-                        className="flex-1 bg-sky-600 text-white px-3 py-1.5 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                        className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                       >
-                        <Eye className="w-3 h-3" />
+                        <Eye className="w-3.5 h-3.5" />
                         Material
                       </button>
                     )}
-                    {((user?.role === 'admin' || user?.role === 'professor') && (activity.pedagogical_pdf_url || activity.material_pdf_url || activity.document_url)) && (
+                    {(user?.role === 'admin' || user?.role === 'professor') && activity.material_pdf_url && (
                       <button 
-                        onClick={() => {
-                          const url = activity.pedagogical_pdf_url || activity.material_pdf_url || activity.document_url || '';
-                          if (url) handleDownloadPDF(activity, url);
-                        }}
-                        className="px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center"
-                        title="Baixar"
+                        type="button"
+                        onClick={() => handleDownloadPDF(activity, activity.material_pdf_url!)}
+                        className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center gap-1.5"
+                        title="Baixar material da aula"
                       >
                         <Download className="w-3.5 h-3.5" />
+                        Baixar
                       </button>
                     )}
                   </div>
@@ -823,7 +806,10 @@ export const Activities = () => {
           pdfUrl={selectedPDF.url}
           title={selectedPDF.title}
           onClose={() => setSelectedPDF(null)}
-          allowDownload={user?.role === 'admin' || user?.role === 'professor'}
+          allowDownload={
+            (user?.role === 'admin' || user?.role === 'professor') &&
+            !selectedPDF.title.includes('Estrutura Pedagógica')
+          }
         />
       )}
 

@@ -9,6 +9,13 @@
 require_once __DIR__ . '/config/cors.php';
 require_once __DIR__ . '/config/database.php';
 
+// Preflight CORS (OPTIONS) - necessário para login via fetch com headers JSON/credentials
+// Deve responder 200 e encerrar antes do roteamento, evitando 405 Method Not Allowed.
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 // Obter ação da query string
 $action = $_GET['action'] ?? '';
 

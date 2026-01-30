@@ -1,21 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import * as React from 'react';
-import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked } from 'lucide-react';
+import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked, BarChart2 } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
-type PageType = 'activities' | 'videos' | 'documents' | 'profile' | 'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc';
+type PageType = 'activities' | 'videos' | 'documents' | 'profile' | 'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'formacao-continuada-cursos' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorios-menu' | 'relatorio-atividades';
 
 interface SidebarProps {
   currentPage: PageType;
   onNavigate: (page: PageType) => void;
+  /** Controlado pelo Dashboard: estado e setter da sidebar (mobile: abre/fecha) */
+  sidebarOpen?: boolean;
+  onSidebarOpenChange?: (open: boolean) => void;
+  /** @deprecated use onSidebarOpenChange */
   onSidebarToggle?: (isOpen: boolean) => void;
 }
 
-export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarProps) => {
+export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, onSidebarOpenChange, onSidebarToggle }: SidebarProps) => {
   const { signOut, profile, loading } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [internalOpen, setInternalOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const sidebarOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setSidebarOpen = onSidebarOpenChange ?? ((v: boolean) => setInternalOpen(v));
   // Expandir menu Cursos se estiver em plataforma ou formacao-continuada
   const [cursosMenuOpen, setCursosMenuOpen] = useState(
     currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas'
@@ -63,14 +69,14 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
   const canManageCourses = isRoot || (effectiveProfile?.can_manage_courses === true);
   const showCursosMenu = canManageActivities || canManageCourses;
 
-  // Notificar mudanças no estado da sidebar
+  // Notificar mudanças no estado da sidebar (compatibilidade)
   useEffect(() => {
     if (onSidebarToggle) {
       onSidebarToggle(sidebarOpen);
     }
   }, [sidebarOpen, onSidebarToggle]);
 
-  // Detectar se é mobile
+  // Detectar se é mobile e sincronizar estado (desktop: sempre aberta)
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -91,6 +97,11 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     currentPage === 'bncc-digital' || currentPage === 'manage-bncc'
   );
 
+  // Expandir menu Relatórios quando navegar para relatório de atividades
+  const [relatoriosMenuOpen, setRelatoriosMenuOpen] = useState(
+    currentPage === 'relatorio-atividades'
+  );
+
   // Expandir menu Cursos quando navegar para plataforma, formacao-continuada ou trilhas
   useEffect(() => {
     if (currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas') {
@@ -101,6 +112,12 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
   useEffect(() => {
     if (currentPage === 'bncc-digital' || currentPage === 'manage-bncc') {
       setBnccMenuOpen(true);
+    }
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage === 'relatorio-atividades') {
+      setRelatoriosMenuOpen(true);
     }
   }, [currentPage]);
 
@@ -141,6 +158,11 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     return items;
   }, [isRoot]);
 
+  // Submenu Relatórios (apenas root)
+  const relatoriosSubMenuItems = useMemo(() => [
+    { id: 'relatorio-atividades' as const, icon: Activity, label: 'Relatório de Atividades' },
+  ], []);
+
   // Menu para Root
   // Usar useMemo para recalcular quando as permissões mudarem
   const rootMenuItems = useMemo(() => [
@@ -153,6 +175,7 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     { id: 'permissions' as const, icon: UserCheck, label: 'Atribuir Cursos' },
     { id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' },
     { id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true },
+    { id: 'relatorios-menu' as const, icon: BarChart2, label: 'Relatórios', isParent: true },
   ], [showCursosMenu]);
 
   // Menu para não-root (professores, admin, etc)
@@ -190,6 +213,8 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
     if (isProfessorOrAdmin || !profileRole) {
       items.push({ id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' });
       items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true });
+      // Formação Continuada (Cursos): curso habilitado + outros com cadeado; redireciona para login dos cursos
+      items.push({ id: 'formacao-continuada-cursos' as const, icon: GraduationCap, label: 'Formação Continuada' });
     }
     
     // SEMPRE adicionar menus básicos (mesmo durante carregamento) — Vídeo Aulas não disponível para admin/professor
@@ -339,27 +364,27 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
               }
 
               if (isParent && item.id === 'bncc-menu') {
-                // Menu BNCC Computacional Digital: submenu Cadastro (root) e Consulta
+                // Menu BNCC Computacional Digital: submenu Cadastro (root) e Consulta — alinhado à esquerda
                 return (
-                  <div key={item.id} className="space-y-1">
+                  <div key={item.id} className="space-y-1 text-left">
                     <button
                       onClick={handleBnccMenuClick}
                       className={`
-                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
                         ${bnccMenuOpen || currentPage === 'bncc-digital' || currentPage === 'manage-bncc'
                           ? 'bg-white text-[#005a93] shadow-md' 
                           : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
                         }
                       `}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0 justify-start">
                         {IconComponent && <IconComponent size={20} className="flex-shrink-0" />}
                         {sidebarOpen && (
-                          <span className="font-medium">{item.label}</span>
+                          <span className="font-medium truncate">{item.label}</span>
                         )}
                       </div>
                       {sidebarOpen && (
-                        bnccMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                        bnccMenuOpen ? <ChevronDown size={16} className="flex-shrink-0" /> : <ChevronRight size={16} className="flex-shrink-0" />
                       )}
                     </button>
                     {bnccMenuOpen && sidebarOpen && (
@@ -389,7 +414,58 @@ export const Sidebar = ({ currentPage, onNavigate, onSidebarToggle }: SidebarPro
                   </div>
                 );
               }
-              
+
+              if (isParent && item.id === 'relatorios-menu') {
+                // Menu Relatórios: submenu Relatório de Atividades (apenas root)
+                return (
+                  <div key={item.id} className="space-y-1 text-left">
+                    <button
+                      onClick={() => setRelatoriosMenuOpen(!relatoriosMenuOpen)}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
+                        ${relatoriosMenuOpen || currentPage === 'relatorio-atividades'
+                          ? 'bg-white text-[#005a93] shadow-md' 
+                          : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0 justify-start">
+                        {IconComponent && <IconComponent size={20} className="flex-shrink-0" />}
+                        {sidebarOpen && (
+                          <span className="font-medium truncate">{item.label}</span>
+                        )}
+                      </div>
+                      {sidebarOpen && (
+                        relatoriosMenuOpen ? <ChevronDown size={16} className="flex-shrink-0" /> : <ChevronRight size={16} className="flex-shrink-0" />
+                      )}
+                    </button>
+                    {relatoriosMenuOpen && sidebarOpen && (
+                      <div className="ml-4 space-y-1">
+                        {relatoriosSubMenuItems.map((subItem) => {
+                          const SubIconComponent = subItem.icon;
+                          const isSubActive = currentPage === subItem.id;
+                          return (
+                            <button
+                              key={subItem.id}
+                              onClick={() => handleNavigate(subItem.id)}
+                              className={`
+                                w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                                ${isSubActive 
+                                  ? 'bg-white bg-opacity-30 text-white font-semibold' 
+                                  : 'hover:bg-white hover:bg-opacity-10 text-white text-opacity-80'
+                                }
+                              `}
+                            >
+                              {SubIconComponent && <SubIconComponent size={18} className="flex-shrink-0" />}
+                              <span>{subItem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
               return (
                 <button

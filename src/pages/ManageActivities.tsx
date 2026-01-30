@@ -23,13 +23,13 @@ interface Activity {
   habilidades_ids?: number[];
   habilidades?: HabilidadeCurriculo[];
   duracao?: string;
-  nivel_dificuldade: 'Fácil' | 'Médio' | 'Difícil';
   thumbnail_url?: string;
   video_url: string;
   pdf_estrutura_pedagogica_url?: string;
   material_apoio_url?: string;
   criado_em?: string;
   atualizado_em?: string;
+  bloqueada?: boolean;
 }
 
 const ANOS_ESCOLARES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano'];
@@ -60,7 +60,6 @@ export const ManageActivities = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('all');
   const [etapaFilter, setEtapaFilter] = useState<string>('all');
-  const [nivelFilter, setNivelFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [formData, setFormData] = useState<Partial<Activity>>({
@@ -74,11 +73,11 @@ export const ManageActivities = () => {
     disciplinas_transversais: [],
     habilidades_ids: [],
     duracao: '',
-    nivel_dificuldade: 'Médio',
     thumbnail_url: '',
     video_url: '',
     pdf_estrutura_pedagogica_url: '',
     material_apoio_url: '',
+    bloqueada: false,
   });
   const [curriculoHabilidades, setCurriculoHabilidades] = useState<HabilidadeCurriculo[]>([]);
   const [habilidadesSearch, setHabilidadesSearch] = useState('');
@@ -98,7 +97,6 @@ export const ManageActivities = () => {
       const response = await apiService.getActivities({
         tipo: tipoFilter !== 'all' ? tipoFilter : undefined,
         etapa: etapaFilter !== 'all' ? etapaFilter : undefined,
-        nivel_dificuldade: nivelFilter !== 'all' ? nivelFilter : undefined,
         search: searchTerm || undefined,
       });
       if (response.error) {
@@ -122,7 +120,7 @@ export const ManageActivities = () => {
       }
     }, 300);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, tipoFilter, etapaFilter, nivelFilter]);
+  }, [searchTerm, tipoFilter, etapaFilter]);
 
   const generateNextActivityId = (): string => {
     // Buscar o maior número de ID existente
@@ -174,11 +172,11 @@ export const ManageActivities = () => {
         disciplinas_transversais: activity.disciplinas_transversais || [],
         habilidades_ids: habilidadesIds,
         duracao: activity.duracao || '',
-        nivel_dificuldade: activity.nivel_dificuldade,
         thumbnail_url: activity.thumbnail_url || '',
-        video_url: activity.video_url,
+        video_url: activity.video_url || '',
         pdf_estrutura_pedagogica_url: activity.pdf_estrutura_pedagogica_url || '',
         material_apoio_url: activity.material_apoio_url || '',
+        bloqueada: activity.bloqueada ?? false,
       });
     } else {
       setEditingActivity(null);
@@ -194,7 +192,6 @@ export const ManageActivities = () => {
         disciplinas_transversais: [],
         habilidades_ids: [],
         duracao: '',
-        nivel_dificuldade: 'Médio',
         thumbnail_url: '',
         video_url: '',
         pdf_estrutura_pedagogica_url: '',
@@ -219,11 +216,11 @@ export const ManageActivities = () => {
       disciplinas_transversais: [],
       habilidades_ids: [],
       duracao: '',
-      nivel_dificuldade: 'Médio',
       thumbnail_url: '',
       video_url: '',
       pdf_estrutura_pedagogica_url: '',
       material_apoio_url: '',
+      bloqueada: false,
     });
     setHabilidadesSearch('');
     setThumbnailFile(null);
@@ -237,9 +234,14 @@ export const ManageActivities = () => {
     setError(null);
     setSuccess(null);
 
-    // Validações
-    if (!formData.id || !formData.nome_atividade || !formData.video_url) {
-      setError('ID, Nome da Atividade e URL do Vídeo são obrigatórios');
+    // Validações (URL do vídeo não obrigatória quando atividade é bloqueada)
+    if (!formData.id || !formData.nome_atividade) {
+      setError('ID e Nome da Atividade são obrigatórios');
+      setLoading(false);
+      return;
+    }
+    if (!formData.bloqueada && !formData.video_url) {
+      setError('URL do Vídeo é obrigatória quando a atividade não está bloqueada');
       setLoading(false);
       return;
     }
@@ -347,13 +349,13 @@ export const ManageActivities = () => {
 
   const filteredCurriculoHabilidades = useMemo(() => {
     const q = habilidadesSearch.trim().toLowerCase();
-    if (!q) return curriculoHabilidades.slice(0, 80);
+    if (!q) return curriculoHabilidades;
     return curriculoHabilidades.filter(
       (h) =>
         h.codigo?.toLowerCase().includes(q) ||
         h.eixo?.toLowerCase().includes(q) ||
         h.descricao?.toLowerCase().includes(q)
-    ).slice(0, 80);
+    );
   }, [curriculoHabilidades, habilidadesSearch]);
 
   const filteredActivities = useMemo(() => {
@@ -402,7 +404,7 @@ export const ManageActivities = () => {
 
       {/* Filtros e Busca */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
@@ -432,16 +434,6 @@ export const ManageActivities = () => {
             <option value="Anos Iniciais">Anos Iniciais</option>
             <option value="Anos Finais">Anos Finais</option>
           </select>
-          <select
-            value={nivelFilter}
-            onChange={(e) => setNivelFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2"
-          >
-            <option value="all">Todos os níveis</option>
-            <option value="Fácil">Fácil</option>
-            <option value="Médio">Médio</option>
-            <option value="Difícil">Difícil</option>
-          </select>
         </div>
         <button
           onClick={() => handleOpenModal()}
@@ -459,7 +451,7 @@ export const ManageActivities = () => {
         ) : filteredActivities.length === 0 ? (
           <div className="p-12 text-center text-gray-600">Nenhuma atividade encontrada</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -467,7 +459,6 @@ export const ManageActivities = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ano Escolar</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dificuldade</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Criado em</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
@@ -508,19 +499,6 @@ export const ManageActivities = () => {
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          activity.nivel_dificuldade === 'Fácil'
-                            ? 'bg-green-100 text-green-800'
-                            : activity.nivel_dificuldade === 'Médio'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {activity.nivel_dificuldade}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {activity.criado_em
@@ -615,7 +593,7 @@ export const ManageActivities = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
                   <select
@@ -648,24 +626,6 @@ export const ManageActivities = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nível de Dificuldade *</label>
-                  <select
-                    required
-                    value={formData.nivel_dificuldade}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        nivel_dificuldade: e.target.value as 'Fácil' | 'Médio' | 'Difícil',
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
-                  >
-                    <option value="Fácil">Fácil</option>
-                    <option value="Médio">Médio</option>
-                    <option value="Difícil">Difícil</option>
-                  </select>
-                </div>
               </div>
 
               {formData.etapa !== 'Educação Infantil' && (
@@ -776,6 +736,21 @@ export const ManageActivities = () => {
                 </div>
               </div>
 
+              <div className="flex items-center gap-2 py-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.bloqueada ?? false}
+                    onChange={(e) => setFormData({ ...formData, bloqueada: e.target.checked })}
+                    className="rounded border-gray-300 text-[#044982] focus:ring-[#044982]"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Atividade bloqueada</span>
+                </label>
+                <span className="text-xs text-gray-500">
+                  (aparece na lista para professores/admins mas não pode ser acessada; vídeo opcional)
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Duração</label>
@@ -789,11 +764,13 @@ export const ManageActivities = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">URL do Vídeo *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    URL do Vídeo {formData.bloqueada ? '(opcional quando bloqueada)' : '*'}
+                  </label>
                   <input
                     type="url"
-                    required
-                    value={formData.video_url}
+                    required={!formData.bloqueada}
+                    value={formData.video_url || ''}
                     onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
                     placeholder="https://..."
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"

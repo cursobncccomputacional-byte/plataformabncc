@@ -19,6 +19,13 @@ ini_set('log_errors', '1');
 // CORS + preflight (mantém o comportamento esperado no frontend)
 require_once __DIR__ . '/../config/cors.php';
 
+// Preflight CORS (OPTIONS): precisa responder 200 ANTES do requireAuth(),
+// senão o navegador bloqueia (401/403 no preflight vira erro de CORS).
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/auth.php';
 

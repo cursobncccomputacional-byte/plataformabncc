@@ -42,7 +42,7 @@ export interface Activity {
   knowledgeObjectId: string;
   skillIds: string[];
   duration: number; // em minutos
-  difficulty: 'facil' | 'medio' | 'dificil';
+  difficulty?: 'facil' | 'medio' | 'dificil'; // Opcional: não usamos mais na plataforma
   materials: string[];
   objectives: string[];
   thumbnail_url: string;
@@ -52,6 +52,8 @@ export interface Activity {
   pedagogical_pdf_url?: string;
   material_pdf_url?: string;
   created_at: string;
+  /** Atividade bloqueada: aparece na lista mas não pode ser acessada (vídeo/PDF) */
+  bloqueada?: boolean;
 }
 
 export interface VideoCourse {

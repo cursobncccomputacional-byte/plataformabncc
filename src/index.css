@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Responsividade mobile: base */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    overflow-x: hidden;
+    /* Safe area para dispositivos com notch/home indicator */
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Área de conteúdo com safe-area (evita corte em notch) */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Botões e links com área de toque mínima (44px recomendado) */
+@layer utilities {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .touch-target-inline {
+    min-height: 44px;
+  }
+}
+
 /* Esconder barra de rolagem (mantém scroll funcionando) */
 .no-scrollbar {
   -ms-overflow-style: none; /* IE/Edge legado */
@@ -9,4 +40,13 @@
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* Tabelas responsivas: scroll horizontal em mobile */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-responsive table {
+  min-width: 640px;
 }

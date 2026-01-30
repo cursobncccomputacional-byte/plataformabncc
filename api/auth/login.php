@@ -7,6 +7,13 @@
  */
 
 require_once __DIR__ . '/../config/cors.php';
+
+// Preflight CORS: responder OPTIONS com 200 para origem cursos.novaedubncc.com.br
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 require_once __DIR__ . '/../config/database.php';
 
 // Apenas POST

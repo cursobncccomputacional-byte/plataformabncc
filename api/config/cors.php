@@ -47,8 +47,5 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 // Mas o frontend usa credentials: 'include' - isso funciona em same-origin
 header('Access-Control-Max-Age: 3600');
 
-// Responder a requisições OPTIONS (preflight)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+// OPTIONS (preflight) é tratado no script que inclui este arquivo, para evitar
+// que a função shutdown do script envie 500 ao dar exit aqui.

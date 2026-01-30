@@ -403,13 +403,11 @@ class ApiService {
   async getActivities(filters?: {
     tipo?: string;
     etapa?: string;
-    nivel_dificuldade?: string;
     search?: string;
   }): Promise<ApiResponse> {
     const params = new URLSearchParams();
     if (filters?.tipo) params.append('tipo', filters.tipo);
     if (filters?.etapa) params.append('etapa', filters.etapa);
-    if (filters?.nivel_dificuldade) params.append('nivel_dificuldade', filters.nivel_dificuldade);
     if (filters?.search) params.append('search', filters.search);
     
     const query = params.toString();
@@ -485,7 +483,6 @@ class ApiService {
       anos_escolares: string[];
       eixos_bncc: string[];
       duracao: string;
-      nivel_dificuldade: 'Fácil' | 'Médio' | 'Difícil';
       thumbnail_url: string;
       video_url: string;
       pdf_estrutura_pedagogica_url: string;

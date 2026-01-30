@@ -110,15 +110,15 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center px-4 py-6 safe-area-top">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md"
+        className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 w-full max-w-md"
       >
         <button
           onClick={onBack}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-6"
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-6 touch-target-inline min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Voltar</span>
@@ -238,7 +238,7 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target-inline"
             style={{ backgroundColor: '#005a93' }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#004a7a'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#005a93'}

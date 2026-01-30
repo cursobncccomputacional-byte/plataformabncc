@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2, Book, Calculator, MapPin, FlaskConical, Dumbbell, Church, Code, Languages, X } from 'lucide-react';
+import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2, Book, Calculator, MapPin, FlaskConical, Dumbbell, Church, Code, Languages, X, Eye, Download, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
 import { renderMarkdown } from '../utils/markdownRenderer';
+import { ActivityDuration } from '../components/ActivityDuration';
+import { SecurePDFViewer } from '../components/SecurePDFViewer';
 
 interface Trilha {
   id: string;
@@ -26,8 +28,35 @@ interface Atividade {
   thumbnail_url?: string;
   video_url: string;
   duracao?: string;
-  nivel_dificuldade?: string;
+  material_pdf_url?: string | null;
+  pedagogical_pdf_url?: string | null;
+  document_url?: string | null;
+  anos_escolares?: string[];
+  bloqueada?: boolean;
 }
+
+const svgPlaceholderDataUri = (title: string) => {
+  const safe = (title || 'Atividade').slice(0, 40);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stop-color="#005a93"/>
+          <stop offset="1" stop-color="#4F46E5"/>
+        </linearGradient>
+      </defs>
+      <rect width="800" height="450" fill="url(#g)"/>
+      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif" font-size="42" fill="#ffffff" opacity="0.95">
+        ${safe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+      </text>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
+
+const typeLabels: Record<string, string> = { plugada: 'Plugada', desplugada: 'Desplugada' };
+const typeColors: Record<string, string> = { plugada: 'bg-blue-100 text-blue-700', desplugada: 'bg-green-100 text-green-700' };
 
 export const TrilhasPedagogicas = () => {
   const { user } = useAuth();
@@ -44,6 +73,7 @@ export const TrilhasPedagogicas = () => {
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
+  const [selectedPDF, setSelectedPDF] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     loadTrilhas();
@@ -168,6 +198,33 @@ export const TrilhasPedagogicas = () => {
     return match ? match[1] : null;
   };
 
+  const handleViewPDF = (atividade: Atividade, url: string, label: string) => {
+    if (atividade.bloqueada) return;
+    if (url && user) setSelectedPDF({ url, title: `${atividade.nome_atividade} — ${label}` });
+  };
+
+  const handleDownloadPDF = (atividade: Atividade, url: string) => {
+    if (atividade.bloqueada) return;
+    if (!url || !(user?.role === 'admin' || user?.role === 'professor')) return;
+    const filename = `${(atividade.nome_atividade || 'material').replace(/[^\w\s-]/g, '')}.pdf`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const parseDurationMinutes = (duracao?: string | null): number => {
+    if (!duracao) return 0;
+    const m = duracao.match(/(\d+)\s*min/);
+    if (m) return parseInt(m[1], 10) || 0;
+    const n = duracao.match(/(\d+)/);
+    return n ? parseInt(n[1], 10) || 0 : 0;
+  };
+
   if (selectedTrilha) {
     return (
       <div className="bg-transparent p-0">
@@ -183,16 +240,16 @@ export const TrilhasPedagogicas = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6"
           >
             {selectedTrilha.thumbnail_url && (
               <img
                 src={resolvePublicAssetUrl(selectedTrilha.thumbnail_url) || ''}
                 alt={selectedTrilha.titulo}
-                className="w-full h-64 object-cover rounded-lg mb-4"
+                className="w-full h-48 sm:h-64 object-cover rounded-lg mb-4"
               />
             )}
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{selectedTrilha.titulo}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{selectedTrilha.titulo}</h1>
             {selectedTrilha.descricao && (
               <p className="text-gray-600 mb-4">{selectedTrilha.descricao}</p>
             )}
@@ -220,56 +277,123 @@ export const TrilhasPedagogicas = () => {
               <p className="text-gray-600">Esta trilha ainda não possui atividades cadastradas.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {atividadesTrilha.map((atividade) => (
-                <motion.div
-                  key={atividade.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => {
-                    if (atividade.video_url) {
-                      setSelectedVideo({ url: atividade.video_url, title: atividade.nome_atividade });
-                    }
-                  }}
-                >
-                  <div className="relative">
-                    <img
-                      src={resolvePublicAssetUrl(atividade.thumbnail_url) || ''}
-                      alt={atividade.nome_atividade}
-                      className="w-full h-48 object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `data:image/svg+xml,${encodeURIComponent(`
-                          <svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
-                            <rect width="400" height="300" fill="#005a93"/>
-                            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="20">${atividade.nome_atividade}</text>
-                          </svg>
-                        `)}`;
-                      }}
-                    />
-                    <div className="absolute top-2 right-2">
-                      <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
-                        {atividade.tipo}
-                      </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {atividadesTrilha.map((atividade, index) => {
+                const typeKey = (atividade.tipo || '').toLowerCase().includes('plugada') ? 'plugada' : 'desplugada';
+                return (
+                  <motion.div
+                    key={atividade.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.05, 0.5) }}
+                    className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-100 group"
+                  >
+                    <div className="relative">
+                      <img
+                        src={resolvePublicAssetUrl(atividade.thumbnail_url) || svgPlaceholderDataUri(atividade.nome_atividade)}
+                        alt={atividade.nome_atividade}
+                        className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = svgPlaceholderDataUri(atividade.nome_atividade);
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      {atividade.bloqueada && (
+                        <div className="absolute top-2 right-2 flex items-center justify-center w-8 h-8 rounded-full bg-gray-800/90 text-white" title="Atividade bloqueada">
+                          <Lock className="w-4 h-4" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-1">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold backdrop-blur-sm ${typeColors[typeKey] || typeColors.desplugada} border border-white/20`}>
+                          {typeLabels[typeKey] || atividade.tipo || 'Desplugada'}
+                        </span>
+                      </div>
+                      {(atividade.anos_escolares?.length ?? 0) > 0 && (
+                        <div className="absolute bottom-2 left-2 right-2 flex gap-1 flex-wrap">
+                          {atividade.anos_escolares!.slice(0, 2).map((yearId) => (
+                            <span
+                              key={yearId}
+                              className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            >
+                              {yearId}
+                            </span>
+                          ))}
+                          {atividade.anos_escolares!.length > 2 && (
+                            <span className="bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
+                              +{atividade.anos_escolares!.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg text-gray-900 mb-2">{atividade.nome_atividade}</h3>
-                    {atividade.descricao && (
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{atividade.descricao}</p>
-                    )}
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      {atividade.duracao && <span>{atividade.duracao}</span>}
-                      <div className="flex items-center gap-1 text-[#044982]">
-                        Ver atividade
-                        <Play className="w-4 h-4" />
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 mb-1.5 line-clamp-2 text-sm leading-tight">
+                        {atividade.nome_atividade}
+                      </h3>
+                      <div className="mb-3 text-xs text-gray-500">
+                        <ActivityDuration
+                          videoUrl={atividade.video_url}
+                          fallbackMinutes={parseDurationMinutes(atividade.duracao)}
+                          className="text-xs"
+                        />
+                      </div>
+                      <div className={`grid grid-cols-2 gap-2 ${atividade.bloqueada ? 'opacity-60 pointer-events-none' : ''}`}>
+                        {atividade.video_url && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); if (atividade.bloqueada) return; setSelectedVideo({ url: atividade.video_url, title: atividade.nome_atividade }); }}
+                            className="w-full text-white px-3 py-2 rounded-lg transition-all text-xs font-medium hover:shadow-md flex items-center justify-center gap-1.5"
+                            style={{ backgroundColor: '#005a93' }}
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            Vídeo
+                          </button>
+                        )}
+                        {(atividade.pedagogical_pdf_url || atividade.document_url) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewPDF(atividade, atividade.pedagogical_pdf_url || atividade.document_url || '', 'Estrutura Pedagógica');
+                            }}
+                            className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Estrutura
+                          </button>
+                        )}
+                        {atividade.material_pdf_url && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewPDF(atividade, atividade.material_pdf_url!, 'Material da Aula');
+                            }}
+                            className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Material
+                          </button>
+                        )}
+                        {(user?.role === 'admin' || user?.role === 'professor') && atividade.material_pdf_url && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDownloadPDF(atividade, atividade.material_pdf_url!); }}
+                            className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center gap-1.5"
+                            title="Baixar material da aula"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Baixar
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -413,13 +537,13 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
 
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
             <input
               type="text"
               placeholder="Buscar trilhas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#044982] focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#044982] focus:border-transparent touch-target-inline"
             />
           </div>
         </div>
@@ -593,15 +717,29 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
         )}
       </div>
 
+      {/* PDF Viewer Modal */}
+      {selectedPDF && (
+        <SecurePDFViewer
+          pdfUrl={selectedPDF.url}
+          title={selectedPDF.title}
+          onClose={() => setSelectedPDF(null)}
+          allowDownload={
+            (user?.role === 'admin' || user?.role === 'professor') &&
+            !selectedPDF.title.includes('Estrutura Pedagógica')
+          }
+        />
+      )}
+
       {/* Modal de Player de Vídeo */}
       {selectedVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">{selectedVideo.title}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-3 sm:p-4 safe-area-top">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 gap-2 min-w-0">
+              <h3 className="text-base sm:text-xl font-semibold text-gray-900 truncate">{selectedVideo.title}</h3>
               <button
                 onClick={() => setSelectedVideo(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="flex-shrink-0 p-2 -m-2 text-gray-400 hover:text-gray-600 transition-colors touch-target rounded-lg"
+                aria-label="Fechar vídeo"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -20,6 +20,13 @@ require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/auth.php';
 
+// Preflight CORS (OPTIONS): responder 200 e encerrar antes de qualquer auth/validação.
+// Sem isso, navegadores bloqueiam chamadas cross-origin com erro 405 no preflight.
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -199,7 +206,8 @@ try {
                 material_apoio_url,
                 COALESCE(criado_em, data_criacao) as criado_em,
                 atualizado_em,
-                criado_por
+                criado_por,
+                COALESCE(bloqueada, 0) as bloqueada
             FROM atividades WHERE id = ?");
             $stmt->execute([$activityId]);
             $activity = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -264,6 +272,7 @@ try {
                 }
             }
 
+            $bloqueada = (int)($activity['bloqueada'] ?? 0) === 1;
             json_response_act(200, [
                 'error' => false,
                 'activity' => [
@@ -278,7 +287,6 @@ try {
                     'habilidades_ids' => $habilidadesIds,
                     'habilidades' => $habilidadesDetails,
                     'duracao' => $activity['duracao'] ?? null,
-                    'nivel_dificuldade' => $activity['nivel_dificuldade'] ?? 'Médio',
                     'thumbnail_url' => $activity['thumbnail_url'] ?? null,
                     'video_url' => $activity['video_url'] ?? null,
                     'pdf_estrutura_pedagogica_url' => $activity['pdf_estrutura_pedagogica_url'] ?? null,
@@ -286,13 +294,13 @@ try {
                     'criado_em' => $activity['criado_em'] ?? null,
                     'atualizado_em' => $activity['atualizado_em'] ?? null,
                     'criado_por' => $activity['criado_por'] ?? null,
+                    'bloqueada' => $bloqueada,
                 ]
             ]);
         } else {
             // Listar todas as atividades (com filtros opcionais)
             $tipo = $_GET['tipo'] ?? null;
             $etapa = $_GET['etapa'] ?? null;
-            $nivel = $_GET['nivel_dificuldade'] ?? null;
             $search = $_GET['search'] ?? null;
 
             // Selecionar campos novos e antigos para compatibilidade
@@ -328,7 +336,8 @@ try {
                 url_video,
                 url_documento,
                 data_criacao,
-                id_eixo
+                id_eixo,
+                COALESCE(bloqueada, 0) as bloqueada
             FROM atividades WHERE 1=1";
             $params = [];
 
@@ -342,18 +351,6 @@ try {
             if ($etapa) {
                 $sql .= " AND etapa = ?";
                 $params[] = $etapa;
-            }
-
-            if ($nivel) {
-                // Compatibilidade: buscar em nivel_dificuldade ou dificuldade (antigo)
-                $sql .= " AND (nivel_dificuldade = ? OR (dificuldade = ? AND nivel_dificuldade IS NULL))";
-                // Converter formato novo para antigo para busca
-                $nivelAntigo = '';
-                if ($nivel === 'Fácil') $nivelAntigo = 'facil';
-                elseif ($nivel === 'Médio') $nivelAntigo = 'medio';
-                elseif ($nivel === 'Difícil') $nivelAntigo = 'dificil';
-                $params[] = $nivel;
-                $params[] = $nivelAntigo;
             }
 
             if ($search) {
@@ -434,13 +431,13 @@ try {
                     'disciplinas_transversais' => $disciplinasTransversais,
                     'habilidades_ids' => $habilidadesIds,
                     'duracao' => $activity['duracao'] ?? null,
-                    'nivel_dificuldade' => $activity['nivel_dificuldade'] ?? 'Médio',
                     'thumbnail_url' => $activity['thumbnail_url'] ?? null,
                     'video_url' => $activity['video_url'] ?? null,
                     'pdf_estrutura_pedagogica_url' => $activity['pdf_estrutura_pedagogica_url'] ?? null,
                     'material_apoio_url' => $activity['material_apoio_url'] ?? null,
                     'criado_em' => $activity['criado_em'] ?? null,
                     'atualizado_em' => $activity['atualizado_em'] ?? null,
+                    'bloqueada' => (int)($activity['bloqueada'] ?? 0) === 1,
                 ];
             }
 
@@ -510,7 +507,6 @@ try {
         $duracao = isset($data['duracao']) && trim((string)$data['duracao']) !== '' 
             ? trim((string)$data['duracao']) 
             : null;
-        $nivelDificuldade = (string)($data['nivel_dificuldade'] ?? '');
         $thumbnailUrl = isset($data['thumbnail_url']) && trim((string)$data['thumbnail_url']) !== '' 
             ? trim((string)$data['thumbnail_url']) 
             : null;
@@ -521,15 +517,15 @@ try {
         $materialApoioUrl = isset($data['material_apoio_url']) && trim((string)$data['material_apoio_url']) !== '' 
             ? trim((string)$data['material_apoio_url']) 
             : null;
+        $bloqueada = !empty($data['bloqueada']);
 
-        // Validações
+        // Validações (video_url não obrigatório quando atividade é bloqueada)
         $missingFields = [];
         if (empty($id)) $missingFields[] = 'id';
         if (empty($nomeAtividade)) $missingFields[] = 'nome_atividade';
         if (empty($tipo)) $missingFields[] = 'tipo';
         if (empty($etapa)) $missingFields[] = 'etapa';
-        if (empty($nivelDificuldade)) $missingFields[] = 'nivel_dificuldade';
-        if (empty($videoUrl)) $missingFields[] = 'video_url';
+        if (empty($videoUrl) && !$bloqueada) $missingFields[] = 'video_url';
         
         if (!empty($missingFields)) {
             json_response_act(400, [
@@ -549,11 +545,6 @@ try {
             json_response_act(400, ['error' => true, 'message' => 'Etapa inválida']);
         }
 
-        $allowedNiveis = ['Fácil', 'Médio', 'Difícil'];
-        if (!in_array($nivelDificuldade, $allowedNiveis, true)) {
-            json_response_act(400, ['error' => true, 'message' => 'Nível de dificuldade inválido']);
-        }
-
         // Verificar se já existe
         $checkStmt = $pdo->prepare("SELECT id FROM atividades WHERE id = ?");
         $checkStmt->execute([$id]);
@@ -561,10 +552,25 @@ try {
             json_response_act(409, ['error' => true, 'message' => 'Atividade com este ID já existe']);
         }
 
-        // Criar atividade (habilidades_ids: coluna opcional; se não existir, use INSERT sem ela)
+        // Criar atividade (habilidades_ids: coluna opcional; bloqueada: coluna opcional)
         try {
+            $hasBloqueadaCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'bloqueada'")->rowCount() > 0;
+            $bloqueadaVal = $bloqueada ? 1 : 0;
             $hasHabilidadesCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'habilidades_ids'")->rowCount() > 0;
-            if ($hasHabilidadesCol) {
+            if ($hasHabilidadesCol && $hasBloqueadaCol) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO atividades (
+                        id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais, habilidades_ids,
+                        duracao, nivel_dificuldade, thumbnail_url, video_url,
+                        pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $params = [
+                    $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais, $habilidadesIdsJson,
+                    $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
+                    $pdfEstruturaUrl, $materialApoioUrl, $bloqueadaVal, $currentUser['id']
+                ];
+            } elseif ($hasHabilidadesCol) {
                 $stmt = $pdo->prepare("
                     INSERT INTO atividades (
                         id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais, habilidades_ids,
@@ -574,8 +580,21 @@ try {
                 ");
                 $params = [
                     $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais, $habilidadesIdsJson,
-                    $duracao, $nivelDificuldade, $thumbnailUrl, $videoUrl,
+                    $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
                     $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
+                ];
+            } elseif ($hasBloqueadaCol) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO atividades (
+                        id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais,
+                        duracao, nivel_dificuldade, thumbnail_url, video_url,
+                        pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $params = [
+                    $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
+                    $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
+                    $pdfEstruturaUrl, $materialApoioUrl, $bloqueadaVal, $currentUser['id']
                 ];
             } else {
                 $stmt = $pdo->prepare("
@@ -587,7 +606,7 @@ try {
                 ");
                 $params = [
                     $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
-                    $duracao, $nivelDificuldade, $thumbnailUrl, $videoUrl,
+                    $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
                     $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
                 ];
             }
@@ -696,10 +715,6 @@ try {
             $updates[] = "duracao = ?";
             $params[] = trim((string)$data['duracao']) ?: null;
         }
-        if (isset($data['nivel_dificuldade'])) {
-            $updates[] = "nivel_dificuldade = ?";
-            $params[] = (string)$data['nivel_dificuldade'];
-        }
         if (isset($data['thumbnail_url'])) {
             $updates[] = "thumbnail_url = ?";
             $params[] = trim((string)$data['thumbnail_url']) ?: null;
@@ -715,6 +730,13 @@ try {
         if (isset($data['material_apoio_url'])) {
             $updates[] = "material_apoio_url = ?";
             $params[] = trim((string)$data['material_apoio_url']) ?: null;
+        }
+        if (array_key_exists('bloqueada', $data)) {
+            $hasBloqueadaCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'bloqueada'")->rowCount() > 0;
+            if ($hasBloqueadaCol) {
+                $updates[] = "bloqueada = ?";
+                $params[] = !empty($data['bloqueada']) ? 1 : 0;
+            }
         }
 
         if (empty($updates)) {

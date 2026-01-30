@@ -276,7 +276,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               knowledgeObjectId: a.knowledgeObjectId || '',
               skillIds: a.skillIds || [],
               duration: a.duration || 0,
-              difficulty: a.difficulty || 'medio',
               materials: a.materials || [],
               objectives: a.objectives || [],
               thumbnail_url: a.thumbnail_url || '',
