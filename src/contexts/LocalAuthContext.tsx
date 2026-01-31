@@ -498,8 +498,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error('A senha deve ter pelo menos 6 caracteres') };
     }
 
-    // Escola é obrigatória apenas para professor e aluno
-    if ((userData.role === 'professor' || userData.role === 'aluno') && !userData.school) {
+    // Escola é obrigatória para professor, teste professor e aluno
+    if ((userData.role === 'professor' || userData.role === 'teste_professor' || userData.role === 'aluno') && !userData.school) {
       return { error: new Error('Escola é obrigatória para professores e alunos') };
     }
 
@@ -520,8 +520,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Validar limite de professores
-      if (userData.role === 'professor' && maxProf !== null && maxProf !== undefined) {
+      // Validar limite de professores (inclui Teste Professor)
+      if ((userData.role === 'professor' || userData.role === 'teste_professor') && maxProf !== null && maxProf !== undefined) {
         if (profCriados >= maxProf) {
           return {
             error: new Error(
@@ -580,11 +580,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('LocalAuthContext: Dados do usuário criado:', apiResponse.user);
           
           // ATUALIZAR CONTADORES DO ADMIN APÓS CRIAR USUÁRIO
-          if (user.role === 'admin' && (userData.role === 'professor' || userData.role === 'aluno')) {
+          if (user.role === 'admin' && (userData.role === 'professor' || userData.role === 'teste_professor' || userData.role === 'aluno')) {
             const updatedUser = {
               ...user,
-              professores_criados: userData.role === 'professor' 
-                ? (user.professores_criados || 0) + 1 
+              professores_criados: (userData.role === 'professor' || userData.role === 'teste_professor')
+                ? (user.professores_criados || 0) + 1
                 : user.professores_criados,
               alunos_criados: userData.role === 'aluno'
                 ? (user.alunos_criados || 0) + 1

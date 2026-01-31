@@ -83,6 +83,7 @@ function hasPermission($requiredRole) {
     $hierarchy = [
         'aluno' => 1,
         'professor' => 2,
+        'teste_professor' => 2,
         'admin' => 3,
         'root' => 4
     ];

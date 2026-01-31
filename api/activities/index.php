@@ -95,6 +95,130 @@ function read_json_body(): array {
 }
 
 /**
+ * Lista fixa de atividades liberadas para o perfil "teste_professor":
+ * EI até 5º ano (2 por etapa/ano). Do 6º ano em diante permanecem bloqueadas.
+ * Comparação por nome da atividade (trim, case-insensitive).
+ *
+ * EI: Compartilhando Interesses, Construindo a Casinha
+ * 1º ano: Baralho de Pessoas, Colorindo por Códigos
+ * 2º ano: Desenho vs Objeto real, Semáforo e o trânsito
+ * 3º ano: Os Meus Preferidos, Criação de Tirinhas
+ * 4º ano: Códigos Secretos, Manipulando Documentos
+ * 5º ano: Batata Quente, Investigadores de Fake News
+ */
+function get_teste_professor_whitelist(): array {
+    return [
+        'Compartilhando Interesses',
+        'Construindo a Casinha',
+        'Baralho de Pessoas',
+        'Colorindo por Códigos',
+        'Desenho vs Objeto real',
+        'Semáforo e o trânsito',
+        'Os Meus Preferidos',
+        'Criação de Tirinhas',
+        'Códigos Secretos',
+        'Manipulando Documentos',
+        'Batata Quente',
+        'Investigadores de Fake News',
+    ];
+}
+
+/**
+ * Lista configurável (via banco) de atividades liberadas para o perfil "teste_professor".
+ * Se a tabela não existir, usamos a whitelist fixa por nome como fallback (compatibilidade).
+ *
+ * @return array{ids: array<int,string>, table_exists: bool}
+ */
+function get_teste_professor_allowed_ids(PDO $pdo): array {
+    try {
+        $tableExists = ($pdo->query("SHOW TABLES LIKE 'teste_professor_atividades_liberadas'")->rowCount() ?? 0) > 0;
+        if (!$tableExists) {
+            return ['ids' => [], 'table_exists' => false];
+        }
+        $stmt = $pdo->query("SELECT activity_id FROM teste_professor_atividades_liberadas");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $ids = [];
+        foreach ($rows as $r) {
+            $id = trim((string)($r['activity_id'] ?? ''));
+            if ($id !== '') $ids[] = $id;
+        }
+        // remover duplicados preservando valores
+        $ids = array_values(array_keys(array_fill_keys($ids, true)));
+        return ['ids' => $ids, 'table_exists' => true];
+    } catch (Throwable $e) {
+        return ['ids' => [], 'table_exists' => false];
+    }
+}
+
+/**
+ * Regra do perfil "teste_professor":
+ * - vê TODAS as atividades: as liberadas (whitelist) como bloqueada=false, as demais como bloqueada=true
+ * - retorna ordenado: liberadas na frente do grid, bloqueadas no final
+ * - fallback (se tabela não existir): usa whitelist fixa por NOME (compatibilidade)
+ *
+ * @param array<int, array<string,mixed>> $activitiesData
+ * @return array<int, array<string,mixed>>
+ */
+function apply_teste_professor_access(PDO $pdo, array $activitiesData): array {
+    $cfg = get_teste_professor_allowed_ids($pdo);
+    $tableExists = (bool)($cfg['table_exists'] ?? false);
+
+    $allowedIdSet = [];
+    if ($tableExists) {
+        foreach ($cfg['ids'] as $id) {
+            $allowedIdSet[$id] = true;
+        }
+    }
+
+    $whitelistNormalized = [];
+    if (!$tableExists) {
+        foreach (get_teste_professor_whitelist() as $nome) {
+            $whitelistNormalized[mb_strtolower(trim((string)$nome), 'UTF-8')] = true;
+        }
+    }
+
+    $liberadas = [];
+    $bloqueadas = [];
+    foreach ($activitiesData as $a) {
+        $id = trim((string)($a['id'] ?? ''));
+        $nome = trim((string)($a['nome_atividade'] ?? ''));
+        $allowed = false;
+        if ($tableExists) {
+            $allowed = $id !== '' && isset($allowedIdSet[$id]);
+        } else {
+            $allowed = $nome !== '' && isset($whitelistNormalized[mb_strtolower($nome, 'UTF-8')]);
+        }
+
+        if ($allowed) {
+            $a['bloqueada'] = false;
+            $liberadas[] = $a;
+        } else {
+            $a['bloqueada'] = true;
+            $bloqueadas[] = $a;
+        }
+    }
+
+    return array_merge($liberadas, $bloqueadas);
+}
+
+/**
+ * Verifica se uma atividade específica é liberada para teste_professor.
+ */
+function is_teste_professor_allowed(PDO $pdo, string $activityId, string $activityName): bool {
+    $cfg = get_teste_professor_allowed_ids($pdo);
+    $tableExists = (bool)($cfg['table_exists'] ?? false);
+    if ($tableExists) {
+        return $activityId !== '' && in_array($activityId, $cfg['ids'], true);
+    }
+    $nameKey = mb_strtolower(trim($activityName), 'UTF-8');
+    $whitelist = [];
+    foreach (get_teste_professor_whitelist() as $n) {
+        $whitelist[mb_strtolower(trim((string)$n), 'UTF-8')] = true;
+    }
+    return $nameKey !== '' && isset($whitelist[$nameKey]);
+}
+
+/**
  * Retorna eixos distintos a partir dos IDs de curriculo_habilidades (para derivar eixos_bncc da atividade).
  * @param PDO $pdo
  * @param array<int> $habilidadesIds
@@ -273,6 +397,10 @@ try {
             }
 
             $bloqueada = (int)($activity['bloqueada'] ?? 0) === 1;
+            // Perfil "Teste Professor": vê a atividade; se não estiver na whitelist, vem como bloqueada
+            if ($currentUser && strtolower((string)($currentUser['role'] ?? '')) === 'teste_professor') {
+                $bloqueada = !is_teste_professor_allowed($pdo, (string)($activity['id'] ?? ''), (string)($activity['nome_atividade'] ?? ''));
+            }
             json_response_act(200, [
                 'error' => false,
                 'activity' => [
@@ -439,6 +567,11 @@ try {
                     'atualizado_em' => $activity['atualizado_em'] ?? null,
                     'bloqueada' => (int)($activity['bloqueada'] ?? 0) === 1,
                 ];
+            }
+
+            // Perfil "Teste Professor": liberar apenas as atividades da lista fixa (EI até 5º ano); demais bloqueadas
+            if ($currentUser && strtolower((string)($currentUser['role'] ?? '')) === 'teste_professor') {
+                $activitiesData = apply_teste_professor_access($pdo, $activitiesData);
             }
 
             json_response_act(200, [

@@ -415,6 +415,69 @@ class ApiService {
   }
 
   /**
+   * Teste Professor: buscar lista de atividades liberadas (whitelist)
+   * Requer root ou can_manage_activities
+   */
+  async getTesteProfessorAllowedActivities(): Promise<ApiResponse & { allowed_activity_ids?: string[]; table_exists?: boolean }> {
+    // enviar headers (fallback) no mesmo padrão de create/update activity
+    const currentUser = await this.getCurrentUser();
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return this.request('/activities/teste-professor-access.php', { headers });
+  }
+
+  /**
+   * Teste Professor: salvar lista de atividades liberadas (substitui whitelist)
+   * Requer root ou can_manage_activities
+   */
+  async setTesteProfessorAllowedActivities(activityIds: string[]): Promise<ApiResponse & { allowed_activity_ids?: string[] }> {
+    const currentUser = await this.getCurrentUser();
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return this.request('/activities/teste-professor-access.php', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ activity_ids: activityIds }),
+    });
+  }
+
+  /**
    * Obter atividade específica por ID
    */
   async getActivity(activityId: string): Promise<ApiResponse> {
@@ -748,9 +811,14 @@ class ApiService {
 
   /**
    * Agente IA - Sugerir atividades do dia (Groq)
-   * Usa a API do Groq para gerar sugestões de atividades pedagógicas
+   * Usa a API do Groq para gerar sugestões de atividades pedagógicas.
+   * Opcionalmente recebe contexto BNCC (habilidades do banco) para alinhar a sugestão aos códigos e descrições reais.
    */
-  async suggestActivitiesFromAI(prompt: string, groqToken?: string): Promise<ApiResponse & { suggestions?: string }> {
+  async suggestActivitiesFromAI(
+    prompt: string,
+    groqToken?: string,
+    bnccContext?: string
+  ): Promise<ApiResponse & { suggestions?: string }> {
     // Token deve ser configurado via variável de ambiente VITE_GROQ_API_KEY
     const token = groqToken || import.meta.env.VITE_GROQ_API_KEY;
     
@@ -769,6 +837,11 @@ class ApiService {
       };
     }
     
+    const systemBase = 'Você é um assistente educacional especializado em sugerir atividades pedagógicas alinhadas à BNCC (Base Nacional Comum Curricular) para pensamento computacional. Forneça sugestões práticas, objetivas e detalhadas, incluindo objetivos, materiais necessários e passo a passo quando relevante. Foque em atividades plugadas e desplugadas para Educação Infantil, Anos Iniciais e Anos Finais.';
+    const systemWithBncc = bnccContext
+      ? `${systemBase}\n\n---\nContexto BNCC Computacional (habilidades reais do currículo - use para alinhar a sugestão a códigos e descrições oficiais):\n${bnccContext}`
+      : systemBase;
+    
     try {
       // Modelos válidos (2026): https://console.groq.com/docs/models
       const candidateModels = [
@@ -783,7 +856,7 @@ class ApiService {
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente educacional especializado em sugerir atividades pedagógicas alinhadas à BNCC (Base Nacional Comum Curricular) para pensamento computacional. Forneça sugestões práticas, objetivas e detalhadas, incluindo objetivos, materiais necessários e passo a passo quando relevante. Foque em atividades plugadas e desplugadas para Educação Infantil, Anos Iniciais e Anos Finais.'
+              content: systemWithBncc
             },
             {
               role: 'user',
@@ -946,6 +1019,22 @@ class ApiService {
       method: 'DELETE',
       headers,
       body: JSON.stringify({ id: activityId }),
+    });
+  }
+
+  /**
+   * Gerar thumbnails (server-side) para atividades.
+   * Requer root (endpoint protegido no backend).
+   */
+  async generateActivityThumbnails(params?: {
+    blocked_only?: boolean;
+    limit?: number;
+    overwrite?: boolean;
+    activity_ids?: string[];
+  }): Promise<ApiResponse & { results?: Array<{ id: string; ok: boolean; thumbnail_url?: string; message?: string }> }> {
+    return this.request('/activities/generate-thumbnails.php', {
+      method: 'POST',
+      body: JSON.stringify(params || {}),
     });
   }
 

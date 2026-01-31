@@ -17,10 +17,11 @@ import { PlanoAula } from './PlanoAula';
 import { BnccDigital } from './BnccDigital';
 import { ManageBncc } from './ManageBncc';
 import { RelatorioAtividades } from './RelatorioAtividades';
+import { TermoReferencia } from './TermoReferencia';
 import type { CreateUserData, User } from '../types/bncc';
 import * as XLSX from 'xlsx';
 
-type RoleFilter = 'all' | 'root' | 'admin' | 'professor' | 'aluno' | 'professor_cursos';
+type RoleFilter = 'all' | 'root' | 'admin' | 'professor' | 'teste_professor' | 'aluno' | 'professor_cursos';
 type StatusFilter = 'all' | 'active' | 'inactive';
 type SortField = 'name' | 'email' | 'role' | 'school' | 'created_at' | 'is_active';
 type SortDirection = 'asc' | 'desc';
@@ -29,7 +30,7 @@ export const RootManagement = () => {
   const { user, getAllUsers, createUser, changePassword, deleteUser, toggleUserStatus } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades' | 'termo-referencia'>('users');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -309,6 +310,8 @@ export const RootManagement = () => {
         return 'Administrador';
       case 'professor':
         return 'Professor';
+      case 'teste_professor':
+        return 'Teste Professor';
       case 'professor_cursos':
         return 'Formação Continuada';
       case 'aluno':
@@ -326,6 +329,8 @@ export const RootManagement = () => {
         return 'bg-blue-100 text-blue-800';
       case 'professor':
         return 'bg-green-100 text-green-800';
+      case 'teste_professor':
+        return 'bg-teal-100 text-teal-800';
       case 'professor_cursos':
         return 'bg-indigo-100 text-indigo-800';
       case 'aluno':
@@ -469,7 +474,7 @@ export const RootManagement = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader onToggleSidebar={() => setSidebarOpen((o) => !o)} />
+      <DashboardHeader onToggleSidebar={() => setSidebarOpen((o) => !o)} sidebarOpen={sidebarOpen} />
 
       <div className="flex">
         <Sidebar
@@ -479,7 +484,7 @@ export const RootManagement = () => {
           onSidebarOpenChange={setSidebarOpen}
         />
 
-        <main className={`flex-1 p-3 sm:p-4 transition-all duration-300 min-w-0 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'} ml-0`}>
+        <main className={`flex-1 p-3 sm:p-4 transition-all duration-300 min-w-0 ${sidebarOpen ? 'md:ml-72' : 'md:ml-20'} ml-0`}>
           {/* Dashboard inicial com estatísticas e gráficos */}
           {currentPage === 'users' && users.length > 0 && (
             <div className="pt-6 px-4 sm:px-6 max-w-[1800px] mx-auto mb-6">
@@ -582,6 +587,7 @@ export const RootManagement = () => {
           {currentPage === 'bncc-digital' && <BnccDigital />}
           {currentPage === 'manage-bncc' && <ManageBncc />}
           {currentPage === 'relatorio-atividades' && <RelatorioAtividades />}
+          {currentPage === 'termo-referencia' && <TermoReferencia />}
           {currentPage === 'users' && (
           <div className="pt-6 px-4 sm:px-6 max-w-[1800px] mx-auto">
 
@@ -690,6 +696,7 @@ export const RootManagement = () => {
                     <option value="root">Root</option>
                     <option value="admin">Admin</option>
                     <option value="professor">Professor</option>
+                    <option value="teste_professor">Teste Professor</option>
                     <option value="aluno">Aluno</option>
                   </select>
 
@@ -732,7 +739,7 @@ export const RootManagement = () => {
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full min-w-[800px] divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left">
@@ -783,11 +790,13 @@ export const RootManagement = () => {
                             )}
                           </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{u.name}</div>
-                          <div className="text-sm text-gray-500">{u.email}</div>
+                        <td className="px-6 py-4 max-w-[200px]">
+                          <div className="break-words min-w-0">
+                            <div className="text-sm font-medium text-gray-900">{u.name}</div>
+                            <div className="text-sm text-gray-500 break-all">{u.email}</div>
+                          </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadge(u.role)}`}>
                               {getRoleLabel(u.role)}
@@ -805,7 +814,7 @@ export const RootManagement = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.school || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-700 break-words max-w-[180px] min-w-0">{u.school || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -985,11 +994,12 @@ export const RootManagement = () => {
                   <option value="root">Root</option>
                   <option value="admin">Admin</option>
                   <option value="professor">Professor</option>
+                  <option value="teste_professor">Teste Professor</option>
                   <option value="aluno">Aluno</option>
                 </select>
               </div>
 
-              {(formData.role === 'professor' || formData.role === 'aluno') && (
+              {(formData.role === 'professor' || formData.role === 'teste_professor' || formData.role === 'aluno') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Escola <span className="text-red-500">*</span>

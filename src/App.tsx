@@ -4,9 +4,6 @@ import { Home } from './pages/Home';
 import { About } from './pages/About';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import UserManagement from './pages/UserManagement';
-import { Reports } from './pages/Reports';
-import { SessionManagement } from './pages/SessionManagement';
 import { LoadingScreen } from './components/LoadingScreen';
 import StudentHome from './pages/StudentHome';
 import { WelcomeLoadingScreen } from './components/WelcomeLoadingScreen';
@@ -14,7 +11,6 @@ import { RootManagement } from './pages/RootManagement';
 
 function AppContent() {
   const [showLogin, setShowLogin] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'user-management' | 'reports' | 'sessions'>('dashboard');
   const [currentView, setCurrentView] = useState<'home' | 'about'>('home');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -50,36 +46,9 @@ function AppContent() {
     if (user.role === 'root') {
       return <RootManagement />;
     }
-    
-    if (user.role === 'admin' && currentPage === 'user-management') {
-      return (
-        <UserManagement 
-          onBackToDashboard={() => setCurrentPage('dashboard')}
-        />
-      );
-    }
 
-    if (user.role === 'admin' && currentPage === 'reports') {
-      return (
-        <Reports 
-          onBackToDashboard={() => setCurrentPage('dashboard')}
-        />
-      );
-    }
-
-    if ((user.role === 'admin' || user.role === 'root') && currentPage === 'sessions') {
-      return (
-        <SessionManagement 
-          onBackToDashboard={() => setCurrentPage('dashboard')}
-        />
-      );
-    }
-    
     return (
       <Dashboard 
-        onNavigateToUserManagement={() => setCurrentPage('user-management')}
-        onNavigateToReports={() => setCurrentPage('reports')}
-        onNavigateToSessions={() => setCurrentPage('sessions')}
         userRole={user.role}
       />
     );

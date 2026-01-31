@@ -107,8 +107,8 @@ try {
 
         // Verificar se é admin ou professor (apenas esses podem receber permissões)
         $role = $targetUser['nivel_acesso'] ?? '';
-        if ($role !== 'admin' && $role !== 'professor') {
-            json_response_perm(400, ['error' => true, 'message' => 'Permissões só podem ser atribuídas a usuários Admin ou Professor']);
+        if ($role !== 'admin' && $role !== 'professor' && $role !== 'teste_professor') {
+            json_response_perm(400, ['error' => true, 'message' => 'Permissões só podem ser atribuídas a usuários Admin, Professor ou Teste Professor']);
         }
 
         // Atualizar apenas os campos fornecidos

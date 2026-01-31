@@ -29,14 +29,25 @@ if (empty($origin) && isset($_SERVER['HTTP_REFERER'])) {
     }
 }
 
-if (!empty($origin) && in_array($origin, $knownOrigins)) {
-    // Para origens conhecidas, usar origem específica (melhor para credentials)
+// Nunca usar Access-Control-Allow-Origin: * com credentials (navegador bloqueia).
+// Sempre usar origem específica quando o front envia cookies/credenciais.
+$allowOrigin = false;
+if (!empty($origin)) {
+    if (in_array($origin, $knownOrigins)) {
+        $allowOrigin = true;
+    } else {
+        // Permitir domínio principal e subdomínios (ex.: cursos.novaedubncc.com.br de outro PC)
+        $host = parse_url($origin, PHP_URL_HOST);
+        $domain = 'novaedubncc.com.br';
+        if ($host && ($host === $domain || substr($host, -strlen($domain) - 1) === '.' . $domain)) {
+            $allowOrigin = true;
+        }
+    }
+}
+if ($allowOrigin) {
     header("Access-Control-Allow-Origin: $origin");
     header('Access-Control-Allow-Credentials: true');
     header('Vary: Origin');
-} else {
-    // Para outras origens, não liberar CORS (evita quebra com credentials)
-    // Requests same-origin não precisam destes headers.
 }
 
 header('Content-Type: application/json; charset=utf-8');

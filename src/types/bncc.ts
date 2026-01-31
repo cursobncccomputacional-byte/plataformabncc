@@ -84,7 +84,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'root' | 'admin' | 'professor' | 'aluno' | 'professor_cursos';
+  role: 'root' | 'admin' | 'professor' | 'teste_professor' | 'aluno' | 'professor_cursos';
   school?: string;
   subjects?: string[];
   created_at: string;
@@ -121,7 +121,7 @@ export interface CreateUserData {
   name: string;
   email: string;
   password: string;
-  role: 'root' | 'admin' | 'professor' | 'aluno' | 'professor_cursos';
+  role: 'root' | 'admin' | 'professor' | 'teste_professor' | 'aluno' | 'professor_cursos';
   school?: string;
   subjects?: string[];
 }

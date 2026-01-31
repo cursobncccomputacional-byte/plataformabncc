@@ -86,6 +86,152 @@ function read_json_body(): array {
 }
 
 /**
+ * Regra do perfil "teste_professor":
+ * - em uma trilha, o usuário vê todas as atividades
+ * - apenas 2 por etapa/ano ficam liberadas; o restante aparece como bloqueada
+ * - atividades já bloqueadas no banco continuam bloqueadas e não contam no limite
+ *
+ * @param array<int, array<string,mixed>> $atividadesData
+ * @param int $limitPerStage
+ * @return array<int, array<string,mixed>>
+ */
+function apply_teste_professor_limit_trilha(array $atividadesData, int $limitPerStage = 2): array {
+    $stageCounts = [];
+    foreach ($atividadesData as &$a) {
+        $isBlocked = !empty($a['bloqueada']);
+        if ($isBlocked) {
+            continue;
+        }
+
+        $etapa = (string)($a['etapa'] ?? '');
+        $anos = $a['anos_escolares'] ?? [];
+        if (!is_array($anos)) {
+            $anos = [];
+        }
+
+        $preferred = ['ei','1ano','2ano','3ano','4ano','5ano','6ano','7ano','8ano','9ano','aee'];
+        $stageKey = '';
+        foreach ($preferred as $id) {
+            if (in_array($id, $anos, true)) {
+                $stageKey = $id;
+                break;
+            }
+        }
+        if ($stageKey === '') {
+            $map = [
+                'Educação Infantil' => 'ei',
+                '1º Ano' => '1ano', '2º Ano' => '2ano', '3º Ano' => '3ano', '4º Ano' => '4ano', '5º Ano' => '5ano',
+                '6º Ano' => '6ano', '7º Ano' => '7ano', '8º Ano' => '8ano', '9º Ano' => '9ano',
+                'AEE' => 'aee',
+            ];
+            $stageKey = $map[$etapa] ?? ($etapa !== '' ? $etapa : 'geral');
+        }
+
+        if (!isset($stageCounts[$stageKey])) {
+            $stageCounts[$stageKey] = 0;
+        }
+        if ($stageCounts[$stageKey] < $limitPerStage) {
+            $stageCounts[$stageKey] += 1;
+            continue;
+        }
+        $a['bloqueada'] = true;
+    }
+    unset($a);
+    return $atividadesData;
+}
+
+/**
+ * Whitelist fixa (fallback) do Teste Professor por NOME (compatibilidade).
+ * Usada apenas quando a tabela teste_professor_atividades_liberadas ainda não existe.
+ */
+function get_teste_professor_whitelist_names_trilha(): array {
+    return [
+        'Compartilhando Interesses',
+        'Construindo a Casinha',
+        'Baralho de Pessoas',
+        'Colorindo por Códigos',
+        'Desenho vs Objeto real',
+        'Semáforo e o trânsito',
+        'Os Meus Preferidos',
+        'Criação de Tirinhas',
+        'Códigos Secretos',
+        'Manipulando Documentos',
+        'Batata Quente',
+        'Investigadores de Fake News',
+    ];
+}
+
+/**
+ * Lista configurável (via banco) de atividades liberadas para "teste_professor".
+ * @return array{ids: array<int,string>, table_exists: bool}
+ */
+function get_teste_professor_allowed_ids_trilha(PDO $pdo): array {
+    try {
+        $tableExists = ($pdo->query("SHOW TABLES LIKE 'teste_professor_atividades_liberadas'")->rowCount() ?? 0) > 0;
+        if (!$tableExists) return ['ids' => [], 'table_exists' => false];
+        $stmt = $pdo->query("SELECT activity_id FROM teste_professor_atividades_liberadas");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $ids = [];
+        foreach ($rows as $r) {
+            $id = trim((string)($r['activity_id'] ?? ''));
+            if ($id !== '') $ids[] = $id;
+        }
+        $ids = array_values(array_keys(array_fill_keys($ids, true)));
+        return ['ids' => $ids, 'table_exists' => true];
+    } catch (Throwable $e) {
+        return ['ids' => [], 'table_exists' => false];
+    }
+}
+
+/**
+ * Regra do perfil "teste_professor" dentro de trilhas:
+ * - vê TODAS as atividades: liberadas como bloqueada=false, demais como bloqueada=true
+ * - ordenação: liberadas na frente do grid, bloqueadas no final
+ */
+function apply_teste_professor_access_trilha(PDO $pdo, array $atividadesData): array {
+    $cfg = get_teste_professor_allowed_ids_trilha($pdo);
+    $tableExists = (bool)($cfg['table_exists'] ?? false);
+
+    $allowedIdSet = [];
+    if ($tableExists) {
+        foreach (($cfg['ids'] ?? []) as $id) {
+            $allowedIdSet[$id] = true;
+        }
+    }
+
+    $whitelistNormalized = [];
+    if (!$tableExists) {
+        foreach (get_teste_professor_whitelist_names_trilha() as $nome) {
+            $whitelistNormalized[mb_strtolower(trim((string)$nome), 'UTF-8')] = true;
+        }
+    }
+
+    $out = [];
+    foreach ($atividadesData as $a) {
+        $id = trim((string)($a['id'] ?? ''));
+        $nome = trim((string)($a['nome_atividade'] ?? ''));
+
+        $allowed = false;
+        if ($tableExists) {
+            $allowed = $id !== '' && isset($allowedIdSet[$id]);
+        } else {
+            $allowed = $nome !== '' && isset($whitelistNormalized[mb_strtolower($nome, 'UTF-8')]);
+        }
+        $a['bloqueada'] = !$allowed;
+        $out[] = $a;
+    }
+
+    // Ordenar: liberadas na frente, bloqueadas no final
+    usort($out, function ($x, $y) {
+        $blockX = !empty($x['bloqueada']);
+        $blockY = !empty($y['bloqueada']);
+        if ($blockX === $blockY) return 0;
+        return $blockX ? 1 : -1;
+    });
+    return $out;
+}
+
+/**
  * Retorna atividades que atendem a TODOS os critérios de agrupamento (AND).
  * @param PDO $pdo
  * @param array<array{tipo:string,valor:string}> $criterios
@@ -473,11 +619,18 @@ try {
                     }
                 }
                 
+                // Normalizar tipo para Plugada/Desplugada (evitar exibir tudo como Plugada quando valor vazio ou inconsistente)
+                $tipoRaw = $atividade['tipo'] ?? '';
+                $tipoLower = strtolower(trim((string)$tipoRaw));
+                // Atenção: "desplugada" contém "plugada". Precisamos checar "desplugada" primeiro.
+                $tipoNormalized = (strpos($tipoLower, 'desplugada') !== false)
+                    ? 'Desplugada'
+                    : ((strpos($tipoLower, 'plugada') !== false) ? 'Plugada' : 'Desplugada');
                 $atividadesData[] = [
                     'id' => $atividade['id'],
                     'nome_atividade' => $atividade['nome_atividade'] ?? '',
                     'descricao' => $atividade['descricao'] ?? null,
-                    'tipo' => $atividade['tipo'] ?? null,
+                    'tipo' => $tipoNormalized,
                     'etapa' => $atividade['etapa'] ?? null,
                     'eixos_bncc' => $eixosBncc,
                     'anos_escolares' => $anosEscolares,
@@ -540,6 +693,20 @@ try {
             
             $trilhaResponse = $trilha;
             $trilhaResponse['criterios_agrupamento'] = $criterios;
+
+            // Perfil "Teste Professor": só mostra as atividades liberadas (configurável)
+            if ($currentUser && strtolower((string)($currentUser['role'] ?? '')) === 'teste_professor') {
+                $atividadesData = apply_teste_professor_access_trilha($pdo, $atividadesData);
+            }
+
+            // Ordenar: atividades desbloqueadas primeiro, bloqueadas por último
+            usort($atividadesData, function ($a, $b) {
+                $blockA = !empty($a['bloqueada']);
+                $blockB = !empty($b['bloqueada']);
+                if ($blockA === $blockB) return 0;
+                return $blockA ? 1 : -1;
+            });
+
             json_response_trilha(200, [
                 'error' => false,
                 'trilha' => $trilhaResponse,
@@ -559,14 +726,10 @@ try {
                 $params = [];
                 
                 if ($tipo) {
-                    // Compatibilidade: trilhas de "ano_escolar" devem aparecer junto com "etapa" para o perfil do professor
-                    if ($tipo === 'etapa') {
-                        $sql .= " AND (tipo = ? OR tipo = 'ano_escolar')";
-                        $params[] = $tipo;
-                    } else {
-                        $sql .= " AND tipo = ?";
-                        $params[] = $tipo;
-                    }
+                    // tipo=etapa → apenas Educação Infantil, Anos Iniciais, Anos Finais
+                    // tipo=ano_escolar → apenas 1º ao 9º Ano e AEE (seção "Por Séries")
+                    $sql .= " AND tipo = ?";
+                    $params[] = $tipo;
                 }
                 
                 $sql .= " ORDER BY ordem ASC, titulo ASC";

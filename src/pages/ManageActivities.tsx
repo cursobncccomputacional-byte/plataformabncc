@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, X, Save, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Save, Eye, Lock, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
@@ -56,6 +56,11 @@ export const ManageActivities = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [thumbLoading, setThumbLoading] = useState(false);
+  const [tpLoading, setTpLoading] = useState(false);
+  const [tpSaving, setTpSaving] = useState(false);
+  const [tpTableExists, setTpTableExists] = useState<boolean | null>(null);
+  const [testeProfessorAllowedIds, setTesteProfessorAllowedIds] = useState<Set<string>>(new Set());
   const [activities, setActivities] = useState<Activity[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState<string>('all');
@@ -66,7 +71,7 @@ export const ManageActivities = () => {
     id: '',
     nome_atividade: '',
     descricao: '',
-    tipo: 'Plugada',
+    tipo: 'Desplugada',
     etapa: 'Anos Iniciais',
     anos_escolares: [],
     eixos_bncc: [],
@@ -87,8 +92,61 @@ export const ManageActivities = () => {
   useEffect(() => {
     if (user?.can_manage_activities || user?.role === 'root') {
       loadActivities();
+      loadTesteProfessorAllowed();
     }
   }, [user]);
+
+  const loadTesteProfessorAllowed = async () => {
+    setTpLoading(true);
+    try {
+      const res = await apiService.getTesteProfessorAllowedActivities();
+      if (res.error) {
+        // não bloquear a tela; apenas mostrar aviso
+        setTpTableExists(null);
+        return;
+      }
+      const ids = (res as any).allowed_activity_ids as string[] | undefined;
+      const tableExists = (res as any).table_exists as boolean | undefined;
+      if (typeof tableExists === 'boolean') setTpTableExists(tableExists);
+      setTesteProfessorAllowedIds(new Set((ids || []).map((x) => String(x))));
+    } catch {
+      setTpTableExists(null);
+    } finally {
+      setTpLoading(false);
+    }
+  };
+
+  const handleToggleTesteProfessorAllowed = async (activityId: string) => {
+    if (!activityId) return;
+    if (!(user?.can_manage_activities || user?.role === 'root')) return;
+
+    const next = new Set(testeProfessorAllowedIds);
+    if (next.has(activityId)) next.delete(activityId);
+    else next.add(activityId);
+
+    // update otimista
+    const prev = new Set(testeProfessorAllowedIds);
+    setTesteProfessorAllowedIds(next);
+    setTpSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await apiService.setTesteProfessorAllowedActivities(Array.from(next));
+      if (res.error) {
+        setTesteProfessorAllowedIds(prev);
+        setError(res.message || 'Erro ao salvar atividades liberadas para Teste Professor');
+        return;
+      }
+      const ids = (res as any).allowed_activity_ids as string[] | undefined;
+      if (ids) setTesteProfessorAllowedIds(new Set(ids.map((x) => String(x))));
+      setSuccess('Acesso do Teste Professor atualizado');
+    } catch (e) {
+      setTesteProfessorAllowedIds(prev);
+      setError(e instanceof Error ? e.message : 'Erro ao salvar atividades liberadas para Teste Professor');
+    } finally {
+      setTpSaving(false);
+    }
+  };
 
   const loadActivities = async () => {
     setLoading(true);
@@ -110,6 +168,34 @@ export const ManageActivities = () => {
       setActivities([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateThumbsBlocked = async () => {
+    setThumbLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await apiService.generateActivityThumbnails({
+        blocked_only: true,
+        overwrite: false,
+        limit: 50,
+      });
+
+      if (res.error) {
+        setError(res.message || 'Erro ao gerar thumbnails');
+        return;
+      }
+
+      const results = (res as any).results as Array<{ ok: boolean }> | undefined;
+      const okCount = results ? results.filter((r) => r.ok).length : 0;
+      const total = (res as any).count ?? okCount;
+      setSuccess(`Thumbnails geradas: ${okCount}/${total}`);
+      await loadActivities();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao gerar thumbnails');
+    } finally {
+      setThumbLoading(false);
     }
   };
 
@@ -185,7 +271,7 @@ export const ManageActivities = () => {
         id: nextId,
         nome_atividade: '',
         descricao: '',
-        tipo: 'Plugada',
+        tipo: 'Desplugada',
         etapa: 'Anos Iniciais',
         anos_escolares: [],
         eixos_bncc: [],
@@ -209,7 +295,7 @@ export const ManageActivities = () => {
       id: '',
       nome_atividade: '',
       descricao: '',
-      tipo: 'Plugada',
+      tipo: 'Desplugada',
       etapa: 'Anos Iniciais',
       anos_escolares: [],
       eixos_bncc: [],
@@ -435,30 +521,51 @@ export const ManageActivities = () => {
             <option value="Anos Finais">Anos Finais</option>
           </select>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-[#044982] text-white px-4 py-2 rounded-md hover:bg-[#005a93] transition"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Atividade
-        </button>
+        <div className="flex flex-wrap gap-2 items-center justify-between">
+          <button
+            type="button"
+            onClick={handleGenerateThumbsBlocked}
+            disabled={thumbLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+            title="Gera thumbnails via IA (server-side) para atividades travadas sem thumbnail"
+          >
+            {thumbLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+            Gerar thumbs (travadas)
+          </button>
+
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 bg-[#044982] text-white px-4 py-2 rounded-md hover:bg-[#005a93] transition"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Atividade
+          </button>
+        </div>
       </div>
 
       {/* Tabela de Atividades */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {tpTableExists === false && (
+          <div className="px-6 py-3 bg-amber-50 text-amber-900 text-sm border-b border-amber-100">
+            A configuração do <b>Teste Professor</b> ainda não está ativa no banco. Execute o script{' '}
+            <code>.sql/create-teste-professor-atividades-liberadas.sql</code> para habilitar a seleção de atividades.
+          </div>
+        )}
         {loading && activities.length === 0 ? (
           <div className="p-12 text-center text-gray-600">Carregando atividades...</div>
         ) : filteredActivities.length === 0 ? (
           <div className="p-12 text-center text-gray-600">Nenhuma atividade encontrada</div>
         ) : (
-          <div className="table-responsive">
-            <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ano Escolar</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teste Professor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Criado em</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
@@ -466,11 +573,29 @@ export const ManageActivities = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredActivities.map((activity) => (
                   <tr key={activity.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{activity.nome_atividade}</div>
-                      {activity.descricao && (
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">{activity.descricao}</div>
-                      )}
+                    <td className="px-6 py-4 align-top max-w-[280px]">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span
+                          className={`flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full ${
+                            activity.thumbnail_url && String(activity.thumbnail_url).trim() !== ''
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}
+                          title={
+                            activity.thumbnail_url && String(activity.thumbnail_url).trim() !== ''
+                              ? 'Thumbnail cadastrada'
+                              : 'Sem thumbnail'
+                          }
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 break-words">{activity.nome_atividade}</div>
+                          {activity.descricao && (
+                            <div className="text-xs text-gray-500 mt-1 break-words line-clamp-3">{activity.descricao}</div>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -483,8 +608,8 @@ export const ManageActivities = () => {
                         {activity.tipo}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{activity.etapa}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-500 break-words">{activity.etapa}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
                       {activity.anos_escolares && activity.anos_escolares.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {activity.anos_escolares.map((ano, index) => (
@@ -499,6 +624,29 @@ export const ManageActivities = () => {
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {activity.bloqueada ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800" title="Atividade travada (sem vídeo liberado)">
+                          <Lock className="w-3.5 h-3.5" />
+                          Travada
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-500">Liberada</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={testeProfessorAllowedIds.has(activity.id)}
+                          onChange={() => handleToggleTesteProfessorAllowed(activity.id)}
+                          disabled={tpLoading || tpSaving || !(user?.can_manage_activities || user?.role === 'root')}
+                          className="h-4 w-4 rounded border-gray-300 text-[#044982] focus:ring-[#044982] disabled:opacity-60 disabled:cursor-not-allowed"
+                          title={tpTableExists === false ? 'Execute o script SQL para habilitar' : 'Liberar esta atividade para Teste Professor'}
+                        />
+                        <span className="text-xs text-gray-500">{testeProfessorAllowedIds.has(activity.id) ? 'Liberada' : 'Bloqueada'}</span>
+                      </label>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {activity.criado_em

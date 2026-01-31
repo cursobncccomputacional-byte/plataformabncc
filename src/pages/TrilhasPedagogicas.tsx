@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, Search, Filter, ArrowRight, Brain, Globe, Users, GraduationCap, Play, Sparkles, Loader2, Book, Calculator, MapPin, FlaskConical, Dumbbell, Church, Code, Languages, X, Eye, Download, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
@@ -64,6 +64,7 @@ export const TrilhasPedagogicas = () => {
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [trilhasEixo, setTrilhasEixo] = useState<Trilha[]>([]);
   const [trilhasEtapa, setTrilhasEtapa] = useState<Trilha[]>([]);
+  const [trilhasSeries, setTrilhasSeries] = useState<Trilha[]>([]);
   const [trilhasDisciplinas, setTrilhasDisciplinas] = useState<Trilha[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrilha, setSelectedTrilha] = useState<Trilha | null>(null);
@@ -73,11 +74,35 @@ export const TrilhasPedagogicas = () => {
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
+  const [videoPlayerReady, setVideoPlayerReady] = useState(false);
   const [selectedPDF, setSelectedPDF] = useState<{ url: string; title: string } | null>(null);
+
+  // Ordenar atividades: desbloqueadas primeiro, bloqueadas por último
+  const atividadesTrilhaOrdenadas = useMemo(
+    () => [...atividadesTrilha].sort((a, b) => (a.bloqueada ? 1 : 0) - (b.bloqueada ? 1 : 0)),
+    [atividadesTrilha]
+  );
 
   useEffect(() => {
     loadTrilhas();
   }, []);
+
+  // No mobile, o player precisa ser criado no mesmo gesto do usuário (iOS bloqueia iframe criado depois).
+  // No desktop, deferimos um frame para o modal abrir mais rápido.
+  useEffect(() => {
+    if (selectedVideo) {
+      const isMobile = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+      if (isMobile) {
+        setVideoPlayerReady(true);
+      } else {
+        setVideoPlayerReady(false);
+        const id = requestAnimationFrame(() => setVideoPlayerReady(true));
+        return () => cancelAnimationFrame(id);
+      }
+    } else {
+      setVideoPlayerReady(false);
+    }
+  }, [selectedVideo]);
 
   const loadTrilhas = async () => {
     setLoading(true);
@@ -93,13 +118,23 @@ export const TrilhasPedagogicas = () => {
         setTrilhasEixo(responseEixo.trilhas || []);
       }
       if (!responseEtapa.error) {
-        // Juntar "etapa" + "ano_escolar" na seção Por Etapa (dedupe por id)
-        const merged = [...(responseEtapa.trilhas || []), ...(responseAnoEscolar.trilhas || [])];
-        const byId = new Map<string, Trilha>();
-        merged.forEach((t: any) => {
-          if (t?.id) byId.set(String(t.id), t);
-        });
-        setTrilhasEtapa(Array.from(byId.values()));
+        // Por Etapas: apenas Educação Infantil, Anos Iniciais e Anos Finais (filtrar por valor)
+        const etapasOnly = (responseEtapa.trilhas || []).filter(
+          (t: Trilha) =>
+            t.valor === 'Educação Infantil' ||
+            t.valor === 'Anos Iniciais' ||
+            t.valor === 'Anos Finais'
+        );
+        setTrilhasEtapa(etapasOnly);
+      }
+      if (!responseAnoEscolar.error) {
+        // Por Séries: tipo ano_escolar, ordenar 1º ao 9º Ano
+        const series = (responseAnoEscolar.trilhas || []) as Trilha[];
+        const ordemSerie = (valor: string) => {
+          const n = valor.match(/(\d+)/);
+          return n ? parseInt(n[1], 10) : 0;
+        };
+        setTrilhasSeries([...series].sort((a, b) => ordemSerie(a.valor) - ordemSerie(b.valor)));
       }
       if (!responseDisciplinas.error) {
         setTrilhasDisciplinas(responseDisciplinas.trilhas || []);
@@ -147,6 +182,9 @@ export const TrilhasPedagogicas = () => {
     trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredTrilhasEtapa = trilhasEtapa.filter((trilha) =>
+    trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredTrilhasSeries = trilhasSeries.filter((trilha) =>
     trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredTrilhasDisciplinas = trilhasDisciplinas.filter((trilha) =>
@@ -217,11 +255,13 @@ export const TrilhasPedagogicas = () => {
     document.body.removeChild(link);
   };
 
-  const parseDurationMinutes = (duracao?: string | null): number => {
-    if (!duracao) return 0;
-    const m = duracao.match(/(\d+)\s*min/);
+  const parseDurationMinutes = (duracao?: string | number | null): number => {
+    if (duracao == null) return 0;
+    const s = typeof duracao === 'number' ? String(duracao) : String(duracao);
+    if (!s.trim()) return 0;
+    const m = s.match(/(\d+)\s*min/);
     if (m) return parseInt(m[1], 10) || 0;
-    const n = duracao.match(/(\d+)/);
+    const n = s.match(/(\d+)/);
     return n ? parseInt(n[1], 10) || 0 : 0;
   };
 
@@ -276,10 +316,20 @@ export const TrilhasPedagogicas = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma atividade encontrada</h3>
               <p className="text-gray-600">Esta trilha ainda não possui atividades cadastradas.</p>
             </div>
+          ) : (selectedVideo || selectedPDF) ? (
+            <div className="flex items-center justify-center py-16 text-gray-500 text-sm">
+              Visualizando mídia — feche o vídeo ou o PDF para voltar às atividades.
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {atividadesTrilha.map((atividade, index) => {
-                const typeKey = (atividade.tipo || '').toLowerCase().includes('plugada') ? 'plugada' : 'desplugada';
+              {atividadesTrilhaOrdenadas.map((atividade, index) => {
+                const tipoLower = (atividade.tipo || '').toLowerCase();
+                const typeKey =
+                  tipoLower.includes('desplugada')
+                    ? 'desplugada'
+                    : tipoLower.includes('plugada')
+                      ? 'plugada'
+                      : 'desplugada';
                 return (
                   <motion.div
                     key={atividade.id}
@@ -337,58 +387,103 @@ export const TrilhasPedagogicas = () => {
                         <ActivityDuration
                           videoUrl={atividade.video_url}
                           fallbackMinutes={parseDurationMinutes(atividade.duracao)}
+                          isBlocked={atividade.bloqueada}
                           className="text-xs"
                         />
                       </div>
-                      <div className={`grid grid-cols-2 gap-2 ${atividade.bloqueada ? 'opacity-60 pointer-events-none' : ''}`}>
-                        {atividade.video_url && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); if (atividade.bloqueada) return; setSelectedVideo({ url: atividade.video_url, title: atividade.nome_atividade }); }}
-                            className="w-full text-white px-3 py-2 rounded-lg transition-all text-xs font-medium hover:shadow-md flex items-center justify-center gap-1.5"
-                            style={{ backgroundColor: '#005a93' }}
-                          >
-                            <Play className="w-3.5 h-3.5" />
-                            Vídeo
-                          </button>
-                        )}
-                        {(atividade.pedagogical_pdf_url || atividade.document_url) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewPDF(atividade, atividade.pedagogical_pdf_url || atividade.document_url || '', 'Estrutura Pedagógica');
-                            }}
-                            className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Estrutura
-                          </button>
-                        )}
-                        {atividade.material_pdf_url && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewPDF(atividade, atividade.material_pdf_url!, 'Material da Aula');
-                            }}
-                            className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Material
-                          </button>
-                        )}
-                        {(user?.role === 'admin' || user?.role === 'professor') && atividade.material_pdf_url && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDownloadPDF(atividade, atividade.material_pdf_url!); }}
-                            className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center gap-1.5"
-                            title="Baixar material da aula"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            Baixar
-                          </button>
-                        )}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (atividade.bloqueada || !atividade.video_url) return;
+                            setSelectedVideo({ url: atividade.video_url, title: atividade.nome_atividade });
+                            if (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches) {
+                              setVideoPlayerReady(true);
+                            }
+                          }}
+                          disabled={atividade.bloqueada || !atividade.video_url}
+                          className="w-full text-white px-3 py-2 rounded-lg transition-all text-xs font-medium hover:shadow-md flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                          style={{ backgroundColor: '#005a93' }}
+                          title={
+                            atividade.bloqueada
+                              ? 'Atividade travada'
+                              : !atividade.video_url
+                                ? 'Sem vídeo cadastrado'
+                                : 'Abrir vídeo'
+                          }
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          Vídeo
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const url = atividade.pedagogical_pdf_url || atividade.document_url || '';
+                            if (atividade.bloqueada || !url) return;
+                            handleViewPDF(atividade, url, 'Estrutura Pedagógica');
+                          }}
+                          disabled={atividade.bloqueada || !(atividade.pedagogical_pdf_url || atividade.document_url)}
+                          className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                          title={
+                            atividade.bloqueada
+                              ? 'Atividade travada'
+                              : !(atividade.pedagogical_pdf_url || atividade.document_url)
+                                ? 'Sem estrutura cadastrada'
+                                : 'Abrir estrutura'
+                          }
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Estrutura
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (atividade.bloqueada || !atividade.material_pdf_url) return;
+                            handleViewPDF(atividade, atividade.material_pdf_url, 'Material da Aula');
+                          }}
+                          disabled={atividade.bloqueada || !atividade.material_pdf_url}
+                          className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                          title={
+                            atividade.bloqueada
+                              ? 'Atividade travada'
+                              : !atividade.material_pdf_url
+                                ? 'Sem material cadastrado'
+                                : 'Abrir material'
+                          }
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Material
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (atividade.bloqueada) return;
+                            if (!(user?.role === 'admin' || user?.role === 'professor')) return;
+                            if (!atividade.material_pdf_url) return;
+                            handleDownloadPDF(atividade, atividade.material_pdf_url);
+                          }}
+                          disabled={atividade.bloqueada || !(user?.role === 'admin' || user?.role === 'professor') || !atividade.material_pdf_url}
+                          className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                          title={
+                            atividade.bloqueada
+                              ? 'Atividade travada'
+                              : !(user?.role === 'admin' || user?.role === 'professor')
+                                ? 'Sem permissão para baixar'
+                                : !atividade.material_pdf_url
+                                  ? 'Sem material cadastrado'
+                                  : 'Baixar material'
+                          }
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Baixar
+                        </button>
                       </div>
                     </div>
                   </motion.div>
@@ -397,6 +492,126 @@ export const TrilhasPedagogicas = () => {
             </div>
           )}
         </div>
+
+        {/* Modais de vídeo e PDF dentro da trilha — precisam estar neste return para aparecer */}
+        {selectedPDF && (
+          <SecurePDFViewer
+            pdfUrl={selectedPDF.url}
+            title={selectedPDF.title}
+            onClose={() => setSelectedPDF(null)}
+            allowDownload={
+              (user?.role === 'admin' || user?.role === 'professor') &&
+              !selectedPDF.title.includes('Estrutura Pedagógica')
+            }
+          />
+        )}
+        {selectedVideo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-3 sm:p-4 safe-area-top">
+            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 gap-2 min-w-0">
+                <h3 className="text-base sm:text-xl font-semibold text-gray-900 truncate">{selectedVideo.title}</h3>
+                <button
+                  onClick={() => setSelectedVideo(null)}
+                  className="flex-shrink-0 p-2 -m-2 text-gray-400 hover:text-gray-600 transition-colors touch-target rounded-lg"
+                  aria-label="Fechar vídeo"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 flex-1 overflow-auto min-h-[200px] flex items-center justify-center">
+                {!videoPlayerReady ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-12">
+                    <div className="w-10 h-10 border-2 border-[#044982] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-gray-600">Abrindo player...</p>
+                  </div>
+                ) : (() => {
+                  const videoType = detectVideoType(selectedVideo.url);
+                  switch (videoType) {
+                    case 'vimeo':
+                      return (
+                        <div className="relative w-full min-h-[200px] sm:min-h-0" style={{ paddingBottom: '56.25%' }}>
+                          <iframe
+                            src={`https://player.vimeo.com/video/${getVimeoId(selectedVideo.url)}?autoplay=1&title=0&byline=0&portrait=0`}
+                            className="absolute top-0 left-0 w-full h-full rounded-lg"
+                            frameBorder="0"
+                            allow="autoplay; fullscreen; picture-in-picture"
+                            allowFullScreen
+                            title="Player de vídeo Vimeo"
+                          />
+                        </div>
+                      );
+                    case 'youtube':
+                      const youtubeId = getYouTubeId(selectedVideo.url);
+                      if (youtubeId) {
+                        return (
+                          <div className="relative w-full min-h-[200px] sm:min-h-0" style={{ paddingBottom: '56.25%' }}>
+                            <iframe
+                              src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+                              className="absolute top-0 left-0 w-full h-full rounded-lg"
+                              frameBorder="0"
+                              allow="autoplay; encrypted-media; picture-in-picture"
+                              allowFullScreen
+                              title="Player de vídeo YouTube"
+                            />
+                          </div>
+                        );
+                      }
+                      break;
+                    case 'googledrive':
+                      const driveId = getGoogleDriveId(selectedVideo.url);
+                      if (driveId) {
+                        return (
+                          <div className="relative w-full min-h-[200px] sm:min-h-0" style={{ paddingBottom: '56.25%' }}>
+                            <iframe
+                              src={`https://drive.google.com/file/d/${driveId}/preview`}
+                              className="absolute top-0 left-0 w-full h-full rounded-lg"
+                              frameBorder="0"
+                              allow="autoplay"
+                              allowFullScreen
+                              title="Player de vídeo Google Drive"
+                            />
+                          </div>
+                        );
+                      }
+                      break;
+                    case 'direct':
+                    default:
+                      return (
+                        <video
+                          controls
+                          playsInline
+                          className="w-full h-auto max-h-[70vh] rounded-lg"
+                          preload="metadata"
+                          controlsList="nodownload"
+                        >
+                          <source src={selectedVideo.url} type="video/mp4" />
+                          <source src={selectedVideo.url} type="video/webm" />
+                          <source src={selectedVideo.url} type="video/ogg" />
+                          Seu navegador não suporta o elemento de vídeo.
+                        </video>
+                      );
+                  }
+                  return (
+                    <video
+                      controls
+                      playsInline
+                      className="w-full h-auto max-h-[70vh] rounded-lg"
+                      preload="metadata"
+                      controlsList="nodownload"
+                    >
+                      <source src={selectedVideo.url} type="video/mp4" />
+                      <source src={selectedVideo.url} type="video/webm" />
+                      <source src={selectedVideo.url} type="video/ogg" />
+                      Seu navegador não suporta o elemento de vídeo.
+                    </video>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -407,8 +622,30 @@ export const TrilhasPedagogicas = () => {
     setShowAISuggestion(true);
     
     try {
+      // Buscar BNCC do banco para enriquecer o prompt da IA (habilidades reais do currículo)
+      let bnccContext = '';
+      try {
+        const res = await apiService.getCurriculoBnccHabilidades({});
+        if (!res.error && res.habilidades?.length) {
+          const etapasMap = (res.etapas || []).reduce<Record<number, string>>((acc, e) => {
+            acc[e.id] = e.nome;
+            return acc;
+          }, {});
+          // Amostra para caber no contexto (evitar estourar tokens): até ~100 habilidades, variando etapas/eixos
+          const sample = res.habilidades.slice(0, 120).map((h: { id: number; codigo?: string; eixo?: string; etapa_id?: number; etapa_nome?: string; descricao?: string }) => {
+            const etapa = h.etapa_nome || etapasMap[h.etapa_id as number] || '';
+            const cod = (h.codigo || '').trim();
+            const desc = (h.descricao || '').trim().slice(0, 200);
+            return `- ${cod} | ${h.eixo || ''} | ${etapa} | ${desc}`;
+          });
+          bnccContext = sample.join('\n');
+        }
+      } catch (_) {
+        // Se falhar a carga da BNCC, segue sem contexto (comportamento anterior)
+      }
+
       const prompt = `Como assistente educacional especializado em BNCC e pensamento computacional, sugira uma atividade prática e pronta para aplicar HOJE em sala de aula. A atividade deve ser:
-- Alinhada à BNCC
+- Alinhada à BNCC (preferencialmente cite códigos de habilidades do contexto BNCC acima quando fizer sentido)
 - Prática e fácil de implementar
 - Adequada para educação básica
 - Incluir objetivos, materiais necessários e passo a passo
@@ -418,7 +655,7 @@ export const TrilhasPedagogicas = () => {
 
 Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatamente.`;
       
-      const response = await apiService.suggestActivitiesFromAI(prompt);
+      const response = await apiService.suggestActivitiesFromAI(prompt, undefined, bnccContext || undefined);
       
       if (response.error) {
         console.error('Erro na sugestão de IA:', response.message);
@@ -482,7 +719,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6 shadow-md relative"
+            className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-md relative"
           >
             {/* Botão de fechar no canto superior direito */}
             <button
@@ -497,13 +734,13 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
             </button>
             
             <div className="flex items-start gap-4 pr-8">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Sparkles className="w-6 h-6 text-purple-600" />
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Sparkles className="w-6 h-6 text-green-600" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
                   <span>Sugestão de Atividade para Hoje</span>
-                  <span className="text-sm font-normal text-purple-600 bg-purple-100 px-2 py-1 rounded">Powered by IA</span>
+                  <span className="text-sm font-normal text-green-700 bg-green-100 px-2 py-1 rounded">Powered by IA</span>
                 </h3>
                 <div className="prose prose-sm max-w-none text-gray-700">
                   {renderMarkdown(aiSuggestion)}
@@ -513,7 +750,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                     setShowAISuggestion(false);
                     setAiSuggestion(null);
                   }}
-                  className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 text-base font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-all shadow-md hover:shadow-lg"
+                  className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 text-base font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all shadow-md hover:shadow-lg"
                 >
                   <X className="w-5 h-5" />
                   Fechar sugestão
@@ -531,7 +768,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
         >
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Trilhas Pedagógicas</h2>
           <p className="text-gray-600 text-base md:text-lg">
-            Sequências prontas alinhadas à BNCC. Explore atividades organizadas por eixo ou etapa.
+            Sequências prontas alinhadas à BNCC. Explore por Eixo BNCC, Etapas (Educação Infantil, Anos Iniciais, Anos Finais), Séries (1º ao 9º Ano) ou Disciplina Transversal.
           </p>
         </motion.div>
 
@@ -604,10 +841,11 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               </div>
             )}
 
-            {/* Trilhas por Etapa */}
+            {/* Trilhas por Etapas: Educação Infantil, Anos Iniciais, Anos Finais */}
             {filteredTrilhasEtapa.length > 0 && (
               <div className="mb-12">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Por Etapa</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Por Etapas</h2>
+                <p className="text-gray-600 mb-4">Educação Infantil, Anos Iniciais e Anos Finais</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {filteredTrilhasEtapa.map((trilha) => {
                     const Icon = getTrilhaIcon(trilha.tipo, trilha.valor);
@@ -653,7 +891,61 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               </div>
             )}
 
-            {/* Trilhas por Disciplinas Transversais */}
+            {/* Trilhas por Séries: 1º ao 9º Ano */}
+            {filteredTrilhasSeries.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Por Séries</h2>
+                <p className="text-gray-600 mb-4">1º Ano ao 9º Ano</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {filteredTrilhasSeries.map((trilha) => {
+                    const Icon = getTrilhaIcon(trilha.tipo, trilha.valor);
+                    return (
+                      <motion.div
+                        key={trilha.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-all"
+                        onClick={() => handleTrilhaClick(trilha)}
+                      >
+                        <div className="relative h-48 bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                          {trilha.thumbnail_url ? (
+                            <img
+                              src={resolvePublicAssetUrl(trilha.thumbnail_url) || ''}
+                              alt={trilha.titulo}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Icon className="w-16 h-16 text-white opacity-80" />
+                          )}
+                          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                            <span className="px-4 py-2 bg-white bg-opacity-90 text-gray-900 rounded-lg font-semibold">
+                              Ver trilha
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-lg text-gray-900 mb-1">{trilha.titulo}</h3>
+                          {trilha.descricao && (
+                            <p className="text-sm text-gray-600 line-clamp-2">{trilha.descricao}</p>
+                          )}
+                          <div className="mt-3 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">{trilha.valor}</span>
+                            <ArrowRight className="w-5 h-5 text-[#044982]" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Trilhas por Disciplina Transversal */}
             {filteredTrilhasDisciplinas.length > 0 && (
               <div className="mb-12">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Por Disciplina Transversal</h2>
@@ -706,7 +998,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               </div>
             )}
 
-            {filteredTrilhasEixo.length === 0 && filteredTrilhasEtapa.length === 0 && filteredTrilhasDisciplinas.length === 0 && (
+            {filteredTrilhasEixo.length === 0 && filteredTrilhasEtapa.length === 0 && filteredTrilhasSeries.length === 0 && filteredTrilhasDisciplinas.length === 0 && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma trilha encontrada</h3>
@@ -746,8 +1038,13 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                 </svg>
               </button>
             </div>
-            <div className="p-4 flex-1 overflow-auto">
-              {(() => {
+            <div className="p-4 flex-1 overflow-auto min-h-[200px] flex items-center justify-center">
+              {!videoPlayerReady ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-12">
+                  <div className="w-10 h-10 border-2 border-[#044982] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-gray-600">Abrindo player...</p>
+                </div>
+              ) : (() => {
                 const videoType = detectVideoType(selectedVideo.url);
                 
                 switch (videoType) {
@@ -768,13 +1065,14 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                     const youtubeId = getYouTubeId(selectedVideo.url);
                     if (youtubeId) {
                       return (
-                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                        <div className="relative w-full min-h-[200px] sm:min-h-0" style={{ paddingBottom: '56.25%' }}>
                           <iframe
                             src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1`}
                             className="absolute top-0 left-0 w-full h-full rounded-lg"
                             frameBorder="0"
                             allow="autoplay; encrypted-media; picture-in-picture"
                             allowFullScreen
+                            title="Player de vídeo YouTube"
                           />
                         </div>
                       );
@@ -785,13 +1083,14 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                     const driveId = getGoogleDriveId(selectedVideo.url);
                     if (driveId) {
                       return (
-                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                        <div className="relative w-full min-h-[200px] sm:min-h-0" style={{ paddingBottom: '56.25%' }}>
                           <iframe
                             src={`https://drive.google.com/file/d/${driveId}/preview`}
                             className="absolute top-0 left-0 w-full h-full rounded-lg"
                             frameBorder="0"
                             allow="autoplay"
                             allowFullScreen
+                            title="Player de vídeo Google Drive"
                           />
                         </div>
                       );
@@ -803,6 +1102,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                     return (
                       <video
                         controls
+                        playsInline
                         className="w-full h-auto max-h-[70vh] rounded-lg"
                         preload="metadata"
                         controlsList="nodownload"
@@ -819,6 +1119,7 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
                 return (
                   <video
                     controls
+                    playsInline
                     className="w-full h-auto max-h-[70vh] rounded-lg"
                     preload="metadata"
                     controlsList="nodownload"

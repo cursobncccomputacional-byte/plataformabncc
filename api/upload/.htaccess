@@ -13,12 +13,8 @@
     php_value max_input_time 300
 </IfModule>
 
-# Headers CORS
-<IfModule mod_headers.c>
-    Header set Access-Control-Allow-Origin "*"
-    Header set Access-Control-Allow-Methods "POST, OPTIONS"
-    Header set Access-Control-Allow-Headers "Content-Type, X-User-Id, X-User-Role"
-</IfModule>
+# CORS é tratado pelo PHP (api/config/cors.php) com origem específica + credentials.
+# Não usar Access-Control-Allow-Origin: * aqui — quebra requisições com cookies (cross-origin).
 
 # Permitir POST
 <Limit POST>

@@ -3,12 +3,15 @@ import { useEffect, useMemo, useState } from 'react';
 interface ActivityDurationProps {
   videoUrl?: string;
   fallbackMinutes: number; // valor em minutos vindo do dataset
+  /** Quando true e fallbackMinutes é 0, exibe 7 min (atividades bloqueadas sem vídeo) */
+  isBlocked?: boolean;
   className?: string;
 }
 
-function extractVimeoId(url?: string): string | null {
-  if (!url) return null;
-  const match = url.match(/vimeo\.com\/(\d+)/);
+function extractVimeoId(url?: string | null): string | null {
+  if (url == null) return null;
+  const s = typeof url === 'string' ? url : String(url);
+  const match = s.match(/vimeo\.com\/(\d+)/);
   return match ? match[1] : null;
 }
 
@@ -21,9 +24,10 @@ function formatMinutes(totalSeconds?: number, fallbackMinutes?: number): string 
   return `${h}h ${m}min`;
 }
 
-export const ActivityDuration = ({ videoUrl, fallbackMinutes, className }: ActivityDurationProps) => {
+export const ActivityDuration = ({ videoUrl, fallbackMinutes, isBlocked, className }: ActivityDurationProps) => {
   const [durationSeconds, setDurationSeconds] = useState<number | undefined>(undefined);
   const vimeoId = useMemo(() => extractVimeoId(videoUrl), [videoUrl]);
+  const effectiveFallback = (isBlocked && (fallbackMinutes == null || fallbackMinutes === 0)) ? 7 : fallbackMinutes;
 
   useEffect(() => {
     let isMounted = true;
@@ -61,7 +65,7 @@ export const ActivityDuration = ({ videoUrl, fallbackMinutes, className }: Activ
   }, [vimeoId]);
 
   return (
-    <span className={className}>{formatMinutes(durationSeconds, fallbackMinutes)}</span>
+    <span className={className}>{formatMinutes(durationSeconds, effectiveFallback)}</span>
   );
 };
 

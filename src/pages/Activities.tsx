@@ -121,8 +121,12 @@ export const Activities = () => {
     fetchUpdatedPermissions();
   }, []); // Executar apenas uma vez ao montar
 
-  // Verificar permissão para ver atividades (usar permissões atualizadas se disponível)
-  const canViewActivities = user?.role === 'root' || 
+  // Verificar permissão para ver atividades (professor/teste_professor também podem visualizar)
+  const canViewActivities =
+    user?.role === 'root' ||
+    user?.role === 'admin' ||
+    user?.role === 'professor' ||
+    user?.role === 'teste_professor' ||
     (userPermissions?.can_manage_activities === true);
   
   // Debug log
@@ -713,62 +717,92 @@ export const Activities = () => {
                     <ActivityDuration
                       videoUrl={activity.video_url}
                       fallbackMinutes={activity.duration}
+                      isBlocked={activity.bloqueada}
                       className="text-xs"
                     />
                   </div>
 
-                  {/* Botões de ação abaixo do vídeo/thumbnail — grid 2 colunas; bloqueada = clique não abre */}
-                  <div className={`grid grid-cols-2 gap-2 ${activity.bloqueada ? 'opacity-60 pointer-events-none' : ''}`}>
-                    {activity.video_url && (
-                      <button 
-                        type="button"
-                        onClick={() => handleViewVideo(activity)}
-                        className="w-full text-white px-3 py-2 rounded-lg transition-all text-xs font-medium hover:shadow-md flex items-center justify-center gap-1.5" 
-                        style={{ backgroundColor: '#005a93' }} 
-                        onMouseEnter={(e) => !activity.bloqueada && (e.currentTarget.style.backgroundColor = '#004a7a')} 
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#005a93')}
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                        Vídeo
-                      </button>
-                    )}
-                    {(activity.pedagogical_pdf_url || activity.document_url) && (
-                      <button 
-                        type="button"
-                        onClick={() =>
-                          handleViewPDF(
-                            activity,
-                            activity.pedagogical_pdf_url || activity.document_url || '',
-                            'Estrutura Pedagógica'
-                          )
-                        }
-                        className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Estrutura
-                      </button>
-                    )}
-                    {activity.material_pdf_url && (
-                      <button 
-                        type="button"
-                        onClick={() => handleViewPDF(activity, activity.material_pdf_url!, 'Material da Aula')}
-                        className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Material
-                      </button>
-                    )}
-                    {(user?.role === 'admin' || user?.role === 'professor') && activity.material_pdf_url && (
-                      <button 
-                        type="button"
-                        onClick={() => handleDownloadPDF(activity, activity.material_pdf_url!)}
-                        className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center gap-1.5"
-                        title="Baixar material da aula"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Baixar
-                      </button>
-                    )}
+                  {/* Botões de ação: sempre visíveis (mesmo travadas/sem URL). */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => !activity.bloqueada && !!activity.video_url && handleViewVideo(activity)}
+                      disabled={activity.bloqueada || !activity.video_url}
+                      className="w-full text-white px-3 py-2 rounded-lg transition-all text-xs font-medium hover:shadow-md flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: '#005a93' }}
+                      title={
+                        activity.bloqueada
+                          ? 'Atividade travada'
+                          : !activity.video_url
+                            ? 'Sem vídeo cadastrado'
+                            : 'Abrir vídeo'
+                      }
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Vídeo
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = activity.pedagogical_pdf_url || activity.document_url || '';
+                        if (activity.bloqueada || !url) return;
+                        handleViewPDF(activity, url, 'Estrutura Pedagógica');
+                      }}
+                      disabled={activity.bloqueada || !(activity.pedagogical_pdf_url || activity.document_url)}
+                      className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                      title={
+                        activity.bloqueada
+                          ? 'Atividade travada'
+                          : !(activity.pedagogical_pdf_url || activity.document_url)
+                            ? 'Sem estrutura cadastrada'
+                            : 'Abrir estrutura'
+                      }
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Estrutura
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => !activity.bloqueada && !!activity.material_pdf_url && handleViewPDF(activity, activity.material_pdf_url!, 'Material da Aula')}
+                      disabled={activity.bloqueada || !activity.material_pdf_url}
+                      className="w-full bg-sky-600 text-white px-3 py-2 rounded-lg hover:bg-sky-700 transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                      title={
+                        activity.bloqueada
+                          ? 'Atividade travada'
+                          : !activity.material_pdf_url
+                            ? 'Sem material cadastrado'
+                            : 'Abrir material'
+                      }
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Material
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activity.bloqueada) return;
+                        if (!(user?.role === 'admin' || user?.role === 'professor')) return;
+                        if (!activity.material_pdf_url) return;
+                        handleDownloadPDF(activity, activity.material_pdf_url);
+                      }}
+                      disabled={activity.bloqueada || !(user?.role === 'admin' || user?.role === 'professor') || !activity.material_pdf_url}
+                      className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-xs flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                      title={
+                        activity.bloqueada
+                          ? 'Atividade travada'
+                          : !(user?.role === 'admin' || user?.role === 'professor')
+                            ? 'Sem permissão para baixar'
+                            : !activity.material_pdf_url
+                              ? 'Sem material cadastrado'
+                              : 'Baixar material'
+                      }
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Baixar
+                    </button>
                   </div>
                 </div>
               </motion.div>

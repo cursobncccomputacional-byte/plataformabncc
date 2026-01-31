@@ -9,7 +9,7 @@ interface UserManagementProps {
   onBackToDashboard: () => void;
 }
 
-type RoleFilter = 'all' | 'professor' | 'aluno';
+type RoleFilter = 'all' | 'professor' | 'teste_professor' | 'aluno';
 type StatusFilter = 'all' | 'active' | 'inactive';
 type SortField = 'name' | 'email' | 'role' | 'school' | 'created_at' | 'is_active';
 type SortDirection = 'asc' | 'desc';
@@ -97,7 +97,12 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
 
     // Filtros
     if (roleFilter !== 'all') {
-      list = list.filter((u) => u.role === roleFilter);
+      if (roleFilter === 'professor') {
+        // Professores inclui também Teste Professor
+        list = list.filter((u) => u.role === 'professor' || u.role === 'teste_professor');
+      } else {
+        list = list.filter((u) => u.role === roleFilter);
+      }
     }
 
     if (statusFilter !== 'all') {
@@ -156,7 +161,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
   const packageStats = useMemo(() => {
     if (!user || user.role !== 'admin') return null;
 
-    const professoresCriados = users.filter(u => u.role === 'professor').length;
+    const professoresCriados = users.filter(u => u.role === 'professor' || u.role === 'teste_professor').length;
     const alunosCriados = users.filter(u => u.role === 'aluno').length;
     const maxProfessores = user.max_professores ?? null;
     const maxAlunos = user.max_alunos ?? null;
@@ -259,7 +264,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
     const data = filteredAndSortedUsers.map(u => ({
       Nome: u.name,
       Email: u.email,
-      Nível: u.role === 'professor' ? 'Professor' : 'Aluno',
+      Nível: u.role === 'professor' ? 'Professor' : u.role === 'teste_professor' ? 'Teste Professor' : 'Aluno',
       Escola: u.school || '-',
       Status: u.is_active ? 'Ativo' : 'Inativo',
       'Criado em': new Date(u.created_at).toLocaleDateString('pt-BR'),
@@ -635,6 +640,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
               >
                 <option value="all">Todos os níveis</option>
                 <option value="professor">Professores</option>
+                <option value="teste_professor">Teste Professor</option>
                 <option value="aluno">Alunos</option>
               </select>
 
@@ -716,7 +722,7 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
         {/* Users Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full min-w-[800px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left">
@@ -778,13 +784,13 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                           )}
                         </button>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
+                      <td className="px-6 py-4 max-w-[200px]">
+                        <div className="break-words min-w-0">
                           <div className="text-sm font-medium text-gray-900">{userItem.name}</div>
-                          <div className="text-sm text-gray-500">{userItem.email}</div>
+                          <div className="text-sm text-gray-500 break-all">{userItem.email}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           userItem.role === 'admin' 
                             ? 'bg-blue-100 text-blue-800'
@@ -792,10 +798,16 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                             ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {userItem.role === 'admin' ? 'Administrador' : userItem.role === 'professor' ? 'Professor' : 'Aluno'}
+                          {userItem.role === 'admin'
+                            ? 'Administrador'
+                            : userItem.role === 'professor'
+                              ? 'Professor'
+                              : userItem.role === 'teste_professor'
+                                ? 'Teste Professor'
+                                : 'Aluno'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 text-sm text-gray-900 break-words max-w-[180px] min-w-0">
                         {userItem.school || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -944,19 +956,22 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                     </label>
                     <select
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'professor' | 'aluno' })}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as CreateUserData['role'] })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       disabled={packageStats && !packageStats.canCreateAny}
                     >
                       <option value="professor" disabled={packageStats && !packageStats.canCreateProfessor}>
                         Professor {packageStats && !packageStats.canCreateProfessor && '(Limite atingido)'}
                       </option>
+                      <option value="teste_professor" disabled={packageStats && !packageStats.canCreateProfessor}>
+                        Teste Professor {packageStats && !packageStats.canCreateProfessor && '(Limite atingido)'}
+                      </option>
                       <option value="aluno" disabled={packageStats && !packageStats.canCreateAluno}>
                         Aluno {packageStats && !packageStats.canCreateAluno && '(Limite atingido)'}
                       </option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">Admin pode criar apenas professores e alunos</p>
-                    {packageStats && formData.role === 'professor' && !packageStats.canCreateProfessor && (
+                    <p className="mt-1 text-xs text-gray-500">Admin pode criar apenas professores (inclui Teste Professor) e alunos</p>
+                    {packageStats && (formData.role === 'professor' || formData.role === 'teste_professor') && !packageStats.canCreateProfessor && (
                       <p className="mt-1 text-xs text-red-600">
                         Limite atingido: {packageStats.professoresCriados}/{packageStats.maxProfessores} professores
                       </p>
@@ -1042,13 +1057,14 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                     </label>
                     <select
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'professor' | 'aluno' })}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as CreateUserData['role'] })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="professor">Professor</option>
+                      <option value="teste_professor">Teste Professor</option>
                       <option value="aluno">Aluno</option>
                     </select>
-                    <p className="mt-1 text-xs text-gray-500">Admin pode editar apenas professores e alunos</p>
+                    <p className="mt-1 text-xs text-gray-500">Admin pode editar apenas professores (inclui Teste Professor) e alunos</p>
                   </div>
 
                   <div>

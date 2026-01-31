@@ -126,14 +126,14 @@ try {
             json_response(400, ['error' => true, 'message' => 'A senha deve ter pelo menos 6 caracteres']);
         }
 
-        $allowedRoles = ['root', 'admin', 'professor', 'aluno', 'professor_cursos'];
+        $allowedRoles = ['root', 'admin', 'professor', 'teste_professor', 'aluno', 'professor_cursos'];
         if (!in_array($role, $allowedRoles, true)) {
             json_response(400, ['error' => true, 'message' => 'Nível de acesso inválido']);
         }
 
-        // Admin só cria professor/aluno
+        // Admin não cria admin/root
         if ($currentUser['role'] === 'admin' && ($role === 'root' || $role === 'admin')) {
-            json_response(403, ['error' => true, 'message' => 'Administradores só podem criar professores e alunos']);
+            json_response(403, ['error' => true, 'message' => 'Administradores não podem criar Admin/Root']);
         }
 
         // VALIDAÇÃO DE LIMITES PARA ADMINS

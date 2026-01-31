@@ -4,7 +4,31 @@ import * as React from 'react';
 import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked, BarChart2 } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
-type PageType = 'activities' | 'videos' | 'documents' | 'profile' | 'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'formacao-continuada-cursos' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorios-menu' | 'relatorio-atividades';
+type PageType =
+  | 'activities'
+  | 'videos'
+  | 'documents'
+  | 'profile'
+  | 'users'
+  | 'courses'
+  | 'permissions'
+  | 'assign-access'
+  | 'plataforma'
+  | 'formacao-continuada'
+  | 'formacao-continuada-cursos'
+  | 'trilhas'
+  | 'admin-packages'
+  | 'sessions'
+  | 'plano-aula'
+  | 'bncc-digital'
+  | 'manage-bncc'
+  | 'relatorios-menu'
+  | 'relatorio-atividades'
+  | 'termo-referencia'
+  | 'admin-menu'
+  | 'admin-users'
+  | 'admin-reports'
+  | 'admin-sessions';
 
 interface SidebarProps {
   currentPage: PageType;
@@ -16,7 +40,13 @@ interface SidebarProps {
   onSidebarToggle?: (isOpen: boolean) => void;
 }
 
-export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, onSidebarOpenChange, onSidebarToggle }: SidebarProps) => {
+export const Sidebar = ({
+  currentPage,
+  onNavigate,
+  sidebarOpen: controlledOpen,
+  onSidebarOpenChange,
+  onSidebarToggle,
+}: SidebarProps) => {
   const { signOut, profile, loading } = useAuth();
   const [internalOpen, setInternalOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -102,6 +132,9 @@ export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, 
     currentPage === 'relatorio-atividades'
   );
 
+  // Expandir menu Painel Administrativo (admin)
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+
   // Expandir menu Cursos quando navegar para plataforma, formacao-continuada ou trilhas
   useEffect(() => {
     if (currentPage === 'plataforma' || currentPage === 'formacao-continuada' || currentPage === 'trilhas') {
@@ -176,6 +209,7 @@ export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, 
     { id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' },
     { id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true },
     { id: 'relatorios-menu' as const, icon: BarChart2, label: 'Relatórios', isParent: true },
+    { id: 'termo-referencia' as const, icon: FileText, label: 'Termo de Referência' },
   ], [showCursosMenu]);
 
   // Menu para não-root (professores, admin, etc)
@@ -192,32 +226,35 @@ export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, 
     // Usar currentRole que já foi calculado acima (com fallback)
     const profileRole = currentRole;
     
-    // TODOS os professores e admins veem Trilhas Pedagógicas (para visualizar)
-    // Não precisa de permissão especial, apenas ser professor ou admin
-    // Se não souber o role ainda, assumir que é professor (mais comum) para mostrar menus
-    const isProfessorOrAdmin = profileRole === 'professor' || profileRole === 'admin';
-    
-    // Mostrar Trilhas se for professor/admin OU se não souber o role (assumir professor)
-    // IMPORTANTE: Mostrar por padrão para evitar menu vazio no primeiro render
-    if (isProfessorOrAdmin || !profileRole) {
+    const isAdmin = profileRole === 'admin';
+    const isProfessor = profileRole === 'professor' || profileRole === 'teste_professor';
+
+    // ADMIN: menu conforme solicitado
+    if (isAdmin) {
+      items.push({ id: 'admin-menu' as const, icon: Settings, label: 'Painel Administrativo', isParent: true });
+      items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Comput', isParent: true });
+      items.push({ id: 'formacao-continuada-cursos' as const, icon: GraduationCap, label: 'Formação Continuada' });
+      items.push({ id: 'documents' as const, icon: FileText, label: 'Documentos' });
+      items.push({ id: 'profile' as const, icon: User, label: 'Perfil' });
+      return items;
+    }
+
+    // PROFESSOR (ou role indefinido no primeiro render): manter experiência atual
+    const assumeProfessor = isProfessor || !profileRole;
+    if (assumeProfessor) {
       items.push({ id: 'trilhas' as const, icon: BookOpen, label: 'Trilhas Pedagógicas' });
-    }
-    
-    // TODOS os professores e admins veem "Atividades BNCC" para visualizar
-    // A permissão can_manage_activities é apenas para CADASTRAR/EDITAR, não para visualizar
-    if (isProfessorOrAdmin || !profileRole) {
       items.push({ id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' });
-    }
-    
-    // Plano de Aula - disponível para professores e admins
-    if (isProfessorOrAdmin || !profileRole) {
       items.push({ id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' });
       items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true });
-      // Formação Continuada (Cursos): curso habilitado + outros com cadeado; redireciona para login dos cursos
       items.push({ id: 'formacao-continuada-cursos' as const, icon: GraduationCap, label: 'Formação Continuada' });
+      items.push(
+        { id: 'documents' as const, icon: FileText, label: 'Documentos' },
+        { id: 'profile' as const, icon: User, label: 'Perfil' }
+      );
+      return items;
     }
     
-    // SEMPRE adicionar menus básicos (mesmo durante carregamento) — Vídeo Aulas não disponível para admin/professor
+    // fallback mínimo
     items.push(
       { id: 'documents' as const, icon: FileText, label: 'Documentos' },
       { id: 'profile' as const, icon: User, label: 'Perfil' }
@@ -255,14 +292,18 @@ export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, 
     setBnccMenuOpen(!bnccMenuOpen);
   };
 
+  const handleAdminMenuClick = () => {
+    setAdminMenuOpen(!adminMenuOpen);
+  };
+
   return (
     <>
       {/* Sidebar */}
       <motion.aside
         initial={false}
         animate={{
-          width: sidebarOpen ? 256 : (isMobile ? 256 : 80),
-          x: sidebarOpen ? 0 : (isMobile ? -256 : 0),
+          width: sidebarOpen ? 288 : (isMobile ? 288 : 80),
+          x: sidebarOpen ? 0 : (isMobile ? -288 : 0),
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
         className={`
@@ -409,6 +450,62 @@ export const Sidebar = ({ currentPage, onNavigate, sidebarOpen: controlledOpen, 
                             </button>
                           );
                         })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (isParent && item.id === 'admin-menu') {
+                return (
+                  <div key={item.id} className="space-y-1 text-left">
+                    <button
+                      onClick={handleAdminMenuClick}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
+                        ${adminMenuOpen
+                          ? 'bg-white text-[#005a93] shadow-md'
+                          : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0 justify-start">
+                        {IconComponent && <IconComponent size={20} className="flex-shrink-0" />}
+                        {sidebarOpen && <span className="font-medium truncate">{item.label}</span>}
+                      </div>
+                      {sidebarOpen && (
+                        adminMenuOpen ? <ChevronDown size={16} className="flex-shrink-0" /> : <ChevronRight size={16} className="flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {adminMenuOpen && sidebarOpen && (
+                      <div className="ml-4 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate('admin-users')}
+                          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm hover:bg-white hover:bg-opacity-10 text-white text-opacity-80"
+                        >
+                          <Users size={18} className="flex-shrink-0" />
+                          <span>Gerenciar Usuários</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate('admin-reports')}
+                          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm hover:bg-white hover:bg-opacity-10 text-white text-opacity-80"
+                        >
+                          <BarChart2 size={18} className="flex-shrink-0" />
+                          <span>Relatórios</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate('admin-sessions')}
+                          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm hover:bg-white hover:bg-opacity-10 text-white text-opacity-80"
+                        >
+                          <Monitor size={18} className="flex-shrink-0" />
+                          <span>Sessões</span>
+                        </button>
                       </div>
                     )}
                   </div>
