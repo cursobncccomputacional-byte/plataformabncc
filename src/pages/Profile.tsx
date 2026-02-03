@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, School, Save, Edit2 } from 'lucide-react';
+import { User, Mail, School, Save, Edit2, FileText, Download, Trash2, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
+import { apiService } from '../services/apiService';
 
-export const Profile = () => {
+interface ProfileProps {
+  onNavigateToPoliticaPrivacidade?: () => void;
+}
+
+export const Profile = ({ onNavigateToPoliticaPrivacidade }: ProfileProps) => {
   const { profile, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [privacidadeMessage, setPrivacidadeMessage] = useState('');
+  const [exportando, setExportando] = useState(false);
+  const [solicitandoExclusao, setSolicitandoExclusao] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -196,6 +204,86 @@ export const Profile = () => {
             </div>
           )}
         </form>
+
+        {/* Privacidade e dados (LGPD) */}
+        <section className="mt-8 pt-8 border-t border-gray-200">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-3">
+            <Shield className="w-5 h-5" style={{ color: '#005a93' }} />
+            Privacidade e seus dados (LGPD)
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Você pode acessar, exportar ou solicitar a exclusão dos seus dados pessoais, em conformidade com a Lei Geral de Proteção de Dados.
+          </p>
+          {onNavigateToPoliticaPrivacidade && (
+            <p className="text-sm text-gray-600 mb-4">
+              <button
+                type="button"
+                onClick={onNavigateToPoliticaPrivacidade}
+                className="inline-flex items-center gap-1 font-medium underline hover:no-underline"
+                style={{ color: '#005a93' }}
+              >
+                <FileText className="w-4 h-4" />
+                Ler Política de Privacidade
+              </button>
+            </p>
+          )}
+          {privacidadeMessage && (
+            <div className={`mb-4 p-3 rounded-lg text-sm ${privacidadeMessage.includes('registrada') || privacidadeMessage.includes('exportado') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {privacidadeMessage}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={exportando}
+              onClick={async () => {
+                setPrivacidadeMessage('');
+                setExportando(true);
+                const res = await apiService.getMeDados();
+                setExportando(false);
+                if (res.error) {
+                  setPrivacidadeMessage(res.message || 'Erro ao exportar dados.');
+                  return;
+                }
+                const payload = { exportado_em: (res as { exportado_em?: string }).exportado_em, dados_pessoais: (res as { dados_pessoais?: Record<string, unknown> }).dados_pessoais };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `meus-dados-plataforma-bncc-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                setPrivacidadeMessage('Exportação concluída. Arquivo JSON baixado.');
+                setTimeout(() => setPrivacidadeMessage(''), 5000);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              {exportando ? 'Exportando...' : 'Exportar meus dados (JSON)'}
+            </button>
+            <button
+              type="button"
+              disabled={solicitandoExclusao}
+              onClick={async () => {
+                if (!window.confirm('Tem certeza que deseja solicitar a exclusão dos seus dados? Nossa equipe entrará em contato para confirmar. Após a exclusão, você não poderá acessar a plataforma com esta conta.')) return;
+                setPrivacidadeMessage('');
+                setSolicitandoExclusao(true);
+                const res = await apiService.solicitarExclusaoDados();
+                setSolicitandoExclusao(false);
+                if (res.error) {
+                  setPrivacidadeMessage(res.message || 'Erro ao registrar solicitação.');
+                  return;
+                }
+                setPrivacidadeMessage('Solicitação de exclusão registrada. Nossa equipe entrará em contato em conformidade com a LGPD.');
+                setTimeout(() => setPrivacidadeMessage(''), 8000);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50 text-sm font-medium"
+            >
+              <Trash2 className="w-4 h-4" />
+              {solicitandoExclusao ? 'Enviando...' : 'Solicitar exclusão dos meus dados'}
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );

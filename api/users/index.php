@@ -203,6 +203,17 @@ try {
             VALUES (?, ?, ?, ?, ?, ?, ?, 1, NOW(), ?)
         ");
         $insertStmt->execute([$userId, $name, $usuario, $hashedPassword, $role, $school, $materiasJson, $currentUser['id']]);
+
+        // LGPD: registrar aceite da Política de Privacidade (se colunas existirem)
+        if (!empty($data['aceite_politica_privacidade'])) {
+            $versaoPolitica = trim((string)($data['versao_politica_privacidade'] ?? '1.0')) ?: '1.0';
+            try {
+                $updLgpd = $pdo->prepare("UPDATE usuarios SET data_aceite_politica_privacidade = NOW(), versao_politica_privacidade = ? WHERE id = ?");
+                $updLgpd->execute([$versaoPolitica, $userId]);
+            } catch (PDOException $e) {
+                // Colunas LGPD podem não existir ainda; executar add-lgpd-consent-usuarios.sql
+            }
+        }
         
         // INCREMENTAR CONTADORES SE FOR ADMIN CRIANDO PROFESSOR OU ALUNO
         if ($currentUser['role'] === 'admin' && ($role === 'professor' || $role === 'aluno')) {

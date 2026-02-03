@@ -92,23 +92,29 @@ function handleLogin() {
         $_SESSION['user_usuario'] = $user['usuario'];
         $_SESSION['user_role'] = $user['nivel_acesso'];
         
-        // Converter dados para formato inglês (para o frontend)
+        $userPayload = [
+            'id' => $user['id'],
+            'name' => $user['nome'],
+            'email' => $user['usuario'],
+            'role' => $user['nivel_acesso'],
+            'school' => $user['escola'],
+            'subjects' => json_decode($user['materias'] ?? '[]', true),
+            'created_at' => $user['data_criacao'],
+            'last_login' => $user['ultimo_login'],
+            'is_active' => (bool)$user['ativo'],
+            'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+            'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0)
+        ];
+        if (array_key_exists('data_aceite_politica_privacidade', $user)) {
+            $userPayload['data_aceite_politica_privacidade'] = $user['data_aceite_politica_privacidade'];
+        }
+        if (array_key_exists('versao_politica_privacidade', $user)) {
+            $userPayload['versao_politica_privacidade'] = $user['versao_politica_privacidade'];
+        }
         $response = [
             'error' => false,
-            'success' => true, // Compatível com projeto que funciona
-            'user' => [
-                'id' => $user['id'],
-                'name' => $user['nome'],
-                'email' => $user['usuario'], // Campo usuario mapeado para email no frontend
-                'role' => $user['nivel_acesso'],
-                'school' => $user['escola'],
-                'subjects' => json_decode($user['materias'] ?? '[]', true),
-                'created_at' => $user['data_criacao'],
-                'last_login' => $user['ultimo_login'],
-                'is_active' => (bool)$user['ativo'],
-                'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
-                'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0)
-            ],
+            'success' => true,
+            'user' => $userPayload,
             'session_id' => session_id()
         ];
         
@@ -169,21 +175,28 @@ function handleMe() {
             exit;
         }
         
+        $userPayload = [
+            'id' => $user['id'],
+            'name' => $user['nome'],
+            'email' => $user['usuario'],
+            'role' => $user['nivel_acesso'],
+            'school' => $user['escola'],
+            'subjects' => json_decode($user['materias'] ?? '[]', true),
+            'created_at' => $user['data_criacao'],
+            'last_login' => $user['ultimo_login'],
+            'is_active' => (bool)$user['ativo'],
+            'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
+            'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0)
+        ];
+        if (array_key_exists('data_aceite_politica_privacidade', $user)) {
+            $userPayload['data_aceite_politica_privacidade'] = $user['data_aceite_politica_privacidade'];
+        }
+        if (array_key_exists('versao_politica_privacidade', $user)) {
+            $userPayload['versao_politica_privacidade'] = $user['versao_politica_privacidade'];
+        }
         $response = [
             'error' => false,
-            'user' => [
-                'id' => $user['id'],
-                'name' => $user['nome'],
-                'email' => $user['usuario'],
-                'role' => $user['nivel_acesso'],
-                'school' => $user['escola'],
-                'subjects' => json_decode($user['materias'] ?? '[]', true),
-                'created_at' => $user['data_criacao'],
-                'last_login' => $user['ultimo_login'],
-                'is_active' => (bool)$user['ativo'],
-                'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
-                'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0)
-            ]
+            'user' => $userPayload
         ];
         
         http_response_code(200);

@@ -101,6 +101,10 @@ export interface User {
   data_contratacao?: string | null;
   data_expiracao?: string | null;
   criado_por?: string | null;
+  /** LGPD: data/hora em que o titular aceitou a Política de Privacidade (primeiro acesso) */
+  data_aceite_politica_privacidade?: string | null;
+  /** LGPD: versão da política aceita (ex.: "1.0") */
+  versao_politica_privacidade?: string | null;
 }
 
 export interface AdminPackage {
@@ -124,6 +128,10 @@ export interface CreateUserData {
   role: 'root' | 'admin' | 'professor' | 'teste_professor' | 'aluno' | 'professor_cursos';
   school?: string;
   subjects?: string[];
+  /** LGPD: indica que o usuário aceitou a Política de Privacidade (registrado no cadastro) */
+  aceite_politica_privacidade?: boolean;
+  /** Versão da política aceita (ex.: "1.0") */
+  versao_politica_privacidade?: string;
 }
 
 // Tipos para sistema de logs e analytics

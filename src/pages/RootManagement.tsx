@@ -18,6 +18,9 @@ import { BnccDigital } from './BnccDigital';
 import { ManageBncc } from './ManageBncc';
 import { RelatorioAtividades } from './RelatorioAtividades';
 import { TermoReferencia } from './TermoReferencia';
+import { Glossario } from './Glossario';
+import { CAE } from './CAE';
+import { PoliticaPrivacidade } from './PoliticaPrivacidade';
 import { ManageDemandas } from './ManageDemandas';
 import type { CreateUserData, User } from '../types/bncc';
 import * as XLSX from 'xlsx';
@@ -31,7 +34,7 @@ export const RootManagement = () => {
   const { user, getAllUsers, createUser, changePassword, deleteUser, toggleUserStatus } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades' | 'demandas' | 'termo-referencia'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades' | 'demandas' | 'termo-referencia' | 'glossario' | 'cae' | 'politica-privacidade'>('users');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -590,6 +593,9 @@ export const RootManagement = () => {
           {currentPage === 'relatorio-atividades' && <RelatorioAtividades />}
           {currentPage === 'demandas' && <ManageDemandas />}
           {currentPage === 'termo-referencia' && <TermoReferencia />}
+          {currentPage === 'glossario' && <Glossario />}
+          {currentPage === 'cae' && <CAE />}
+          {currentPage === 'politica-privacidade' && <PoliticaPrivacidade onBack={() => setCurrentPage('users')} />}
           {currentPage === 'users' && (
           <div className="pt-6 px-4 sm:px-6 max-w-[1800px] mx-auto">
 

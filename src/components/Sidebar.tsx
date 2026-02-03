@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import * as React from 'react';
-import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked, BarChart2, ClipboardList } from 'lucide-react';
+import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked, BarChart2, ClipboardList, Newspaper, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
 type PageType =
   | 'activities'
   | 'videos'
-  | 'documents'
+  | 'cae'
   | 'profile'
   | 'users'
   | 'courses'
@@ -25,6 +25,8 @@ type PageType =
   | 'relatorios-menu'
   | 'relatorio-atividades'
   | 'termo-referencia'
+  | 'glossario'
+  | 'politica-privacidade'
   | 'gestao-interna-menu'
   | 'demandas'
   | 'admin-menu'
@@ -228,6 +230,8 @@ export const Sidebar = ({
     { id: 'relatorios-menu' as const, icon: BarChart2, label: 'Relatórios', isParent: true },
     { id: 'gestao-interna-menu' as const, icon: ClipboardList, label: 'Gestão Interna', isParent: true },
     { id: 'termo-referencia' as const, icon: FileText, label: 'Termo de Referência' },
+    { id: 'glossario' as const, icon: BookOpen, label: 'Glossário BNCC' },
+    { id: 'cae' as const, icon: Newspaper, label: 'CAE' },
   ], [showCursosMenu]);
 
   // Menu para não-root (professores, admin, etc)
@@ -235,7 +239,7 @@ export const Sidebar = ({
   // Apenas veem "Atividades BNCC" para visualizar atividades já cadastradas
   // Formação Continuada é acessada em outro subdomínio (cursos.novaedubncc.com.br)
   // Usar useMemo para recalcular quando as permissões mudarem
-  // IMPORTANTE: Sempre incluir menus básicos (videos, documents, profile) mesmo durante carregamento
+  // IMPORTANTE: Sempre incluir menus básicos (videos, cae, profile) mesmo durante carregamento
   const nonRootMenuItems = useMemo(() => {
     const items = [];
     
@@ -251,8 +255,10 @@ export const Sidebar = ({
     if (isAdmin) {
       items.push({ id: 'admin-menu' as const, icon: Settings, label: 'Painel Administrativo', isParent: true });
       items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Comput', isParent: true });
+      items.push({ id: 'glossario' as const, icon: BookOpen, label: 'Glossário BNCC' });
       items.push({ id: 'formacao-continuada-cursos' as const, icon: GraduationCap, label: 'Formação Continuada' });
-      items.push({ id: 'documents' as const, icon: FileText, label: 'Documentos' });
+      items.push({ id: 'cae' as const, icon: Newspaper, label: 'CAE' });
+      items.push({ id: 'politica-privacidade' as const, icon: ShieldCheck, label: 'Política de Privacidade' });
       items.push({ id: 'profile' as const, icon: User, label: 'Perfil' });
       return items;
     }
@@ -264,9 +270,11 @@ export const Sidebar = ({
       items.push({ id: 'activities' as const, icon: Activity, label: 'Atividades BNCC' });
       items.push({ id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' });
       items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true });
+      items.push({ id: 'glossario' as const, icon: BookOpen, label: 'Glossário BNCC' });
       items.push({ id: 'formacao-continuada-cursos' as const, icon: GraduationCap, label: 'Formação Continuada' });
       items.push(
-        { id: 'documents' as const, icon: FileText, label: 'Documentos' },
+        { id: 'cae' as const, icon: Newspaper, label: 'CAE' },
+        { id: 'politica-privacidade' as const, icon: ShieldCheck, label: 'Política de Privacidade' },
         { id: 'profile' as const, icon: User, label: 'Perfil' }
       );
       return items;
@@ -274,7 +282,8 @@ export const Sidebar = ({
     
     // fallback mínimo
     items.push(
-      { id: 'documents' as const, icon: FileText, label: 'Documentos' },
+      { id: 'cae' as const, icon: Newspaper, label: 'CAE' },
+      { id: 'politica-privacidade' as const, icon: ShieldCheck, label: 'Política de Privacidade' },
       { id: 'profile' as const, icon: User, label: 'Perfil' }
     );
     
@@ -356,7 +365,7 @@ export const Sidebar = ({
         </div>
 
         {/* Scroll Area (menus + links úteis) */}
-        <div className={`flex-1 min-h-0 overflow-y-auto ${isRoot ? 'no-scrollbar' : ''}`}>
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           {/* Navigation */}
           <nav className="p-4 space-y-2">
             {/* Renderizar menus sempre que houver items, mesmo durante carregamento */}

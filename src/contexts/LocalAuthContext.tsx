@@ -151,6 +151,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               can_manage_courses: apiResponse.user.can_manage_courses ?? false,
               bio: `Usuário ${apiResponse.user.role}`,
               updated_at: new Date().toISOString(),
+              data_aceite_politica_privacidade: apiResponse.user.data_aceite_politica_privacidade ?? undefined,
+              versao_politica_privacidade: apiResponse.user.versao_politica_privacidade ?? undefined,
             };
             
             setUser(userData);
@@ -193,6 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               can_manage_courses: apiResponse.user.can_manage_courses ?? false,
               bio: userData.bio || `Usuário ${apiResponse.user.role}`,
               updated_at: new Date().toISOString(),
+              data_aceite_politica_privacidade: apiResponse.user.data_aceite_politica_privacidade ?? userData.data_aceite_politica_privacidade,
+              versao_politica_privacidade: apiResponse.user.versao_politica_privacidade ?? userData.versao_politica_privacidade,
             };
             
             setUser(updatedUserData);
@@ -314,6 +318,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           is_active: apiResponse.user.is_active ?? true,
           bio: `Usuário ${apiResponse.user.role}`,
           updated_at: new Date().toISOString(),
+          data_aceite_politica_privacidade: apiResponse.user.data_aceite_politica_privacidade ?? undefined,
+          versao_politica_privacidade: apiResponse.user.versao_politica_privacidade ?? undefined,
         };
         
         setUser(userData);
@@ -526,7 +532,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password: userData.password,
         role: userData.role,
         school: userData.school || undefined,
-        subjects: userData.subjects || []
+        subjects: userData.subjects || [],
+        aceite_politica_privacidade: userData.aceite_politica_privacidade,
+        versao_politica_privacidade: userData.versao_politica_privacidade,
       });
       
       console.log('=== LocalAuthContext: Resposta completa da API ===');

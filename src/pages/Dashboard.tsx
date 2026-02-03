@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Sidebar } from '../components/Sidebar';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { VideoCourses } from './VideoCourses';
-import { Documents } from './Documents';
+import { CAE } from './CAE';
 import { Profile } from './Profile';
 import { Activities } from './Activities';
 import { ManageActivities } from './ManageActivities';
@@ -16,6 +16,8 @@ import { useAuth } from '../contexts/LocalAuthContext';
 import UserManagement from './UserManagement';
 import { Reports } from './Reports';
 import { SessionManagement } from './SessionManagement';
+import { Glossario } from './Glossario';
+import { PoliticaPrivacidade } from './PoliticaPrivacidade';
 
 interface DashboardProps {
   userRole: 'admin' | 'professor' | 'teste_professor' | 'professor_cursos';
@@ -26,7 +28,7 @@ export const Dashboard = ({ userRole }: DashboardProps) => {
   const [currentPage, setCurrentPage] = useState<
     | 'activities'
     | 'videos'
-    | 'documents'
+    | 'cae'
     | 'profile'
     | 'plataforma'
     | 'formacao-continuada'
@@ -34,6 +36,8 @@ export const Dashboard = ({ userRole }: DashboardProps) => {
     | 'trilhas'
     | 'plano-aula'
     | 'bncc-digital'
+    | 'glossario'
+    | 'politica-privacidade'
     | 'admin-users'
     | 'admin-reports'
     | 'admin-sessions'
@@ -60,6 +64,13 @@ export const Dashboard = ({ userRole }: DashboardProps) => {
         {currentPage === 'trilhas' && <TrilhasPedagogicas />}
         {currentPage === 'plano-aula' && <PlanoAula />}
         {currentPage === 'bncc-digital' && <BnccDigital />}
+        {currentPage === 'glossario' && <Glossario />}
+        {currentPage === 'politica-privacidade' && (
+          <PoliticaPrivacidade onBack={() => setCurrentPage('profile')} />
+        )}
+        {currentPage === 'profile' && (
+          <Profile onNavigateToPoliticaPrivacidade={() => setCurrentPage('politica-privacidade')} />
+        )}
         {currentPage === 'admin-users' && (
           <UserManagement onBackToDashboard={() => setCurrentPage('bncc-digital')} />
         )}
@@ -71,8 +82,7 @@ export const Dashboard = ({ userRole }: DashboardProps) => {
         )}
         {currentPage === 'activities' && <Activities />}
         {currentPage === 'videos' && <VideoCourses />}
-        {currentPage === 'documents' && <Documents />}
-        {currentPage === 'profile' && <Profile />}
+        {currentPage === 'cae' && <CAE />}
       </main>
       </div>
 

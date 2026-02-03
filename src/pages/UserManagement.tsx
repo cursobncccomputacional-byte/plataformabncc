@@ -312,6 +312,8 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
         setShowCreateModal(false);
         setFormData({
           name: '',
+          aceite_politica_privacidade: undefined,
+          versao_politica_privacidade: undefined,
           email: '',
           password: '',
           role: 'professor',
@@ -994,6 +996,19 @@ export default function UserManagement({ onBackToDashboard }: UserManagementProp
                       onChange={(e) => setFormData({ ...formData, school: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="aceite-politica"
+                      checked={!!formData.aceite_politica_privacidade}
+                      onChange={(e) => setFormData({ ...formData, aceite_politica_privacidade: e.target.checked, versao_politica_privacidade: e.target.checked ? '1.0' : undefined })}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="aceite-politica" className="text-sm text-gray-700">
+                      Declaro que o usuário foi informado sobre a Política de Privacidade (LGPD) e que o aceite foi registrado, ou que o mesmo aceitou a política.
+                    </label>
                   </div>
                 </div>
 

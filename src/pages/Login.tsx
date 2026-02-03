@@ -7,9 +7,10 @@ import { apiService } from '../services/apiService';
 interface LoginProps {
   onBack: () => void;
   onSuccess: () => void;
+  onNavigateToPoliticaPrivacidade?: () => void;
 }
 
-export const Login = ({ onBack, onSuccess }: LoginProps) => {
+export const Login = ({ onBack, onSuccess, onNavigateToPoliticaPrivacidade }: LoginProps) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -140,6 +141,22 @@ export const Login = ({ onBack, onSuccess }: LoginProps) => {
           {isLogin
             ? 'Entre para acessar os cursos e materiais'
             : 'Comece sua jornada na Nova Edu'}
+        </p>
+
+        <p className="text-xs text-gray-500 text-center mb-4">
+          Ao utilizar a plataforma, você concorda com nossa{' '}
+          <button
+            type="button"
+            onClick={() => {
+              onBack();
+              onNavigateToPoliticaPrivacidade?.();
+            }}
+            className="underline font-medium hover:text-gray-700"
+            style={{ color: '#005a93' }}
+          >
+            Política de Privacidade (LGPD)
+          </button>
+          .
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

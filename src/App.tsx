@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/LocalAuthContext';
 import { Home } from './pages/Home';
 import { About } from './pages/About';
+import { PoliticaPrivacidade } from './pages/PoliticaPrivacidade';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { LoadingScreen } from './components/LoadingScreen';
 import StudentHome from './pages/StudentHome';
 import { WelcomeLoadingScreen } from './components/WelcomeLoadingScreen';
 import { RootManagement } from './pages/RootManagement';
+import { TermoAceiteFirstAccess } from './components/TermoAceiteFirstAccess';
 
 function AppContent() {
   const [showLogin, setShowLogin] = useState(false);
-  const [currentView, setCurrentView] = useState<'home' | 'about'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'about' | 'politica-privacidade'>('home');
+  const [showPoliticaFromTermo, setShowPoliticaFromTermo] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const { user, loading } = useAuth();
+  const { user, loading, updateProfile, signOut } = useAuth();
 
   // Simular carregamento inicial da aplicação
   React.useEffect(() => {
@@ -37,27 +40,39 @@ function AppContent() {
   }
 
   if (user) {
-    // Renderizar página baseada no role e página atual
+    // Termo de aceite no primeiro acesso (todos os perfis, inclusive root)
+    const precisaAceitar = !user.data_aceite_politica_privacidade;
+    if (precisaAceitar) {
+      if (showPoliticaFromTermo) {
+        return (
+          <PoliticaPrivacidade onBack={() => setShowPoliticaFromTermo(false)} />
+        );
+      }
+      return (
+        <TermoAceiteFirstAccess
+          onVerPolitica={() => setShowPoliticaFromTermo(true)}
+          onAccepted={async (data) => {
+            await updateProfile(data);
+          }}
+          onRecusarSair={signOut}
+        />
+      );
+    }
+
     if (user.role === 'aluno') {
       return <StudentHome />;
     }
-    
-    // Root: Apenas gerenciamento de usuários
     if (user.role === 'root') {
       return <RootManagement />;
     }
-
-    return (
-      <Dashboard 
-        userRole={user.role}
-      />
-    );
+    return <Dashboard userRole={user.role} />;
   }
 
   if (showLogin) {
     return (
       <Login
         onBack={() => setShowLogin(false)}
+        onNavigateToPoliticaPrivacidade={() => { setShowLogin(false); setCurrentView('politica-privacidade'); }}
         onSuccess={() => {
           setIsLoggingIn(true);
           setTimeout(() => {
@@ -69,12 +84,20 @@ function AppContent() {
     );
   }
 
-  // Renderizar página baseada na view atual
   if (currentView === 'about') {
     return <About onBackToHome={() => setCurrentView('home')} />;
   }
+  if (currentView === 'politica-privacidade') {
+    return <PoliticaPrivacidade onBack={() => setCurrentView('home')} />;
+  }
 
-  return <Home onLoginClick={() => setShowLogin(true)} onNavigateToAbout={() => setCurrentView('about')} />;
+  return (
+    <Home
+      onLoginClick={() => setShowLogin(true)}
+      onNavigateToAbout={() => setCurrentView('about')}
+      onNavigateToPoliticaPrivacidade={() => setCurrentView('politica-privacidade')}
+    />
+  );
 }
 
 function App() {

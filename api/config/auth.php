@@ -51,7 +51,7 @@ function getCurrentUser() {
     
     if ($user) {
         // Converter para formato inglês (para o frontend)
-        return [
+        $profile = [
             'id' => $user['id'],
             'can_manage_activities' => (bool)($user['can_manage_activities'] ?? 0),
             'can_manage_courses' => (bool)($user['can_manage_courses'] ?? 0),
@@ -64,6 +64,13 @@ function getCurrentUser() {
             'last_login' => $user['ultimo_login'],
             'is_active' => (bool)$user['ativo']
         ];
+        if (array_key_exists('data_aceite_politica_privacidade', $user)) {
+            $profile['data_aceite_politica_privacidade'] = $user['data_aceite_politica_privacidade'];
+        }
+        if (array_key_exists('versao_politica_privacidade', $user)) {
+            $profile['versao_politica_privacidade'] = $user['versao_politica_privacidade'];
+        }
+        return $profile;
     }
     
     return null;

@@ -297,6 +297,8 @@ class ApiService {
     role: string;
     school?: string;
     subjects?: string[];
+    aceite_politica_privacidade?: boolean;
+    versao_politica_privacidade?: string;
   }): Promise<ApiResponse> {
     // Chamar diretamente o arquivo PHP para não depender de rewrite (/api/users/)
     return this.request('/users/index.php', {
@@ -313,6 +315,24 @@ class ApiService {
     return this.request(`/users/change-password.php`, {
       method: 'PATCH',
       body: JSON.stringify({ user_id: userId, new_password: newPassword }),
+    });
+  }
+
+  /** LGPD: exportar dados do titular (portabilidade) */
+  async getMeDados(): Promise<ApiResponse<{ exportado_em: string; dados_pessoais: Record<string, unknown> }>> {
+    return this.request('/users/me-dados.php', { method: 'GET' });
+  }
+
+  /** LGPD: solicitar exclusão dos dados (Art. 18) */
+  async solicitarExclusaoDados(): Promise<ApiResponse> {
+    return this.request('/users/me-solicitar-exclusao.php', { method: 'POST' });
+  }
+
+  /** LGPD: registrar aceite da Política de Privacidade (primeiro acesso) */
+  async aceitarPoliticaPrivacidade(versao?: string): Promise<ApiResponse & { data_aceite_politica_privacidade?: string; versao_politica_privacidade?: string }> {
+    return this.request('/users/me-aceitar-politica.php', {
+      method: 'POST',
+      body: JSON.stringify({ aceite: true, versao: versao || '1.0' }),
     });
   }
 
@@ -2122,6 +2142,38 @@ class ApiService {
       message: 'API não está acessível. Verifique sua conexão.',
       diagnosis: diagnosis as any,
     };
+  }
+
+  /**
+   * Envia o formulário de contato/inscrição para contato@novaedubncc.com.br
+   */
+  async submitContactForm(data: {
+    nome: string;
+    email: string;
+    celular: string;
+    cidade: string;
+    nome_escola: string;
+    cargo: string;
+    tipo_escola: string;
+  }): Promise<ApiResponse> {
+    const url = `${this.baseUrl}/contact/index.php`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json().catch(() => ({ error: true, message: 'Resposta inválida' }));
+      if (!response.ok) {
+        return { error: true, message: result.message || 'Erro ao enviar' };
+      }
+      return { error: result.error ?? false, message: result.message };
+    } catch (e) {
+      return {
+        error: true,
+        message: e instanceof Error ? e.message : 'Não foi possível enviar. Tente novamente.',
+      };
+    }
   }
 }
 

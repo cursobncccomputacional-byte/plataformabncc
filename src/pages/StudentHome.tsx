@@ -14,8 +14,9 @@ import { MazeGame } from '../games/MazeGame';
 import { GeoboardGame } from '../games/GeoboardGame';
 import { SecurityQuizGame } from '../games/SecurityQuizGame';
 import { SudokuGame } from '../games/SudokuGame';
-import { LogOut, User, Gamepad2, Trophy, Filter, Brain, Globe, Shield } from 'lucide-react';
+import { LogOut, User, Gamepad2, Trophy, Filter, Brain, Globe, Shield, ShieldCheck } from 'lucide-react';
 import { gamesData, getCategoryIcon, getCategoryColor, getDifficultyBadge, GameInfo } from '../data/gamesData';
+import { PoliticaPrivacidade } from './PoliticaPrivacidade';
 
 interface StudentHomeProps {}
 
@@ -24,7 +25,7 @@ type GameDifficulty = 'all' | 'facil' | 'medio' | 'dificil';
 
 export default function StudentHome(_props: StudentHomeProps) {
   const { user, signOut } = useAuth();
-  const [currentPage, setCurrentPage] = useState<'games' | 'progress' | 'profile'>('games');
+  const [currentPage, setCurrentPage] = useState<'games' | 'progress' | 'profile' | 'politica-privacidade'>('games');
   const [currentGame, setCurrentGame] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<GameCategory>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>('all');
@@ -104,6 +105,18 @@ export default function StudentHome(_props: StudentHomeProps) {
               >
                 <User className="w-5 h-5" />
                 <span className="font-medium">Perfil</span>
+              </button>
+
+              <button
+                onClick={() => setCurrentPage('politica-privacidade')}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                  currentPage === 'politica-privacidade'
+                    ? 'text-white bg-purple-600'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <ShieldCheck className="w-5 h-5" />
+                <span className="font-medium">Política de Privacidade</span>
               </button>
             </nav>
 
@@ -358,6 +371,10 @@ export default function StudentHome(_props: StudentHomeProps) {
                 </div>
               </div>
             </div>
+          )}
+
+          {currentPage === 'politica-privacidade' && (
+            <PoliticaPrivacidade onBack={() => setCurrentPage('games')} />
           )}
         </main>
       </div>

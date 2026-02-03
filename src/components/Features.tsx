@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
-import { Brain, Globe, Bot, Code, Users, BookOpen, Zap, Target, Lightbulb, Star, GraduationCap, Award } from 'lucide-react';
+import { Brain, Globe, Bot, Code, Users, BookOpen, Zap, Target, Lightbulb, Star, GraduationCap, Award, CheckCircle, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { AxisDetailsModal } from './AxisDetailsModal';
+import { apiService } from '../services/apiService';
 
 const features = [
   {
@@ -48,9 +49,43 @@ const benefits = [
   { icon: Lightbulb, text: 'Inovação Constante em Educação', color: 'text-blue-500' }
 ];
 
+const CARGO_OPCOES = [
+  { value: '', label: 'Selecione' },
+  { value: 'professor', label: 'Professor' },
+  { value: 'coordenador', label: 'Coordenador Pedagógico' },
+  { value: 'diretor', label: 'Diretor' },
+  { value: 'vice-diretor', label: 'Vice-Diretor' },
+  { value: 'orientador', label: 'Orientador Educacional' },
+  { value: 'supervisor', label: 'Supervisor Escolar' },
+  { value: 'secretario', label: 'Secretário (a) de Educação' },
+  { value: 'pedagogo', label: 'Pedagogo (a)' },
+  { value: 'outro', label: 'Outro' },
+];
+
+const TIPO_ESCOLA_OPCOES = [
+  { value: '', label: 'Selecione' },
+  { value: 'municipal', label: 'Escola Municipal' },
+  { value: 'estadual', label: 'Escola Estadual' },
+  { value: 'federal', label: 'Escola Federal' },
+  { value: 'particular', label: 'Escola Particular' },
+  { value: 'outro', label: 'Outro' },
+];
+
 export const Features = () => {
   const [selectedAxis, setSelectedAxis] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    celular: '',
+    cidade: '',
+    nome_escola: '',
+    cargo: '',
+    tipo_escola: '',
+  });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formSuccess, setFormSuccess] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const scrollToForm = () => {
     const formElement = document.getElementById('formulario-inscricao');
@@ -70,6 +105,38 @@ export const Features = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedAxis(null);
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(false);
+    if (!formData.nome.trim() || !formData.email.trim() || !formData.celular.trim() || !formData.cidade.trim() || !formData.nome_escola.trim() || !formData.cargo || !formData.tipo_escola) {
+      setFormError('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    setFormLoading(true);
+    try {
+      const res = await apiService.submitContactForm({
+        nome: formData.nome.trim(),
+        email: formData.email.trim(),
+        celular: formData.celular.trim(),
+        cidade: formData.cidade.trim(),
+        nome_escola: formData.nome_escola.trim(),
+        cargo: formData.cargo,
+        tipo_escola: formData.tipo_escola,
+      });
+      if (res.error) {
+        setFormError(res.message || 'Não foi possível enviar. Tente novamente.');
+      } else {
+        setFormSuccess(true);
+        setFormData({ nome: '', email: '', celular: '', cidade: '', nome_escola: '', cargo: '', tipo_escola: '' });
+      }
+    } catch {
+      setFormError('Erro ao enviar. Tente novamente.');
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   return (
@@ -850,7 +917,20 @@ export const Features = () => {
                 </p>
               </div>
 
-              <form className="space-y-6">
+              <form className="space-y-6" onSubmit={handleContactSubmit}>
+                {formSuccess && (
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/20 text-green-100 border border-green-400/40">
+                    <CheckCircle className="w-6 h-6 flex-shrink-0" />
+                    <p className="text-sm font-medium">Mensagem enviada com sucesso! Em breve entraremos em contato.</p>
+                  </div>
+                )}
+                {formError && (
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/20 text-red-100 border border-red-400/40">
+                    <AlertCircle className="w-6 h-6 flex-shrink-0" />
+                    <p className="text-sm font-medium">{formError}</p>
+                  </div>
+                )}
+
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-white font-medium mb-2">
@@ -859,6 +939,8 @@ export const Features = () => {
                     <input
                       type="text"
                       required
+                      value={formData.nome}
+                      onChange={(e) => setFormData((p) => ({ ...p, nome: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900"
                       placeholder="Seu nome completo"
                     />
@@ -871,6 +953,8 @@ export const Features = () => {
                     <input
                       type="email"
                       required
+                      value={formData.email}
+                      onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900"
                       placeholder="seu@email.com"
                     />
@@ -893,6 +977,8 @@ export const Features = () => {
                     <input
                       type="tel"
                       required
+                      value={formData.celular}
+                      onChange={(e) => setFormData((p) => ({ ...p, celular: e.target.value }))}
                       className="flex-1 px-4 py-3 rounded-r-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900"
                       placeholder="(11) 99999-9999"
                     />
@@ -906,6 +992,8 @@ export const Features = () => {
                   <input
                     type="text"
                     required
+                    value={formData.cidade}
+                    onChange={(e) => setFormData((p) => ({ ...p, cidade: e.target.value }))}
                     className="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900"
                     placeholder="Digite sua cidade"
                   />
@@ -918,6 +1006,8 @@ export const Features = () => {
                   <input
                     type="text"
                     required
+                    value={formData.nome_escola}
+                    onChange={(e) => setFormData((p) => ({ ...p, nome_escola: e.target.value }))}
                     className="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900"
                     placeholder="Nome da sua instituição de ensino"
                   />
@@ -930,18 +1020,13 @@ export const Features = () => {
                     </label>
                     <select
                       required
+                      value={formData.cargo}
+                      onChange={(e) => setFormData((p) => ({ ...p, cargo: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900 bg-white"
                     >
-                      <option value="">Selecione</option>
-                      <option value="professor">Professor</option>
-                      <option value="coordenador">Coordenador Pedagógico</option>
-                      <option value="diretor">Diretor</option>
-                      <option value="vice-diretor">Vice-Diretor</option>
-                      <option value="orientador">Orientador Educacional</option>
-                      <option value="supervisor">Supervisor Escolar</option>
-                      <option value="secretario">Secretário (a) de Educação</option>
-                      <option value="pedagogo">Pedagogo (a)</option>
-                      <option value="outro">Outro</option>
+                      {CARGO_OPCOES.map((o) => (
+                        <option key={o.value || 'v'} value={o.value}>{o.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -951,29 +1036,30 @@ export const Features = () => {
                     </label>
                     <select
                       required
+                      value={formData.tipo_escola}
+                      onChange={(e) => setFormData((p) => ({ ...p, tipo_escola: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-yellow-300 focus:outline-none text-gray-900 bg-white"
                     >
-                      <option value="">Selecione</option>
-                      <option value="municipal">Escola Municipal</option>
-                      <option value="estadual">Escola Estadual</option>
-                      <option value="federal">Escola Federal</option>
-                      <option value="particular">Escola Particular</option>
-                      <option value="outro">Outro</option>
+                      {TIPO_ESCOLA_OPCOES.map((o) => (
+                        <option key={o.value || 'v'} value={o.value}>{o.label}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
 
                 <motion.button
                   type="submit"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full bg-green-500 text-white font-bold px-8 py-4 rounded-xl hover:bg-green-600 transition-colors shadow-lg text-lg"
+                  disabled={formLoading}
+                  whileHover={!formLoading ? { scale: 1.05 } : undefined}
+                  whileTap={!formLoading ? { scale: 0.95 } : undefined}
+                  className="w-full bg-green-500 text-white font-bold px-8 py-4 rounded-xl hover:bg-green-600 transition-colors shadow-lg text-lg disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  Enviar
+                  {formLoading ? 'Enviando...' : 'Enviar'}
                 </motion.button>
                 
                 <div className="text-center mt-6">
                   <button 
+                    type="button"
                     onClick={() => window.location.href = '/sobre'}
                     className="text-blue-200 hover:text-white transition-colors underline text-sm bg-transparent border-none cursor-pointer"
                   >

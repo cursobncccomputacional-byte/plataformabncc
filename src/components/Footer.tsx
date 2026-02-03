@@ -1,6 +1,10 @@
-import { BookOpen, Mail, Phone } from 'lucide-react';
+import { BookOpen, Mail, Phone, FileText } from 'lucide-react';
 
-export const Footer = () => {
+interface FooterProps {
+  onPoliticaPrivacidadeClick?: () => void;
+}
+
+export const Footer = ({ onPoliticaPrivacidadeClick }: FooterProps) => {
   return (
     <footer className="text-gray-300 py-12 px-4" style={{ backgroundColor: '#044982' }}>
       <div className="max-w-7xl mx-auto">
@@ -48,6 +52,21 @@ export const Footer = () => {
           <div>
             <h3 className="text-white font-semibold mb-4">Recursos</h3>
             <ul className="space-y-2 text-sm">
+              {onPoliticaPrivacidadeClick && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={onPoliticaPrivacidadeClick}
+                    className="text-left transition-colors flex items-center gap-2"
+                    style={{ color: '#d1d5db' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#ffbe00'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#d1d5db'; }}
+                  >
+                    <FileText className="w-4 h-4 flex-shrink-0" />
+                    Política de Privacidade (LGPD)
+                  </button>
+                </li>
+              )}
               <li>
                 <a href="#" className="transition-colors" onMouseEnter={(e) => e.currentTarget.style.color = '#ffbe00'} onMouseLeave={(e) => e.currentTarget.style.color = '#d1d5db'}>
                   Documentação BNCC
