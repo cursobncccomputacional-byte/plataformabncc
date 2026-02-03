@@ -98,6 +98,10 @@ export const ManageDemandas = () => {
   const [formDataPrevista, setFormDataPrevista] = useState('');
 
   const [selectedWeekKey, setSelectedWeekKey] = useState(() => getWeekKey(new Date()));
+  const [weekDetailKey, setWeekDetailKey] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'concluida'>('all');
+  const [responsavelFilter, setResponsavelFilter] = useState<string>('all');
+  const [searchFilter, setSearchFilter] = useState('');
 
   const rootUsers = useMemo(() => users.filter((u) => u.role === 'root'), [users]);
 
@@ -174,6 +178,51 @@ export const ManageDemandas = () => {
       };
     });
   }, [weeksForSelector, demandas]);
+
+  /** Demandas pendentes e concluídas da semana selecionada no detalhe (clique na barra) */
+  const demandasDaSemanaDetail = useMemo(() => {
+    if (!weekDetailKey) return { pendentes: [] as Demanda[], concluidas: [] as Demanda[] };
+    const range = getWeekRange(weekDetailKey);
+    const pendentes = demandas
+      .filter(
+        (d) =>
+          isDateInWeek(d.data_prevista, range.start, range.end) && !d.data_conclusao
+      )
+      .sort((a, b) => (a.data_prevista || '').localeCompare(b.data_prevista || ''));
+    const concluidas = demandas
+      .filter(
+        (d) =>
+          isDateInWeek(d.data_prevista, range.start, range.end) && d.data_conclusao != null
+      )
+      .sort((a, b) => (a.data_prevista || '').localeCompare(b.data_prevista || ''));
+    return { pendentes, concluidas };
+  }, [weekDetailKey, demandas]);
+
+  /** Filtro da lista principal de demandas (status, responsável, busca por texto) */
+  const demandasFiltradas = useMemo(() => {
+    let list = [...demandas];
+
+    if (statusFilter === 'pendente') {
+      list = list.filter((d) => !d.data_conclusao);
+    } else if (statusFilter === 'concluida') {
+      list = list.filter((d) => d.data_conclusao != null);
+    }
+
+    if (responsavelFilter !== 'all') {
+      list = list.filter((d) => d.responsavel_id === responsavelFilter);
+    }
+
+    const q = searchFilter.trim().toLowerCase();
+    if (q) {
+      list = list.filter((d) => {
+        const nome = d.nome.toLowerCase();
+        const desc = (d.descricao || '').toLowerCase();
+        return nome.includes(q) || desc.includes(q);
+      });
+    }
+
+    return list;
+  }, [demandas, statusFilter, responsavelFilter, searchFilter]);
 
   /** Sincronizar semana selecionada: preferir semana atual quando estiver na lista do mês */
   useEffect(() => {
@@ -496,31 +545,131 @@ export const ManageDemandas = () => {
             Percentual de demandas concluídas em relação ao total previsto para cada semana do mês.
           </p>
           <div className="flex flex-col gap-2">
-            {aderenciaPorSemana.map(({ key, label, totalPrevistas, concluidas, aderencia }) => (
-              <div key={key} className="flex items-center gap-3">
-                <div className="w-32 flex-shrink-0 text-xs text-gray-600 truncate" title={label}>
-                  {key}
-                </div>
-                <div className="flex-1 min-w-0 h-6 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500 flex items-center justify-end pr-1"
-                    style={{
-                      width: `${Math.min(100, aderencia)}%`,
-                      backgroundColor: totalPrevistas === 0 ? '#e5e7eb' : aderencia >= 100 ? '#059669' : aderencia >= 50 ? '#0ea5e9' : '#f59e0b',
-                    }}
+            {aderenciaPorSemana.map(({ key, label, totalPrevistas, concluidas, aderencia }) => {
+              const isDetailOpen = weekDetailKey === key;
+              return (
+                <div key={key} className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setWeekDetailKey(isDetailOpen ? null : key)}
+                    className="flex items-center gap-3 w-full text-left rounded-lg py-1 -mx-1 px-1 hover:bg-gray-50 transition-colors cursor-pointer"
+                    title={totalPrevistas > 0 ? `Clique para ver demandas de ${key}` : undefined}
                   >
-                    {totalPrevistas > 0 && (
-                      <span className="text-xs font-medium text-white drop-shadow">
-                        {aderencia}%
-                      </span>
-                    )}
-                  </div>
+                    <div className="w-32 flex-shrink-0 text-xs text-gray-600 truncate" title={label}>
+                      {key}
+                    </div>
+                    <div className="flex-1 min-w-0 h-6 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500 flex items-center justify-end pr-1"
+                        style={{
+                          width: `${Math.min(100, aderencia)}%`,
+                          backgroundColor: totalPrevistas === 0 ? '#e5e7eb' : aderencia >= 100 ? '#059669' : aderencia >= 50 ? '#0ea5e9' : '#f59e0b',
+                        }}
+                      >
+                        {totalPrevistas > 0 && (
+                          <span className="text-xs font-medium text-white drop-shadow">
+                            {aderencia}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-20 flex-shrink-0 text-xs text-gray-500 text-right">
+                      {concluidas}/{totalPrevistas}
+                    </div>
+                  </button>
+                  {isDetailOpen && (
+                    <div className="ml-0 pl-2 border-l-2 border-[#005a93] bg-gray-50 rounded-r py-2 px-3 text-sm">
+                      <div className="flex gap-6 flex-wrap">
+                        <div className="min-w-[180px]">
+                          <div className="font-medium text-amber-700 mb-1">
+                            Pendentes ({demandasDaSemanaDetail.pendentes.length})
+                          </div>
+                          <ul className="list-disc list-inside text-gray-700 space-y-0.5">
+                            {demandasDaSemanaDetail.pendentes.length === 0 ? (
+                              <li className="text-gray-500">Nenhuma</li>
+                            ) : (
+                              demandasDaSemanaDetail.pendentes.map((d) => (
+                                <li key={d.id}>
+                                  <div className="font-medium text-gray-800">{d.nome}</div>
+                                  <div className="text-xs text-gray-500">
+                                    Responsável: {d.responsavel_nome || '—'}
+                                    {d.data_prevista && (
+                                      <>
+                                        {' '}
+                                        • Prevista:{' '}
+                                        {new Date(d.data_prevista).toLocaleDateString('pt-BR', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                        })}
+                                      </>
+                                    )}
+                                  </div>
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                        <div className="min-w-[180px]">
+                          <div className="font-medium text-green-700 mb-1">
+                            Concluídas ({demandasDaSemanaDetail.concluidas.length})
+                          </div>
+                          <ul className="list-disc list-inside text-gray-700 space-y-0.5">
+                            {demandasDaSemanaDetail.concluidas.length === 0 ? (
+                              <li className="text-gray-500">Nenhuma</li>
+                            ) : (
+                              demandasDaSemanaDetail.concluidas.map((d) => (
+                                <li key={d.id}>
+                                  <div className="font-medium text-gray-800">{d.nome}</div>
+                                  <div className="text-xs text-gray-500">
+                                    Responsável: {d.responsavel_nome || '—'}
+                                    {d.data_prevista && (
+                                      <>
+                                        {' '}
+                                        • Prevista:{' '}
+                                        {new Date(d.data_prevista).toLocaleDateString('pt-BR', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                        })}
+                                      </>
+                                    )}
+                                    {d.data_conclusao && (
+                                      <>
+                                        {' '}
+                                        • Concluída:{' '}
+                                        {(() => {
+                                          const raw = d.data_conclusao.replace(' ', 'T');
+                                          const asUtc = raw.includes('Z') ? raw : raw + 'Z';
+                                          return new Date(asUtc).toLocaleString('pt-BR', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          });
+                                        })()}
+                                      </>
+                                    )}
+                                  </div>
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setWeekDetailKey(null); }}
+                        className="mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="w-20 flex-shrink-0 text-xs text-gray-500 text-right">
-                  {concluidas}/{totalPrevistas}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {aderenciaPorSemana.length === 0 && (
               <p className="text-sm text-gray-500">Nenhuma semana no mês corrente com demandas.</p>
             )}
@@ -656,14 +805,55 @@ export const ManageDemandas = () => {
       </div>
 
       {/* Lista de demandas */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-900 p-4 border-b border-gray-200">
           Lista de demandas
         </h3>
+
+        {/* Filtros da lista */}
+        <div className="px-4 pt-3 pb-2 border-b border-gray-100 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[220px]">
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Filtrar por nome ou descrição..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:border-transparent"
+              style={{ ['--tw-ring-color' as string]: '#005a93' }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'pendente' | 'concluida')}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:border-transparent"
+              style={{ ['--tw-ring-color' as string]: '#005a93' }}
+            >
+              <option value="all">Todos os status</option>
+              <option value="pendente">Pendentes</option>
+              <option value="concluida">Concluídas</option>
+            </select>
+            <select
+              value={responsavelFilter}
+              onChange={(e) => setResponsavelFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:border-transparent"
+              style={{ ['--tw-ring-color' as string]: '#005a93' }}
+            >
+              <option value="all">Todos os responsáveis</option>
+              {rootUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+              <option value="">Sem responsável</option>
+            </select>
+          </div>
+        </div>
+
         {loading ? (
           <div className="p-8 text-center text-gray-500">Carregando...</div>
-        ) : demandas.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">Nenhuma demanda cadastrada.</div>
+        ) : demandasFiltradas.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">Nenhuma demanda encontrada com os filtros atuais.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -678,7 +868,7 @@ export const ManageDemandas = () => {
                 </tr>
               </thead>
               <tbody>
-                {demandas.map((d) => (
+                {demandasFiltradas.map((d) => (
                   <tr key={d.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                     <td className="py-3 px-4 font-medium text-gray-900 w-2/5 min-w-[280px] align-top">{d.nome}</td>
                     <td className="py-3 px-4 text-gray-600 w-[180px] max-w-[180px] truncate align-top" title={d.descricao}>
