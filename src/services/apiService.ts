@@ -398,6 +398,50 @@ class ApiService {
   }
 
   /**
+   * Demandas (Gestão Interna - root apenas)
+   */
+  async getDemandas(semana?: string): Promise<ApiResponse> {
+    const url = semana ? `/demandas/index.php?semana=${encodeURIComponent(semana)}` : '/demandas/index.php';
+    return this.request(url);
+  }
+
+  async createDemanda(data: {
+    nome: string;
+    descricao?: string;
+    responsavel_id?: string | null;
+    data_prevista?: string | null;
+  }): Promise<ApiResponse> {
+    return this.request('/demandas/index.php', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateDemanda(
+    id: number,
+    data: { nome?: string; descricao?: string; responsavel_id?: string | null; data_prevista?: string | null }
+  ): Promise<ApiResponse> {
+    return this.request('/demandas/index.php', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, ...data }),
+    });
+  }
+
+  async concluirDemanda(id: number): Promise<ApiResponse> {
+    return this.request('/demandas/index.php', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, concluir: true }),
+    });
+  }
+
+  async reabrirDemanda(id: number): Promise<ApiResponse> {
+    return this.request('/demandas/index.php', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, reabrir: true }),
+    });
+  }
+
+  /**
    * Buscar atividades do banco de dados
    */
   async getActivities(filters?: {
@@ -501,6 +545,9 @@ class ApiService {
     video_url: string;
     pdf_estrutura_pedagogica_url?: string;
     material_apoio_url?: string;
+    aee?: boolean;
+    /** Para AEE: múltiplas etapas (ex.: ["Educação Infantil", "Anos Iniciais", "Anos Finais"]) */
+    etapas?: string[];
   }): Promise<ApiResponse> {
     // Obter usuário atual para enviar nos headers
     const currentUser = await this.getCurrentUser();
@@ -550,6 +597,8 @@ class ApiService {
       video_url: string;
       pdf_estrutura_pedagogica_url: string;
       material_apoio_url: string;
+      aee: boolean;
+      etapas: string[];
     }>
   ): Promise<ApiResponse> {
     // Obter usuário atual para enviar nos headers
@@ -640,7 +689,7 @@ class ApiService {
   /**
    * Trilhas Pedagógicas
    */
-  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar'): Promise<ApiResponse & { trilhas?: any[] }> {
+  async getTrilhas(tipo?: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar' | 'aee'): Promise<ApiResponse & { trilhas?: any[] }> {
     const query = tipo ? `?tipo=${tipo}` : '';
     return this.request(`/trilhas/index.php${query}`);
   }
@@ -653,9 +702,9 @@ class ApiService {
     id: string;
     titulo: string;
     descricao?: string;
-    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar';
+    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar' | 'aee';
     valor: string;
-    criterios_agrupamento?: { tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar'; valor: string }[];
+    criterios_agrupamento?: { tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar' | 'aee'; valor: string }[];
     thumbnail_url?: string;
     ordem?: number;
   }): Promise<ApiResponse> {
@@ -668,9 +717,9 @@ class ApiService {
   async updateTrilha(trilhaId: string, updates: Partial<{
     titulo: string;
     descricao: string;
-    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar';
+    tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar' | 'aee';
     valor: string;
-    criterios_agrupamento: { tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar'; valor: string }[];
+    criterios_agrupamento: { tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar' | 'aee'; valor: string }[];
     thumbnail_url: string;
     ordem: number;
     ativo: boolean;

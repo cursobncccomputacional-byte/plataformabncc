@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
 
-export type TipoCriterio = 'eixo_bncc' | 'etapa' | 'ano_escolar' | 'disciplina_transversal';
+export type TipoCriterio = 'eixo_bncc' | 'etapa' | 'ano_escolar' | 'disciplina_transversal' | 'aee';
 
 export interface CriterioAgrupamento {
   tipo: TipoCriterio;
@@ -15,7 +15,7 @@ interface Trilha {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar';
+  tipo: 'eixo_bncc' | 'etapa' | 'disciplina_transversal' | 'ano_escolar' | 'aee';
   valor: string;
   criterios_agrupamento?: CriterioAgrupamento[];
   thumbnail_url?: string;
@@ -30,6 +30,7 @@ const TIPOS_CRITERIO: { value: TipoCriterio; label: string }[] = [
   { value: 'etapa', label: 'Etapa' },
   { value: 'ano_escolar', label: 'Ano escolar' },
   { value: 'disciplina_transversal', label: 'Disciplina transversal' },
+  { value: 'aee', label: 'AEE (Atendimento Educacional Especializado)' },
 ];
 
 const VALORES_EIXO_BNCC = [
@@ -80,6 +81,8 @@ function valoresPorTipo(tipo: TipoCriterio): string[] {
       return VALORES_ANO_ESCOLAR;
     case 'disciplina_transversal':
       return VALORES_DISCIPLINAS_TRANSVERSAIS;
+    case 'aee':
+      return ['AEE'];
     default:
       return [];
   }
@@ -344,6 +347,7 @@ export const ManageTrilhas = () => {
             <option value="etapa">Etapa</option>
             <option value="ano_escolar">Ano escolar</option>
             <option value="disciplina_transversal">Disciplina Transversal</option>
+            <option value="aee">AEE</option>
           </select>
         </div>
 

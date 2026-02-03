@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import * as React from 'react';
-import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked, BarChart2 } from 'lucide-react';
+import { Video, FileText, User, LogOut, Activity, Menu, X, Users, Shield, GraduationCap, BookOpen, UserCheck, Settings, ChevronDown, ChevronRight, Package, Monitor, FileCheck, BookMarked, BarChart2, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 
 type PageType =
@@ -25,6 +25,8 @@ type PageType =
   | 'relatorios-menu'
   | 'relatorio-atividades'
   | 'termo-referencia'
+  | 'gestao-interna-menu'
+  | 'demandas'
   | 'admin-menu'
   | 'admin-users'
   | 'admin-reports'
@@ -134,6 +136,10 @@ export const Sidebar = ({
 
   // Expandir menu Painel Administrativo (admin)
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  // Expandir menu Gestão Interna (root)
+  const [gestaoInternaMenuOpen, setGestaoInternaMenuOpen] = useState(
+    currentPage === 'demandas'
+  );
 
   // Expandir menu Cursos quando navegar para plataforma, formacao-continuada ou trilhas
   useEffect(() => {
@@ -151,6 +157,12 @@ export const Sidebar = ({
   useEffect(() => {
     if (currentPage === 'relatorio-atividades') {
       setRelatoriosMenuOpen(true);
+    }
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage === 'demandas') {
+      setGestaoInternaMenuOpen(true);
     }
   }, [currentPage]);
 
@@ -196,6 +208,11 @@ export const Sidebar = ({
     { id: 'relatorio-atividades' as const, icon: Activity, label: 'Relatório de Atividades' },
   ], []);
 
+  // Submenu Gestão Interna (apenas root)
+  const gestaoInternaSubMenuItems = useMemo(() => [
+    { id: 'demandas' as const, icon: ClipboardList, label: 'Demandas' },
+  ], []);
+
   // Menu para Root
   // Usar useMemo para recalcular quando as permissões mudarem
   const rootMenuItems = useMemo(() => [
@@ -209,6 +226,7 @@ export const Sidebar = ({
     { id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' },
     { id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true },
     { id: 'relatorios-menu' as const, icon: BarChart2, label: 'Relatórios', isParent: true },
+    { id: 'gestao-interna-menu' as const, icon: ClipboardList, label: 'Gestão Interna', isParent: true },
     { id: 'termo-referencia' as const, icon: FileText, label: 'Termo de Referência' },
   ], [showCursosMenu]);
 
@@ -539,6 +557,57 @@ export const Sidebar = ({
                     {relatoriosMenuOpen && sidebarOpen && (
                       <div className="ml-4 space-y-1">
                         {relatoriosSubMenuItems.map((subItem) => {
+                          const SubIconComponent = subItem.icon;
+                          const isSubActive = currentPage === subItem.id;
+                          return (
+                            <button
+                              key={subItem.id}
+                              onClick={() => handleNavigate(subItem.id)}
+                              className={`
+                                w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 text-sm
+                                ${isSubActive 
+                                  ? 'bg-white bg-opacity-30 text-white font-semibold' 
+                                  : 'hover:bg-white hover:bg-opacity-10 text-white text-opacity-80'
+                                }
+                              `}
+                            >
+                              {SubIconComponent && <SubIconComponent size={18} className="flex-shrink-0" />}
+                              <span>{subItem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (isParent && item.id === 'gestao-interna-menu') {
+                return (
+                  <div key={item.id} className="space-y-1 text-left">
+                    <button
+                      onClick={() => setGestaoInternaMenuOpen(!gestaoInternaMenuOpen)}
+                      className={`
+                        w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
+                        ${gestaoInternaMenuOpen || currentPage === 'demandas'
+                          ? 'bg-white text-[#005a93] shadow-md' 
+                          : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0 justify-start">
+                        {IconComponent && <IconComponent size={20} className="flex-shrink-0" />}
+                        {sidebarOpen && (
+                          <span className="font-medium truncate">{item.label}</span>
+                        )}
+                      </div>
+                      {sidebarOpen && (
+                        gestaoInternaMenuOpen ? <ChevronDown size={16} className="flex-shrink-0" /> : <ChevronRight size={16} className="flex-shrink-0" />
+                      )}
+                    </button>
+                    {gestaoInternaMenuOpen && sidebarOpen && (
+                      <div className="ml-4 space-y-1">
+                        {gestaoInternaSubMenuItems.map((subItem) => {
                           const SubIconComponent = subItem.icon;
                           const isSubActive = currentPage === subItem.id;
                           return (

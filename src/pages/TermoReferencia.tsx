@@ -1,206 +1,188 @@
-import { FileText, Download, Printer } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 /**
- * Página de Termo de Referência da Plataforma BNCC.
- * Documento técnico completo para apresentação gerencial.
+ * Página de Termo de Referência (Minuta) da Plataforma BNCC.
+ * Documento para aquisição/licenciamento — uso interno e gerencial.
  */
 export const TermoReferencia = () => {
-  const handlePrint = () => window.print();
-  const handleExport = () => {
-    const el = document.getElementById('termo-referencia-conteudo');
-    if (!el) return;
-    const prev = document.title;
-    document.title = `Termo_de_Referencia_Plataforma_BNCC_${new Date().toISOString().slice(0, 10)}`;
-    window.print();
-    document.title = prev;
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 max-w-[900px] mx-auto">
-      <div className="flex items-center justify-between mb-6 print:hidden">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold" style={{ color: '#044982' }}>
           Termo de Referência
         </h1>
-        <div className="flex gap-2">
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
-          >
-            <Printer className="h-4 w-4" />
-            Imprimir
-          </button>
-          <button
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-white"
-            style={{ backgroundColor: '#005a93' }}
-          >
-            <Download className="h-4 w-4" />
-            Exportar PDF
-          </button>
-        </div>
       </div>
 
-      <div
-        id="termo-referencia-conteudo"
-        className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-10 text-gray-800 space-y-8 print:shadow-none print:border print:p-0"
-      >
-        {/* Cabeçalho do documento */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-10 text-gray-800 space-y-8">
         <header className="border-b border-gray-200 pb-6">
           <div className="flex items-center gap-3 mb-2">
             <FileText className="h-10 w-10" style={{ color: '#005a93' }} />
             <h2 className="text-xl font-bold text-gray-900">
-              Termo de Referência Técnico — Plataforma BNCC Nova Edu
+              Termo de Referência (Minuta)
             </h2>
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mt-1">
             Documento gerado em {new Date().toLocaleDateString('pt-BR', { dateStyle: 'long' })}. Uso interno e gerencial.
           </p>
         </header>
 
-        {/* 1. Objetivo e Escopo */}
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">1. Objetivo e Escopo</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">OBJETO</h3>
           <p className="text-gray-700 leading-relaxed">
-            A <strong>Plataforma BNCC</strong> é um sistema web de apoio à implementação da Base Nacional Comum Curricular (BNCC) no âmbito da <strong>Computação</strong>, oferecendo gestão de usuários, atividades pedagógicas, trilhas de aprendizagem, currículo de habilidades (BNCC Computacional Digital), cursos de formação continuada, planos de aula e relatórios. O escopo abrange educação infantil, anos iniciais e anos finais do ensino fundamental, com suporte a atividades plugadas e desplugadas, eixo BNCC (Pensamento Computacional, Mundo Digital, Cultura Digital) e disciplinas transversais.
+            Contratação de empresa especializada para fornecimento de licença de uso (SaaS) e/ou desenvolvimento de Plataforma Web de Gestão e Apoio Pedagógico à implementação da Base Nacional Comum Curricular (BNCC), com foco em Computação e Cultura Digital.
           </p>
         </section>
 
-        {/* 2. Stack Tecnológico */}
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">2. Stack Tecnológico</h3>
-          <ul className="list-disc pl-6 space-y-2 text-gray-700">
-            <li><strong>Frontend:</strong> React 18+, TypeScript, Vite, Tailwind CSS, Framer Motion, React Router (implícito via estado). Build estático (SPA) com variável de ambiente <code className="bg-gray-100 px-1 rounded">VITE_API_URL</code> para URL da API.</li>
-            <li><strong>Backend/API:</strong> PHP (Apache), endpoints RESTful sob <code className="bg-gray-100 px-1 rounded">/api</code>. Autenticação por sessão (cookie/session_id), CORS configurável em <code className="bg-gray-100 px-1 rounded">api/config/cors.php</code> e <code className="bg-gray-100 px-1 rounded">api/config/auth.php</code>.</li>
-            <li><strong>Persistência:</strong> Banco de dados relacional (MySQL/MariaDB) — estrutura de usuários, atividades, trilhas, currículo BNCC, cursos, módulos, aulas, permissões, sessões e pacotes de administrador.</li>
-            <li><strong>Upload de mídia:</strong> API em <code className="bg-gray-100 px-1 rounded">api/upload/</code> para imagens e arquivos (thumbnails, vídeos, PDFs de estrutura pedagógica e material de apoio).</li>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">1. OBJETIVO E ESCOPO</h3>
+          <p className="text-gray-700 leading-relaxed mb-3">
+            O presente Termo tem por objetivo definir as características técnicas e funcionais para a aquisição de uma Plataforma Web de apoio à implementação da BNCC Computacional. A solução deve oferecer gestão centralizada de usuários, atividades pedagógicas, trilhas de aprendizagem e formação continuada, abrangendo desde a Educação Infantil até os Anos Finais do Ensino Fundamental.
+          </p>
+          <p className="text-gray-700 leading-relaxed">
+            A solução deverá suportar atividades &quot;plugadas&quot; (com uso de computador) e &quot;desplugadas&quot; (sem uso de computador), cobrindo os eixos da BNCC: Pensamento Computacional, Mundo Digital e Cultura Digital, bem como disciplinas transversais.
+          </p>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">2. REQUISITOS DE ARQUITETURA E TECNOLOGIA</h3>
+          <p className="text-gray-700 mb-3">A solução ofertada deverá aderir aos seguintes padrões tecnológicos para garantir compatibilidade, escalabilidade e manutenção:</p>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">2.1. Frontend (Interface do Usuário)</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Aplicação do tipo SPA (Single Page Application) com build estático.</li>
+            <li>Desenvolvida preferencialmente em React 18+ e TypeScript.</li>
+            <li>Utilização de Vite para build tool e Tailwind CSS para estilização responsiva.</li>
+            <li>Animações de interface via Framer Motion.</li>
+            <li>Gerenciamento de rotas via React Router.</li>
           </ul>
-        </section>
-
-        {/* 3. Modelo de Usuários e Permissões */}
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">3. Modelo de Usuários e Permissões</h3>
-          <p className="text-gray-700 mb-3">
-            Controle de acesso baseado em <strong>roles</strong> (papéis) e flags de permissão. Hierarquia e responsabilidades:
-          </p>
-          <ul className="list-disc pl-6 space-y-2 text-gray-700">
-            <li><strong>Root:</strong> Acesso total ao painel administrativo root: gestão de usuários (CRUD, ativar/inativar, alterar senha, exportação CSV), pacotes admin (limites de professores/alunos por admin), sessões ativas, atribuição de acesso, cursos (plataforma, formação continuada, trilhas), permissões de curso por usuário, plano de aula, BNCC Computacional Digital (cadastro e consulta), relatórios (ex.: relatório de atividades) e <strong>termo de referência</strong>.</li>
-            <li><strong>Admin:</strong> Painel administrativo restrito (gerenciar usuários da rede, relatórios, sessões); limites opcionais <code className="bg-gray-100 px-1 rounded">max_professores</code> e <code className="bg-gray-100 px-1 rounded">max_alunos</code>; acesso à BNCC Digital (consulta) e formação continuada.</li>
-            <li><strong>Professor / Teste Professor:</strong> Atividades BNCC (consulta), trilhas pedagógicas, plano de aula, BNCC Digital (consulta), formação continuada, documentos e perfil. Vinculação opcional a <code className="bg-gray-100 px-1 rounded">school</code> (escola).</li>
-            <li><strong>Professor Cursos:</strong> Perfil para formação continuada (acesso a cursos em ambiente específico).</li>
-            <li><strong>Aluno:</strong> Interface dedicada (StudentHome) com conteúdo liberado conforme permissões e matrículas.</li>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">2.2. Backend e API</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Linguagem de servidor: PHP (servidor Apache).</li>
+            <li>Arquitetura: Endpoints RESTful (padrão <code className="bg-gray-100 px-1 rounded">/api</code>).</li>
+            <li>Autenticação: Baseada em sessão (cookie/session_id), com persistência segura no backend.</li>
+            <li>Configuração de CORS (Cross-Origin Resource Sharing) gerenciável.</li>
           </ul>
-          <p className="text-gray-700 mt-3">
-            Permissões granulares (root): <code className="bg-gray-100 px-1 rounded">can_manage_activities</code> (cadastro de atividades/plataforma) e <code className="bg-gray-100 px-1 rounded">can_manage_courses</code> (formação continuada e trilhas). Atribuição de acesso e “Atribuir Cursos” permitem associar usuários a cursos e permissões.
-          </p>
-        </section>
-
-        {/* 4. Módulos e Recursos Funcionais */}
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">4. Módulos e Recursos Funcionais</h3>
-          <ul className="space-y-4 text-gray-700">
-            <li>
-              <strong>4.1 Gestão de Usuários (Root)</strong><br />
-              CRUD de usuários; filtros por role, status (ativo/inativo) e busca por nome/e-mail/escola; ordenação e paginação; ações em lote (ativar, inativar, excluir); exportação CSV (todos ou selecionados); alteração de senha; criação com role, escola e disciplinas quando aplicável.
-            </li>
-            <li>
-              <strong>4.2 Pacotes Admin (Root)</strong><br />
-              Definição de limites por administrador: número máximo de professores e de alunos, pacote (nome/template), data de contratação e expiração. Interface para edição em massa desses parâmetros.
-            </li>
-            <li>
-              <strong>4.3 Sessões (Root / Admin)</strong><br />
-              Listagem de sessões ativas com usuário, IP, user agent, data de login/logout, tempo de sessão e total de atividades registradas. Detalhamento de atividades por sessão (tipo, recurso, data). Integração com <code className="bg-gray-100 px-1 rounded">sessionService</code> e API de sessões.
-            </li>
-            <li>
-              <strong>4.4 Atribuir Acesso</strong><br />
-              Atribuição de permissões e acessos a usuários (curso, rede, etc.) conforme regras de negócio configuradas no painel root.
-            </li>
-            <li>
-              <strong>4.5 Cursos (Root)</strong><br />
-              Três subcontextos: <strong>Plataforma</strong> (atividades BNCC), <strong>Formação Continuada</strong> (cursos com módulos e aulas) e <strong>Trilhas</strong>. Em cada um: listagem, criação, edição e exclusão; associação de conteúdos (atividades a trilhas; módulos/aulas/vídeos a cursos).
-            </li>
-            <li>
-              <strong>4.6 Atividades BNCC (Plataforma)</strong><br />
-              Cadastro de atividades com: nome, descrição, tipo (plugada/desplugada), etapa (Educação Infantil, Anos Iniciais, Anos Finais), anos escolares, eixos BNCC, disciplinas transversais, habilidades curriculares (IDs), duração, thumbnail, vídeo, PDF de estrutura pedagógica e material de apoio, flag de bloqueio. Filtros e busca na listagem; upload de mídia via API.
-            </li>
-            <li>
-              <strong>4.7 Trilhas Pedagógicas</strong><br />
-              Trilhas por critério: eixo BNCC, etapa, ano escolar ou disciplina transversal. Cadastro de trilhas com título, descrição, tipo, valor do critério, thumbnail, ordem e associação de atividades. Na visão professor: listagem por tipo (eixo, etapa, série, disciplina), seleção de trilha e listagem de atividades com vídeo e PDF; sugestão de atividades via IA (endpoint de diagnóstico/sugestão).
-            </li>
-            <li>
-              <strong>4.8 BNCC Computacional Digital</strong><br />
-              <strong>Cadastro (Root):</strong> habilidades do currículo BNCC (etapa, código, eixo, descrição, explicação, exemplos por tipo, materiais com link). <strong>Consulta (todos os roles autorizados):</strong> busca e filtro por etapa/eixo; visualização de detalhes da habilidade (explicação, exemplos, materiais). Dados consumidos por atividades e relatórios.
-            </li>
-            <li>
-              <strong>4.9 Formação Continuada (Cursos)</strong><br />
-              Cursos com título, descrição, status, categoria, instrutor, preço, thumbnail; módulos e aulas; vídeos por aula. Permissões de curso por usuário (getCoursePermissions, createCoursePermission, deleteCoursePermission, enrollUserInCourse). Acesso ao conteúdo em ambiente específico (ex.: cursos.novaedubncc.com.br).
-            </li>
-            <li>
-              <strong>4.10 Plano de Aula</strong><br />
-              Módulo disponível no menu root e para professores; funcionalidade prevista para planejamento de aulas (implementação futura conforme especificação).
-            </li>
-            <li>
-              <strong>4.11 Relatórios</strong><br />
-              <strong>Relatório de Atividades:</strong> listagem de atividades com etapa, tipo, eixos BNCC e habilidades vinculadas; cópia de texto da habilidade para uso em documentos. Dados cruzados com currículo BNCC.
-            </li>
-            <li>
-              <strong>4.12 Termo de Referência (este documento)</strong><br />
-              Acesso exclusivo root; documento técnico consolidado para gestão, com opção de impressão e exportação em PDF.
-            </li>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">2.3. Persistência de Dados</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Banco de dados relacional (MySQL ou MariaDB).</li>
+            <li>Estrutura deve suportar relacionamentos complexos entre usuários, currículo BNCC, trilhas de aprendizagem e logs de acesso.</li>
           </ul>
-        </section>
-
-        {/* 5. APIs e Endpoints Principais */}
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">5. APIs e Endpoints Principais</h3>
-          <p className="text-gray-700 mb-3">
-            Base URL configurável (<code className="bg-gray-100 px-1 rounded">VITE_API_URL</code> ou <code className="bg-gray-100 px-1 rounded">/api</code>). Autenticação via sessão (credentials: include). Principais grupos:
-          </p>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">2.4. Armazenamento de Mídia</h4>
           <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">
-            <li><strong>Auth:</strong> login, logout, me (perfil atual).</li>
-            <li><strong>Users:</strong> listagem, criação, alteração de senha, toggle status, exclusão, permissões, limites admin, formação continuada (toggle).</li>
-            <li><strong>Activities:</strong> listagem com filtros, get por ID, create, update, delete, upload de imagem.</li>
-            <li><strong>Trilhas:</strong> listagem por tipo, get trilha (com atividades), create, update, delete; diagnóstico/sugestão (trilhas/diagnostico).</li>
-            <li><strong>Currículo BNCC:</strong> habilidades (curriculo-bncc): listagem com filtros, get, create, update, delete.</li>
-            <li><strong>Courses:</strong> listagem, create, update, delete; permissões e matrículas; módulos, aulas, vídeos por aula (CRUD completo).</li>
-            <li><strong>Sessions:</strong> listagem de sessões e atividades de sessão (sessionService / API de sessões).</li>
-            <li><strong>Upload:</strong> envio de arquivos para armazenamento e geração de URLs.</li>
+            <li>API dedicada para upload e gestão de arquivos (imagens, thumbnails, vídeos, PDFs).</li>
+            <li>Capacidade de armazenamento de material de apoio pedagógico e estruturas de aula.</li>
           </ul>
         </section>
 
-        {/* 6. Estrutura de Dados Principais */}
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">6. Estrutura de Dados Principais</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">3. ESPECIFICAÇÕES FUNCIONAIS</h3>
+          <p className="text-gray-700 mb-3">O sistema deverá possuir controle de acesso baseado em Papéis (Roles), contemplando as seguintes funcionalidades por perfil:</p>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">3.1. Perfil Super Administrador (Root)</h4>
+          <p className="text-gray-700 text-sm mb-2">Este perfil terá acesso irrestrito ao sistema, devendo possuir as seguintes capacidades:</p>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li><strong>Gestão de Usuários:</strong> Funcionalidades de criar, ler, atualizar e inativar (CRUD) usuários, alteração de senhas, filtros avançados (role, status, escola) e exportação de dados em CSV.</li>
+            <li><strong>Gestão de Pacotes:</strong> Configuração de limites de uso por administrador (nº máximo de professores/alunos), definição de templates de pacotes, datas de contratação e expiração.</li>
+            <li><strong>Monitoramento:</strong> Visualização de sessões ativas em tempo real (IP, User Agent, tempos de login/logout) e logs de atividades.</li>
+            <li><strong>Gestão de Conteúdo:</strong> Cadastro e manutenção da &quot;BNCC Computacional Digital&quot; (habilidades, eixos, descrições), gestão de atividades da plataforma e cursos de formação.</li>
+            <li><strong>Permissões Granulares:</strong> Capacidade de atribuir flags como <code className="bg-gray-100 px-1 rounded">can_manage_activities</code> e <code className="bg-gray-100 px-1 rounded">can_manage_courses</code> a outros usuários.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">3.2. Perfil Administrador de Rede (Admin)</h4>
+          <p className="text-gray-700 text-sm mb-2">Perfil destinado à gestão local (ex.: Secretaria de Educação ou Gestor Escolar):</p>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Gerenciamento dos usuários vinculados à sua rede.</li>
+            <li>Acesso a relatórios de uso e pedagógicos.</li>
+            <li>Consulta à BNCC Digital e módulos de formação continuada.</li>
+            <li>Respeito aos limites (max_professores, max_alunos) definidos pelo Root.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">3.3. Perfil Professor</h4>
+          <p className="text-gray-700 text-sm mb-2">Interface voltada para o uso pedagógico em sala de aula:</p>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li><strong>Consulta de Atividades:</strong> Acesso a atividades pedagógicas, trilhas e planos de aula.</li>
+            <li><strong>Ferramentas de Ensino:</strong> Acesso a vídeos explicativos, estruturas pedagógicas (PDF) e materiais de apoio para download.</li>
+            <li><strong>Perfil &quot;Teste Professor&quot;:</strong> Funcionalidade específica para contas de demonstração onde apenas atividades selecionadas (configuráveis pelo Root) estão liberadas. O perfil visualiza todas as atividades: as liberadas em destaque; as bloqueadas exibem tooltips informativos sem permitir o download/visualização do conteúdo.</li>
+            <li><strong>Formação:</strong> Acesso a cursos de formação continuada com controle de progresso.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">3.4. Perfil Aluno</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">
+            <li>Ambiente dedicado (StudentHome) simplificado.</li>
+            <li>Acesso exclusivo aos conteúdos liberados via matrícula ou permissões atribuídas pelo professor/escola.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">4. DETALHAMENTO DOS MÓDULOS</h3>
+          <p className="text-gray-700 mb-3">A solução deverá entregar os seguintes módulos funcionais integrados:</p>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">4.1. Módulo de Atividades BNCC</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Cadastro de atividades contendo: Nome, descrição, classificação (plugada/desplugada), etapa de ensino, eixos BNCC, e vínculos com habilidades curriculares (códigos BNCC).</li>
+            <li>Suporte a anexos multimídia: Thumbnail, vídeo (streaming/link), PDF de estrutura pedagógica e materiais para impressão.</li>
+            <li>Sistema de busca e filtragem avançada por metadados da BNCC.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">4.2. Módulo de Trilhas Pedagógicas</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Organização de atividades em sequências lógicas (trilhas).</li>
+            <li>Critérios de agrupamento: Por Eixo BNCC, Etapa, Ano Escolar ou Disciplina Transversal.</li>
+            <li>Funcionalidade de Sugestão via IA: Endpoint preparado para sugerir trilhas ou atividades com base em diagnóstico (requisito de arquitetura para integração futura).</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">4.3. Módulo BNCC Computacional Digital</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Digitalização completa do currículo, permitindo o cadastro de Habilidades com seus respectivos códigos, descrições, explicações pedagógicas e exemplos práticos.</li>
+            <li>Este módulo deve servir como base de dados para o vínculo de todas as atividades e relatórios do sistema.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">4.4. Módulo de Formação Continuada (LMS)</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li>Ambiente de cursos com suporte a módulos e aulas.</li>
+            <li>Controle de matrícula e permissões de acesso por usuário.</li>
+            <li>Suporte a vídeo-aulas e materiais complementares.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">4.5. Relatórios e Business Intelligence</h4>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">
+            <li><strong>Relatório de Atividades:</strong> Listagem detalhada cruzando atividades realizadas com as habilidades da BNCC trabalhadas.</li>
+            <li>Capacidade de extração de textos das habilidades para uso em planejamento docente.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">5. REQUISITOS DE INTEGRAÇÃO E DADOS</h3>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">5.1. APIs e Interoperabilidade</h4>
+          <p className="text-gray-700 text-sm mb-2">A solução deve fornecer uma API RESTful documentada, suportando:</p>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm mb-4">
+            <li><strong>Auth:</strong> Autenticação segura e recuperação de perfil (/me).</li>
+            <li><strong>Users/Courses/Activities:</strong> Endpoints completos para gestão das entidades principais.</li>
+            <li><strong>Integração &quot;Teste Professor&quot;:</strong> Endpoint específico (/teste-professor-access) para gestão dinâmica de conteúdos liberados em contas de demonstração.</li>
+          </ul>
+          <h4 className="text-base font-semibold text-gray-800 mt-4 mb-2">5.2. Estrutura de Dados Mínima</h4>
+          <p className="text-gray-700 text-sm mb-2">O banco de dados deve garantir a integridade das seguintes informações principais:</p>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">
+            <li><strong>Entidade Usuário:</strong> Deve conter flags de permissão (can_manage...), dados de contrato (datas, pacote) e vínculo escolar.</li>
+            <li><strong>Entidade Atividade:</strong> Deve vincular-se a múltiplas habilidades (N:N) e conter URLs para todos os ativos de mídia.</li>
+            <li><strong>Entidade Sessão:</strong> Registro para auditoria contendo IP, User Agent, timestamps e contagem de atividades realizadas na sessão.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">6. SEGURANÇA DA INFORMAÇÃO E LGPD</h3>
+          <p className="text-gray-700 mb-3">A contratada deve garantir que a solução esteja em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018):</p>
           <ul className="list-disc pl-6 space-y-2 text-gray-700 text-sm">
-            <li><strong>Usuário:</strong> id, name, email, role, school, subjects, created_at, last_login, is_active, can_manage_activities, can_manage_courses, max_professores, max_alunos, pacote, data_contratacao, data_expiracao.</li>
-            <li><strong>Atividade:</strong> id, nome_atividade, descrição, tipo (plugada/desplugada), etapa, anos_escolares, eixos_bncc, disciplinas_transversais, habilidades_ids, duração, thumbnail_url, video_url, pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada, timestamps.</li>
-            <li><strong>Trilha:</strong> id, titulo, descrição, tipo (eixo_bncc | etapa | ano_escolar | disciplina_transversal), valor, thumbnail_url, ordem, ativo; relação N:N com atividades.</li>
-            <li><strong>Habilidade (currículo BNCC):</strong> id, etapa_id, codigo, eixo, descricao, explicacao, exemplos (tipo, conteudo), materiais (descricao, link).</li>
-            <li><strong>Curso:</strong> id, titulo, descricao, status, categoria, nome_instrutor, preco, thumbnail_url; módulos e aulas com vídeos.</li>
-            <li><strong>Sessão:</strong> id, usuario_id, session_id, ip_address, user_agent, data_login, data_logout, tempo_sessao, total_atividades; atividades de sessão com tipo, recurso_id, detalhes, data_atividade.</li>
+            <li><strong>Autenticação:</strong> Gerenciamento seguro de sessões no backend, sem exposição de dados sensíveis no localStorage (apenas identificadores de sessão opacos).</li>
+            <li><strong>Proteção de Conteúdo:</strong> Mecanismos para evitar acesso direto a URLs de materiais pagos/restritos por usuários não autenticados (ex.: URLs assinadas ou validação de sessão no download).</li>
+            <li><strong>Auditoria:</strong> O sistema deve manter logs de acesso (tabela de Sessões) identificando a origem e o comportamento dos usuários para fins de segurança.</li>
+            <li><strong>CORS:</strong> Configuração restritiva de origens permitidas na API.</li>
           </ul>
         </section>
 
-        {/* 7. Segurança e Controle de Acesso */}
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">7. Segurança e Controle de Acesso</h3>
-          <ul className="list-disc pl-6 space-y-2 text-gray-700">
-            <li>Autenticação baseada em sessão (PHP); sessão persistida e validada no backend; frontend armazena <code className="bg-gray-100 px-1 rounded">api_session_id</code> e perfil em <code className="bg-gray-100 px-1 rounded">localStorage</code> para estado de autenticação.</li>
-            <li>Rotas e componentes condicionados ao role (root, admin, professor, aluno); painel root somente para <code className="bg-gray-100 px-1 rounded">user.role === 'root'</code>.</li>
-            <li>CORS configurado na API para origens permitidas; upload com políticas definidas em <code className="bg-gray-100 px-1 rounded">api/upload/.htaccess</code> e <code className="bg-gray-100 px-1 rounded">api/upload/index.php</code>.</li>
-            <li>Visualização de PDFs e vídeos pode utilizar componentes de segurança (ex.: SecurePDFViewer) e URLs assinadas ou controladas pelo backend quando aplicável.</li>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">7. CRITÉRIOS DE ACEITE</h3>
+          <p className="text-gray-700 mb-2">O recebimento da solução estará condicionado à validação de:</p>
+          <ul className="list-disc pl-6 space-y-1 text-gray-700 text-sm">
+            <li>Funcionamento pleno do fluxo de &quot;Teste Professor&quot; (bloqueio/liberação visual).</li>
+            <li>Integridade do upload e visualização de arquivos PDF e vídeos.</li>
+            <li>Exatidão nos relatórios de cruzamento entre Atividades e Habilidades BNCC.</li>
+            <li>Performance adequada da aplicação SPA (carregamento otimizado).</li>
           </ul>
-        </section>
-
-        {/* 8. Considerações Finais */}
-        <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">8. Considerações Finais</h3>
-          <p className="text-gray-700 leading-relaxed">
-            Este termo de referência descreve a plataforma em sua versão atual, incluindo todos os módulos acessíveis ao perfil root, recursos de API, modelo de dados e controles de acesso. Alterações de escopo, novos módulos ou mudanças de stack devem ser documentadas em revisões deste documento. Para dúvidas técnicas ou de escopo, contatar a equipe de desenvolvimento ou gestão do produto.
-          </p>
         </section>
 
         <footer className="pt-6 border-t border-gray-200 text-sm text-gray-500">
-          Plataforma BNCC — Nova Edu. Documento de referência técnica. Confidencial — uso interno e gerencial.
+          Plataforma BNCC — Termo de Referência (Minuta). Documento para aquisição/licenciamento. Uso interno e gerencial.
         </footer>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, X, Save, Eye, Lock, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Save, Eye, Lock, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
@@ -30,9 +30,13 @@ interface Activity {
   criado_em?: string;
   atualizado_em?: string;
   bloqueada?: boolean;
+  aee?: boolean;
+  /** Para AEE: múltiplas etapas (ex.: EI + Anos Iniciais + Anos Finais) */
+  etapas?: string[];
 }
 
 const ANOS_ESCOLARES = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano'];
+const ETAPAS_AEE: ('Educação Infantil' | 'Anos Iniciais' | 'Anos Finais')[] = ['Educação Infantil', 'Anos Iniciais', 'Anos Finais'];
 const EIXOS_BNCC = [
   'Pensamento Computacional',
   'Mundo Digital',
@@ -56,7 +60,6 @@ export const ManageActivities = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [thumbLoading, setThumbLoading] = useState(false);
   const [tpLoading, setTpLoading] = useState(false);
   const [tpSaving, setTpSaving] = useState(false);
   const [tpTableExists, setTpTableExists] = useState<boolean | null>(null);
@@ -83,6 +86,7 @@ export const ManageActivities = () => {
     pdf_estrutura_pedagogica_url: '',
     material_apoio_url: '',
     bloqueada: false,
+    aee: false,
   });
   const [curriculoHabilidades, setCurriculoHabilidades] = useState<HabilidadeCurriculo[]>([]);
   const [habilidadesSearch, setHabilidadesSearch] = useState('');
@@ -171,34 +175,6 @@ export const ManageActivities = () => {
     }
   };
 
-  const handleGenerateThumbsBlocked = async () => {
-    setThumbLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await apiService.generateActivityThumbnails({
-        blocked_only: true,
-        overwrite: false,
-        limit: 50,
-      });
-
-      if (res.error) {
-        setError(res.message || 'Erro ao gerar thumbnails');
-        return;
-      }
-
-      const results = (res as any).results as Array<{ ok: boolean }> | undefined;
-      const okCount = results ? results.filter((r) => r.ok).length : 0;
-      const total = (res as any).count ?? okCount;
-      setSuccess(`Thumbnails geradas: ${okCount}/${total}`);
-      await loadActivities();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao gerar thumbnails');
-    } finally {
-      setThumbLoading(false);
-    }
-  };
-
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (user?.can_manage_activities || user?.role === 'root') {
@@ -208,20 +184,21 @@ export const ManageActivities = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, tipoFilter, etapaFilter]);
 
-  const generateNextActivityId = (): string => {
-    // Buscar o maior número de ID existente
-    const activityIds = activities
+  /** Calcula o próximo ID no formato atividade-NNN a partir de uma lista de atividades (evita duplicata com uso simultâneo). */
+  const getNextActivityIdFromList = (list: Activity[]): string => {
+    const numbers = list
       .map((a) => a.id)
       .filter((id) => /^atividade-\d+$/i.test(id))
       .map((id) => {
         const match = id.match(/^atividade-(\d+)$/i);
         return match ? parseInt(match[1], 10) : 0;
       });
-
-    const maxNumber = activityIds.length > 0 ? Math.max(...activityIds) : 0;
-    const nextNumber = maxNumber + 1;
-    return `atividade-${String(nextNumber).padStart(3, '0')}`;
+    const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+    return `atividade-${String(maxNumber + 1).padStart(3, '0')}`;
   };
+
+  /** Usado apenas quando a lista em memória está carregada (ex.: filtros). Para nova atividade, use getNextActivityIdFromList com dados frescos da API. */
+  const generateNextActivityId = (): string => getNextActivityIdFromList(activities);
 
   const loadCurriculoHabilidades = async () => {
     if (curriculoHabilidades.length > 0) return;
@@ -263,10 +240,22 @@ export const ManageActivities = () => {
         pdf_estrutura_pedagogica_url: activity.pdf_estrutura_pedagogica_url || '',
         material_apoio_url: activity.material_apoio_url || '',
         bloqueada: activity.bloqueada ?? false,
+        aee: activity.aee ?? false,
+        etapas: Array.isArray(activity.etapas) && activity.etapas.length > 0
+          ? [...activity.etapas]
+          : (activity.etapa ? [activity.etapa] : []),
       });
     } else {
       setEditingActivity(null);
-      const nextId = generateNextActivityId();
+      // Buscar lista atualizada na API para evitar "código já cadastrado" com uso simultâneo
+      let nextId: string;
+      try {
+        const res = await apiService.getActivities({});
+        const list = (res as { activities?: Activity[] }).activities ?? [];
+        nextId = getNextActivityIdFromList(list);
+      } catch {
+        nextId = getNextActivityIdFromList(activities);
+      }
       setFormData({
         id: nextId,
         nome_atividade: '',
@@ -307,6 +296,8 @@ export const ManageActivities = () => {
       pdf_estrutura_pedagogica_url: '',
       material_apoio_url: '',
       bloqueada: false,
+      aee: false,
+      etapas: [],
     });
     setHabilidadesSearch('');
     setThumbnailFile(null);
@@ -389,6 +380,25 @@ export const ManageActivities = () => {
       setFormData({ ...formData, anos_escolares: current.filter((a) => a !== ano) });
     } else {
       setFormData({ ...formData, anos_escolares: [...current, ano] });
+    }
+  };
+
+  const toggleEtapaAee = (etapa: 'Educação Infantil' | 'Anos Iniciais' | 'Anos Finais') => {
+    const current = formData.etapas || [];
+    if (current.includes(etapa)) {
+      const next = current.filter((e) => e !== etapa);
+      setFormData({
+        ...formData,
+        etapas: next,
+        etapa: next.length > 0 ? next[0] : (formData.etapa || 'Anos Iniciais'),
+      });
+    } else {
+      const next = [...current, etapa];
+      setFormData({
+        ...formData,
+        etapas: next,
+        etapa: formData.etapa || next[0],
+      });
     }
   };
 
@@ -516,23 +526,13 @@ export const ManageActivities = () => {
             className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2"
           >
             <option value="all">Todas as etapas</option>
+            <option value="aee">AEE</option>
             <option value="Educação Infantil">Educação Infantil</option>
             <option value="Anos Iniciais">Anos Iniciais</option>
             <option value="Anos Finais">Anos Finais</option>
           </select>
         </div>
         <div className="flex flex-wrap gap-2 items-center justify-between">
-          <button
-            type="button"
-            onClick={handleGenerateThumbsBlocked}
-            disabled={thumbLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50"
-            title="Gera thumbnails via IA (server-side) para atividades travadas sem thumbnail"
-          >
-            {thumbLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-            Gerar thumbs (travadas)
-          </button>
-
           <button
             onClick={() => handleOpenModal()}
             className="flex items-center gap-2 bg-[#044982] text-white px-4 py-2 rounded-md hover:bg-[#005a93] transition"
@@ -773,20 +773,70 @@ export const ManageActivities = () => {
                     <option value="Anos Finais">Anos Finais</option>
                   </select>
                 </div>
-
               </div>
 
-              {formData.etapa !== 'Educação Infantil' && (
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  id="form-aee"
+                  checked={!!formData.aee}
+                  onChange={(e) => setFormData({ ...formData, aee: e.target.checked })}
+                  className="rounded border-gray-300 text-[#044982] focus:ring-[#044982]"
+                />
+                <label htmlFor="form-aee" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  É atividade AEE? (Atendimento Educacional Especializado) — constará na trilha de AEE
+                </label>
+              </div>
+
+              {formData.aee && (
+                <div className="mt-2 p-3 bg-teal-50 border border-teal-200 rounded-lg" role="group" aria-labelledby="etapas-aee-label">
+                  <p id="etapas-aee-label" className="text-sm font-medium text-gray-700 mb-2">
+                    Etapas / Público-alvo (AEE) — pode marcar mais de uma
+                  </p>
+                  <p className="text-xs text-gray-600 mb-2">
+                    A atividade aparecerá nas trilhas por etapa correspondentes (ex.: EI, Anos Iniciais, Anos Finais).
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    {ETAPAS_AEE.map((etapa) => {
+                      const id = `form-etapa-aee-${etapa.replace(/\s/g, '-')}`;
+                      const checked = (formData.etapas || []).includes(etapa);
+                      return (
+                        <label
+                          key={etapa}
+                          htmlFor={id}
+                          className="flex items-center gap-2 cursor-pointer select-none min-h-[2rem] py-1 pr-2 rounded hover:bg-teal-100/50"
+                        >
+                          <input
+                            id={id}
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleEtapaAee(etapa)}
+                            className="rounded border-gray-300 text-[#044982] focus:ring-[#044982] h-4 w-4 shrink-0 cursor-pointer"
+                          />
+                          <span className="text-sm text-gray-700">{etapa}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {(formData.etapa !== 'Educação Infantil' ||
+                (formData.aee &&
+                  ((formData.etapas || []).includes('Anos Iniciais') || (formData.etapas || []).includes('Anos Finais')))) && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Anos Escolares</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Anos Escolares (séries)</label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Marque os anos em que a atividade se aplica (ex.: 1º Ano, 2º Ano). Para AEE com Anos Iniciais/Finais, opcional.
+                  </p>
                   <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                     {ANOS_ESCOLARES.map((ano) => (
-                      <label key={ano} className="flex items-center gap-2 cursor-pointer">
+                      <label key={ano} className="flex items-center gap-2 cursor-pointer select-none min-h-[2rem]">
                         <input
                           type="checkbox"
                           checked={(formData.anos_escolares || []).includes(ano)}
                           onChange={() => toggleAnoEscolar(ano)}
-                          className="rounded border-gray-300 text-[#044982] focus:ring-[#044982]"
+                          className="rounded border-gray-300 text-[#044982] focus:ring-[#044982] h-4 w-4 shrink-0 cursor-pointer"
                         />
                         <span className="text-sm text-gray-700">{ano}</span>
                       </label>

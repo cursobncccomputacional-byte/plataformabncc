@@ -241,6 +241,7 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
     if (empty($criterios)) {
         return [];
     }
+    $hasEtapasCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'etapas'")->rowCount() > 0;
     $conditions = [];
     $params = [];
     $eixoNameToId = [
@@ -287,6 +288,10 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
             } elseif ($valor === 'Anos Iniciais') {
                 $conds = ["etapa = ?"];
                 $params[] = $valor;
+                if ($hasEtapasCol) {
+                    $conds[] = "JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1";
+                    $params[] = json_encode($valor, JSON_UNESCAPED_UNICODE);
+                }
                 $anosIniciaisId = ['1ano', '2ano', '3ano', '4ano', '5ano'];
                 $anosIniciaisNome = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
                 $anosIniciaisNomeAlt = ['1° Ano', '2° Ano', '3° Ano', '4° Ano', '5° Ano'];
@@ -311,8 +316,14 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
                 }
                 $conditions[] = '(' . implode(' OR ', $conds) . ')';
             } else {
-                $conditions[] = "etapa = ?";
-                $params[] = $valor;
+                if ($hasEtapasCol && in_array($valor, ['Educação Infantil', 'Anos Iniciais', 'Anos Finais'], true)) {
+                    $conditions[] = "(etapa = ? OR JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1)";
+                    $params[] = $valor;
+                    $params[] = json_encode($valor, JSON_UNESCAPED_UNICODE);
+                } else {
+                    $conditions[] = "etapa = ?";
+                    $params[] = $valor;
+                }
             }
         } elseif ($tipo === 'ano_escolar') {
             $anoId = $anoEscolarMap[$valor] ?? $valor;
@@ -330,6 +341,8 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
             $conditions[] = "(IF(JSON_VALID(disciplinas_transversais), JSON_CONTAINS(disciplinas_transversais, ?), 0) = 1 OR COALESCE(disciplinas_transversais, '') LIKE ?)";
             $params[] = $disciplinaJson;
             $params[] = '%' . $valor . '%';
+        } elseif ($tipo === 'aee') {
+            $conditions[] = "COALESCE(aee, 0) = 1";
         }
     }
     if (empty($conditions)) {
@@ -339,7 +352,8 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
     $sql = "SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
         COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
         material_apoio_url,
-        COALESCE(bloqueada, 0) as bloqueada
+        COALESCE(bloqueada, 0) as bloqueada,
+        COALESCE(aee, 0) as aee
         FROM atividades WHERE $where ORDER BY COALESCE(criado_em, data_criacao) DESC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -482,6 +496,10 @@ try {
                     if ($valorTrilha === 'Educação Infantil') {
                         $conds[] = "etapa = ?";
                         $params[] = $valorTrilha;
+                        if ($hasEtapasColTrilha) {
+                            $conds[] = "JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1";
+                            $params[] = json_encode($valorTrilha, JSON_UNESCAPED_UNICODE);
+                        }
                     }
                     foreach ([$anoEscolarJson, $anoEscolarNomeJson, $anoEscolarNomeAltJson, $anoEscolarNomeSemJson] as $j) {
                         $conds[] = "(IF(JSON_VALID(anos_escolares), JSON_CONTAINS(anos_escolares, ?), 0) = 1 OR COALESCE(anos_escolares, '') LIKE ?)";
@@ -548,6 +566,7 @@ try {
                             $params[] = json_encode($ano);
                             $params[] = '%' . $ano . '%';
                         }
+                        $etapasCond2 = $hasEtapasColTrilha ? " OR JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1" : "";
                         $stmtAtiv = $pdo->prepare("
                             SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                             COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
@@ -555,22 +574,35 @@ try {
                             FROM atividades 
                             WHERE (
                                 etapa = ?
-                                OR " . implode(' OR ', $conditions) . "
+                                OR " . implode(' OR ', $conditions) . $etapasCond2 . "
                             )
                             ORDER BY COALESCE(criado_em, data_criacao) DESC
                         ");
+                        if ($hasEtapasColTrilha) $params[] = json_encode($valorTrilha, JSON_UNESCAPED_UNICODE);
                         $stmtAtiv->execute($params);
                     } else {
-                        // Buscar apenas por etapa
-                        $stmtAtiv = $pdo->prepare("
-                            SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
-                            COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
-                            FROM atividades 
-                            WHERE etapa = ?
-                            ORDER BY COALESCE(criado_em, data_criacao) DESC
-                        ");
-                        $stmtAtiv->execute([$valorTrilha]);
+                        // Buscar apenas por etapa (inclui AEE com múltiplas etapas)
+                        if ($hasEtapasColTrilha) {
+                            $stmtAtiv = $pdo->prepare("
+                                SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                                COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                                material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                                FROM atividades 
+                                WHERE etapa = ? OR JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1
+                                ORDER BY COALESCE(criado_em, data_criacao) DESC
+                            ");
+                            $stmtAtiv->execute([$valorTrilha, json_encode($valorTrilha, JSON_UNESCAPED_UNICODE)]);
+                        } else {
+                            $stmtAtiv = $pdo->prepare("
+                                SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                                COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                                material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                                FROM atividades 
+                                WHERE etapa = ?
+                                ORDER BY COALESCE(criado_em, data_criacao) DESC
+                            ");
+                            $stmtAtiv->execute([$valorTrilha]);
+                        }
                     }
                 }
                 $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
@@ -592,6 +624,23 @@ try {
                 ");
                 $stmtAtiv->execute([$disciplinaJson, $likeDisc]);
                 $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
+            } elseif ($trilha['tipo'] === 'aee') {
+                // Trilha AEE: listar atividades marcadas como AEE (coluna aee = 1)
+                $hasAeeCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+                if ($hasAeeCol) {
+                    $stmtAtiv = $pdo->prepare("
+                        SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
+                        COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada, COALESCE(aee, 0) as aee
+                        FROM atividades
+                        WHERE COALESCE(aee, 0) = 1
+                        ORDER BY COALESCE(criado_em, data_criacao) DESC
+                    ");
+                    $stmtAtiv->execute([]);
+                    $atividades = $stmtAtiv->fetchAll(PDO::FETCH_ASSOC);
+                } else {
+                    $atividades = [];
+                }
             }
             
             // Processar atividades
@@ -641,6 +690,7 @@ try {
                     'pedagogical_pdf_url' => $atividade['pdf_estrutura_pedagogica_url'] ?? null,
                     'document_url' => $atividade['pdf_estrutura_pedagogica_url'] ?? null,
                     'bloqueada' => (int)($atividade['bloqueada'] ?? 0) === 1,
+                    'aee' => (int)($atividade['aee'] ?? 0) === 1,
                 ];
             }
             
@@ -800,15 +850,15 @@ try {
             json_response_trilha(400, ['error' => true, 'message' => 'Informe ao menos um critério de agrupamento (tipo+valor ou criterios_agrupamento)']);
         }
         if (empty($criterios)) {
-            $allowedTipos = ['eixo_bncc', 'etapa', 'disciplina_transversal', 'ano_escolar'];
+            $allowedTipos = ['eixo_bncc', 'etapa', 'disciplina_transversal', 'ano_escolar', 'aee'];
             if (!in_array($tipo, $allowedTipos, true)) {
-                json_response_trilha(400, ['error' => true, 'message' => 'Tipo inválido. Use: eixo_bncc, etapa, ano_escolar ou disciplina_transversal']);
+                json_response_trilha(400, ['error' => true, 'message' => 'Tipo inválido. Use: eixo_bncc, etapa, ano_escolar, disciplina_transversal ou aee']);
             }
         } else {
-            $allowedTipos = ['eixo_bncc', 'etapa', 'disciplina_transversal', 'ano_escolar'];
+            $allowedTipos = ['eixo_bncc', 'etapa', 'disciplina_transversal', 'ano_escolar', 'aee'];
             foreach ($criterios as $c) {
                 if (!in_array($c['tipo'] ?? '', $allowedTipos, true)) {
-                    json_response_trilha(400, ['error' => true, 'message' => 'Critério com tipo inválido. Use: eixo_bncc, etapa, ano_escolar ou disciplina_transversal']);
+                    json_response_trilha(400, ['error' => true, 'message' => 'Critério com tipo inválido. Use: eixo_bncc, etapa, ano_escolar, disciplina_transversal ou aee']);
                 }
             }
         }

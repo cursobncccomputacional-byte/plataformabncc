@@ -11,6 +11,13 @@
 
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/database.php';
+
+// Preflight CORS: responder OPTIONS com 200 antes de qualquer auth
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 require_once __DIR__ . '/../config/auth.php';
 
 if (session_status() === PHP_SESSION_NONE) {

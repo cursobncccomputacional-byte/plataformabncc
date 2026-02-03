@@ -305,18 +305,22 @@ try {
 
         if ($activityId) {
             // Buscar atividade específica (com compatibilidade para campos antigos)
+            $hasAeeColSingle = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+            $hasEtapasColSingle = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'etapas'")->rowCount() > 0;
             $stmt = $pdo->prepare("SELECT 
                 id,
                 COALESCE(nome_atividade, titulo) as nome_atividade,
                 descricao,
                 tipo,
                 etapa,
+                " . ($hasEtapasColSingle ? "COALESCE(etapas, '[]') as etapas," : "") . "
                 anos_escolares,
                 COALESCE(eixos_bncc, JSON_ARRAY(id_eixo)) as eixos_bncc,
                 COALESCE(disciplinas_transversais, '[]') as disciplinas_transversais,
                 COALESCE(habilidades_ids, '[]') as habilidades_ids,
                 duracao,
-                COALESCE(nivel_dificuldade, 
+                " . ($hasAeeColSingle ? "COALESCE(aee, 0) as aee," : "") . "
+                COALESCE(nivel_dificuldade,
                     CASE 
                         WHEN dificuldade = 'facil' THEN 'Fácil'
                         WHEN dificuldade = 'medio' THEN 'Médio'
@@ -401,29 +405,38 @@ try {
             if ($currentUser && strtolower((string)($currentUser['role'] ?? '')) === 'teste_professor') {
                 $bloqueada = !is_teste_professor_allowed($pdo, (string)($activity['id'] ?? ''), (string)($activity['nome_atividade'] ?? ''));
             }
+            $activityOut = [
+                'id' => $activity['id'],
+                'nome_atividade' => $activity['nome_atividade'] ?? '',
+                'descricao' => $activity['descricao'] ?? null,
+                'tipo' => $tipo,
+                'etapa' => $activity['etapa'] ?? null,
+                'anos_escolares' => $anosEscolares,
+                'eixos_bncc' => $eixosBncc,
+                'disciplinas_transversais' => $disciplinasTransversais,
+                'habilidades_ids' => $habilidadesIds,
+                'habilidades' => $habilidadesDetails,
+                'duracao' => $activity['duracao'] ?? null,
+                'thumbnail_url' => $activity['thumbnail_url'] ?? null,
+                'video_url' => $activity['video_url'] ?? null,
+                'pdf_estrutura_pedagogica_url' => $activity['pdf_estrutura_pedagogica_url'] ?? null,
+                'material_apoio_url' => $activity['material_apoio_url'] ?? null,
+                'criado_em' => $activity['criado_em'] ?? null,
+                'atualizado_em' => $activity['atualizado_em'] ?? null,
+                'criado_por' => $activity['criado_por'] ?? null,
+                'bloqueada' => $bloqueada,
+            ];
+            if ($hasAeeColSingle) {
+                $activityOut['aee'] = (int)($activity['aee'] ?? 0) === 1;
+            }
+            if ($hasEtapasColSingle && isset($activity['etapas'])) {
+                $etapasRaw = $activity['etapas'];
+                $etapasArray = is_string($etapasRaw) ? (json_decode($etapasRaw, true) ?: []) : (is_array($etapasRaw) ? $etapasRaw : []);
+                $activityOut['etapas'] = array_values(array_filter($etapasArray, 'is_string'));
+            }
             json_response_act(200, [
                 'error' => false,
-                'activity' => [
-                    'id' => $activity['id'],
-                    'nome_atividade' => $activity['nome_atividade'] ?? '',
-                    'descricao' => $activity['descricao'] ?? null,
-                    'tipo' => $tipo,
-                    'etapa' => $activity['etapa'] ?? null,
-                    'anos_escolares' => $anosEscolares,
-                    'eixos_bncc' => $eixosBncc,
-                    'disciplinas_transversais' => $disciplinasTransversais,
-                    'habilidades_ids' => $habilidadesIds,
-                    'habilidades' => $habilidadesDetails,
-                    'duracao' => $activity['duracao'] ?? null,
-                    'thumbnail_url' => $activity['thumbnail_url'] ?? null,
-                    'video_url' => $activity['video_url'] ?? null,
-                    'pdf_estrutura_pedagogica_url' => $activity['pdf_estrutura_pedagogica_url'] ?? null,
-                    'material_apoio_url' => $activity['material_apoio_url'] ?? null,
-                    'criado_em' => $activity['criado_em'] ?? null,
-                    'atualizado_em' => $activity['atualizado_em'] ?? null,
-                    'criado_por' => $activity['criado_por'] ?? null,
-                    'bloqueada' => $bloqueada,
-                ]
+                'activity' => $activityOut
             ]);
         } else {
             // Listar todas as atividades (com filtros opcionais)
@@ -432,17 +445,21 @@ try {
             $search = $_GET['search'] ?? null;
 
             // Selecionar campos novos e antigos para compatibilidade
+            $hasAeeCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+            $hasEtapasCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'etapas'")->rowCount() > 0;
             $sql = "SELECT 
                 id,
                 COALESCE(nome_atividade, titulo) as nome_atividade,
                 descricao,
                 tipo,
                 etapa,
+                " . ($hasEtapasCol ? "COALESCE(etapas, '[]') as etapas," : "") . "
                 anos_escolares,
                 COALESCE(eixos_bncc, JSON_ARRAY(id_eixo)) as eixos_bncc,
                 COALESCE(disciplinas_transversais, '[]') as disciplinas_transversais,
                 COALESCE(habilidades_ids, '[]') as habilidades_ids,
                 duracao,
+                " . ($hasAeeCol ? "COALESCE(aee, 0) as aee," : "") . "
                 COALESCE(nivel_dificuldade, 
                     CASE 
                         WHEN dificuldade = 'facil' THEN 'Fácil'
@@ -477,8 +494,20 @@ try {
             }
 
             if ($etapa) {
-                $sql .= " AND etapa = ?";
-                $params[] = $etapa;
+                if (strtolower($etapa) === 'aee') {
+                    if ($hasAeeCol) {
+                        $sql .= " AND COALESCE(aee, 0) = 1";
+                    } else {
+                        $sql .= " AND 1 = 0";
+                    }
+                } elseif ($hasEtapasCol) {
+                    $sql .= " AND (etapa = ? OR JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1)";
+                    $params[] = $etapa;
+                    $params[] = json_encode($etapa, JSON_UNESCAPED_UNICODE);
+                } else {
+                    $sql .= " AND etapa = ?";
+                    $params[] = $etapa;
+                }
             }
 
             if ($search) {
@@ -548,7 +577,7 @@ try {
                     }
                 }
                 
-                $activitiesData[] = [
+                $item = [
                     'id' => $activity['id'],
                     'nome_atividade' => $activity['nome_atividade'] ?? '',
                     'descricao' => $activity['descricao'] ?? null,
@@ -567,6 +596,14 @@ try {
                     'atualizado_em' => $activity['atualizado_em'] ?? null,
                     'bloqueada' => (int)($activity['bloqueada'] ?? 0) === 1,
                 ];
+                if ($hasAeeCol) {
+                    $item['aee'] = (int)($activity['aee'] ?? 0) === 1;
+                }
+                if ($hasEtapasCol && isset($activity['etapas'])) {
+                    $etapasRaw = $activity['etapas'];
+                    $item['etapas'] = is_string($etapasRaw) ? (json_decode($etapasRaw, true) ?: []) : (is_array($etapasRaw) ? $etapasRaw : []);
+                }
+                $activitiesData[] = $item;
             }
 
             // Perfil "Teste Professor": liberar apenas as atividades da lista fixa (EI até 5º ano); demais bloqueadas
@@ -592,14 +629,30 @@ try {
             : null;
         $tipo = (string)($data['tipo'] ?? '');
         $etapa = (string)($data['etapa'] ?? '');
-        // Para Educação Infantil, anos_escolares deve ser array vazio []
-        // Para outras etapas, pode ser array vazio ou com valores
-        if ($etapa === 'Educação Infantil') {
-            $anosEscolares = '[]'; // JSON array vazio para Educação Infantil
+        // etapas: para AEE, array de etapas (ex.: ["Educação Infantil", "Anos Iniciais", "Anos Finais"])
+        $etapasArray = isset($data['etapas']) && is_array($data['etapas'])
+            ? array_values(array_filter(array_map('trim', $data['etapas']), function ($v) { return $v !== ''; }))
+            : [];
+        $allowedEtapasList = ['Educação Infantil', 'Anos Iniciais', 'Anos Finais'];
+        $etapasArray = array_values(array_intersect($etapasArray, $allowedEtapasList));
+        $aee = !empty($data['aee']);
+        if ($aee && !empty($etapasArray) && $etapa === '') {
+            $etapa = $etapasArray[0];
+        }
+        if ($aee && !empty($etapasArray) && !in_array($etapa, $etapasArray, true)) {
+            $etapa = $etapasArray[0];
+        }
+        $etapasJson = !empty($etapasArray) ? json_encode($etapasArray, JSON_UNESCAPED_UNICODE) : null;
+        // Para Educação Infantil (não AEE), anos_escolares = []. Para AEE ou outras etapas, usar o que o usuário enviou.
+        $userAnosEscolares = isset($data['anos_escolares']) && is_array($data['anos_escolares'])
+            ? array_values(array_filter($data['anos_escolares'], function ($v) { return trim((string)$v) !== ''; }))
+            : [];
+        if ($etapa === 'Educação Infantil' && !$aee) {
+            $anosEscolares = '[]'; // Educação Infantil (não AEE): sem séries
+        } elseif (!empty($userAnosEscolares)) {
+            $anosEscolares = json_encode($userAnosEscolares, JSON_UNESCAPED_UNICODE); // Respeitar séries selecionadas (inclui AEE)
         } else {
-            $anosEscolares = isset($data['anos_escolares']) && is_array($data['anos_escolares'])
-                ? json_encode($data['anos_escolares'], JSON_UNESCAPED_UNICODE) 
-                : '[]'; // Array vazio ao invés de null
+            $anosEscolares = '[]';
         }
         // habilidades_ids: se enviado, derivar eixos_bncc a partir de curriculo_habilidades
         $habilidadesIds = [];
@@ -685,63 +738,88 @@ try {
             json_response_act(409, ['error' => true, 'message' => 'Atividade com este ID já existe']);
         }
 
-        // Criar atividade (habilidades_ids: coluna opcional; bloqueada: coluna opcional)
+        // Criar atividade (habilidades_ids: coluna opcional; bloqueada: coluna opcional; etapas: AEE múltiplas etapas)
         try {
             $hasBloqueadaCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'bloqueada'")->rowCount() > 0;
+            $hasAeeColInsert = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+            $hasEtapasColInsert = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'etapas'")->rowCount() > 0;
             $bloqueadaVal = $bloqueada ? 1 : 0;
+            $aeeVal = $aee ? 1 : 0;
+            $colsEtapas = $hasEtapasColInsert ? ', etapas' : '';
+            $valsEtapas = $hasEtapasColInsert ? ', ?' : '';
             $hasHabilidadesCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'habilidades_ids'")->rowCount() > 0;
             if ($hasHabilidadesCol && $hasBloqueadaCol) {
+                $colsAee = $hasAeeColInsert ? ', aee' : '';
+                $valsAee = $hasAeeColInsert ? ', ?' : '';
                 $stmt = $pdo->prepare("
                     INSERT INTO atividades (
                         id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais, habilidades_ids,
                         duracao, nivel_dificuldade, thumbnail_url, video_url,
-                        pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada, criado_por
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada{$colsAee}{$colsEtapas}, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{$valsAee}{$valsEtapas}, ?)
                 ");
                 $params = [
                     $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais, $habilidadesIdsJson,
                     $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
-                    $pdfEstruturaUrl, $materialApoioUrl, $bloqueadaVal, $currentUser['id']
+                    $pdfEstruturaUrl, $materialApoioUrl, $bloqueadaVal
                 ];
+                if ($hasAeeColInsert) $params[] = $aeeVal;
+                if ($hasEtapasColInsert) $params[] = $etapasJson;
+                $params[] = $currentUser['id'];
             } elseif ($hasHabilidadesCol) {
+                $colsAee = $hasAeeColInsert ? ', aee' : '';
+                $valsAee = $hasAeeColInsert ? ', ?' : '';
                 $stmt = $pdo->prepare("
                     INSERT INTO atividades (
                         id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais, habilidades_ids,
                         duracao, nivel_dificuldade, thumbnail_url, video_url,
-                        pdf_estrutura_pedagogica_url, material_apoio_url, criado_por
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        pdf_estrutura_pedagogica_url, material_apoio_url{$colsAee}{$colsEtapas}, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{$valsAee}{$valsEtapas}, ?)
                 ");
                 $params = [
                     $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais, $habilidadesIdsJson,
                     $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
-                    $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
+                    $pdfEstruturaUrl, $materialApoioUrl
                 ];
+                if ($hasAeeColInsert) $params[] = $aeeVal;
+                if ($hasEtapasColInsert) $params[] = $etapasJson;
+                $params[] = $currentUser['id'];
             } elseif ($hasBloqueadaCol) {
+                $colsAee = $hasAeeColInsert ? ', aee' : '';
+                $valsAee = $hasAeeColInsert ? ', ?' : '';
                 $stmt = $pdo->prepare("
                     INSERT INTO atividades (
                         id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais,
                         duracao, nivel_dificuldade, thumbnail_url, video_url,
-                        pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada, criado_por
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        pdf_estrutura_pedagogica_url, material_apoio_url, bloqueada{$colsAee}{$colsEtapas}, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{$valsAee}{$valsEtapas}, ?)
                 ");
                 $params = [
                     $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
                     $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
-                    $pdfEstruturaUrl, $materialApoioUrl, $bloqueadaVal, $currentUser['id']
+                    $pdfEstruturaUrl, $materialApoioUrl, $bloqueadaVal
                 ];
+                if ($hasAeeColInsert) $params[] = $aeeVal;
+                if ($hasEtapasColInsert) $params[] = $etapasJson;
+                $params[] = $currentUser['id'];
             } else {
+                $colsAee = $hasAeeColInsert ? ', aee' : '';
+                $valsAee = $hasAeeColInsert ? ', ?' : '';
                 $stmt = $pdo->prepare("
                     INSERT INTO atividades (
                         id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, disciplinas_transversais,
                         duracao, nivel_dificuldade, thumbnail_url, video_url,
-                        pdf_estrutura_pedagogica_url, material_apoio_url, criado_por
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        pdf_estrutura_pedagogica_url, material_apoio_url{$colsAee}{$colsEtapas}, criado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{$valsAee}{$valsEtapas}, ?)
                 ");
                 $params = [
                     $id, $nomeAtividade, $descricao, $tipo, $etapa, $anosEscolares, $eixosBncc, $disciplinasTransversais,
                     $duracao, 'Médio', $thumbnailUrl, $videoUrl ?: null,
-                    $pdfEstruturaUrl, $materialApoioUrl, $currentUser['id']
+                    $pdfEstruturaUrl, $materialApoioUrl
                 ];
+                if ($hasAeeColInsert) $params[] = $aeeVal;
+                if ($hasEtapasColInsert) $params[] = $etapasJson;
+                $params[] = $currentUser['id'];
             }
             $stmt->execute($params);
         } catch (PDOException $e) {
@@ -792,6 +870,16 @@ try {
         if (isset($data['etapa'])) {
             $updates[] = "etapa = ?";
             $params[] = (string)$data['etapa'];
+        }
+        if (array_key_exists('etapas', $data)) {
+            $hasEtapasColPut = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'etapas'")->rowCount() > 0;
+            if ($hasEtapasColPut) {
+                $putEtapas = is_array($data['etapas']) ? array_values(array_filter(array_map('trim', $data['etapas']), function ($v) { return $v !== ''; })) : [];
+                $allowedPut = ['Educação Infantil', 'Anos Iniciais', 'Anos Finais'];
+                $putEtapas = array_values(array_intersect($putEtapas, $allowedPut));
+                $updates[] = "etapas = ?";
+                $params[] = empty($putEtapas) ? null : json_encode($putEtapas, JSON_UNESCAPED_UNICODE);
+            }
         }
         if (isset($data['anos_escolares'])) {
             $updates[] = "anos_escolares = ?";

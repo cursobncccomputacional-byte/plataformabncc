@@ -51,7 +51,7 @@ if ($allowOrigin) {
 }
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Session-ID, X-User-Id, X-User-Role');
 // REMOVIDO: Access-Control-Allow-Credentials: true
 // O projeto que funciona usa Access-Control-Allow-Origin: * SEM credentials

@@ -1,6 +1,4 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useInactivityTimer } from '../hooks/useInactivityTimer';
-import { InactivityWarning } from '../components/InactivityWarning';
 import { 
   SchoolYear, 
   BNCCAxis, 
@@ -53,12 +51,6 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
-  
-  // Inactivity Management
-  showInactivityWarning: boolean;
-  extendSession: () => void;
-  handleInactivityLogout: () => void;
-  getTimeRemaining: () => number;
   
   // User Management (Admin only)
   getAllUsers: () => Promise<User[]>;
@@ -128,37 +120,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return initial ? { user: initial } : null;
   });
   const [loading, setLoading] = useState(true);
-  const [showInactivityWarning, setShowInactivityWarning] = useState(false);
   const [spreadsheetActivities, setSpreadsheetActivities] = useState<Activity[]>([]);
   const [activitiesSpreadsheet, setActivitiesSpreadsheet] = useState<{
     loaded: boolean;
     url: string | null;
     error: string | null;
   }>({ loaded: false, url: null, error: null });
-
-  // Hook de inatividade - 10 minutos (600000ms)
-  const { getTimeRemaining, resetTimer } = useInactivityTimer({
-    timeout: 10 * 60 * 1000, // 10 minutos
-    onTimeout: () => {
-      setShowInactivityWarning(true);
-    }
-  });
-
-  // Função para estender a sessão
-  const extendSession = () => {
-    setShowInactivityWarning(false);
-    resetTimer();
-  };
-
-  // Função para logout por inatividade
-  const handleInactivityLogout = async () => {
-    setShowInactivityWarning(false);
-    // Registrar logout por inatividade antes de fazer signOut
-    if (user) {
-      await sessionService.registerLogout({ tipo_logout: 'inativo' });
-    }
-    signOut();
-  };
 
   useEffect(() => {
     // Verificar se há sessão ativa na API (apenas dados reais)
@@ -825,12 +792,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     updateProfile,
     
-    // Inactivity Management
-    showInactivityWarning,
-    extendSession,
-    handleInactivityLogout,
-    getTimeRemaining,
-    
     // User Management (Admin only)
     getAllUsers,
     createUser,
@@ -863,15 +824,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {/* Componente de aviso de inatividade */}
-      {user && (
-        <InactivityWarning
-          isVisible={showInactivityWarning}
-          timeRemaining={getTimeRemaining()}
-          onExtend={extendSession}
-          onLogout={handleInactivityLogout}
-        />
-      )}
     </AuthContext.Provider>
   );
 };

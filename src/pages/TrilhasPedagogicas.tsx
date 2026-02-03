@@ -12,7 +12,7 @@ interface Trilha {
   id: string;
   titulo: string;
   descricao?: string;
-  tipo: 'eixo_bncc' | 'etapa' | 'ano_escolar' | 'disciplina_transversal';
+  tipo: 'eixo_bncc' | 'etapa' | 'ano_escolar' | 'disciplina_transversal' | 'aee';
   valor: string;
   thumbnail_url?: string;
   ordem: number;
@@ -66,6 +66,7 @@ export const TrilhasPedagogicas = () => {
   const [trilhasEtapa, setTrilhasEtapa] = useState<Trilha[]>([]);
   const [trilhasSeries, setTrilhasSeries] = useState<Trilha[]>([]);
   const [trilhasDisciplinas, setTrilhasDisciplinas] = useState<Trilha[]>([]);
+  const [trilhasAee, setTrilhasAee] = useState<Trilha[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrilha, setSelectedTrilha] = useState<Trilha | null>(null);
   const [atividadesTrilha, setAtividadesTrilha] = useState<Atividade[]>([]);
@@ -107,11 +108,12 @@ export const TrilhasPedagogicas = () => {
   const loadTrilhas = async () => {
     setLoading(true);
     try {
-      const [responseEixo, responseEtapa, responseAnoEscolar, responseDisciplinas] = await Promise.all([
+      const [responseEixo, responseEtapa, responseAnoEscolar, responseDisciplinas, responseAee] = await Promise.all([
         apiService.getTrilhas('eixo_bncc'),
         apiService.getTrilhas('etapa'),
         apiService.getTrilhas('ano_escolar'),
         apiService.getTrilhas('disciplina_transversal'),
+        apiService.getTrilhas('aee'),
       ]);
 
       if (!responseEixo.error) {
@@ -139,12 +141,16 @@ export const TrilhasPedagogicas = () => {
       if (!responseDisciplinas.error) {
         setTrilhasDisciplinas(responseDisciplinas.trilhas || []);
       }
+      if (!responseAee.error) {
+        setTrilhasAee(responseAee.trilhas || []);
+      }
 
       setTrilhas([
         ...(responseEixo.trilhas || []), 
         ...(responseEtapa.trilhas || []),
         ...(responseAnoEscolar.trilhas || []),
-        ...(responseDisciplinas.trilhas || [])
+        ...(responseDisciplinas.trilhas || []),
+        ...(responseAee.trilhas || [])
       ]);
     } catch (error) {
       console.error('Erro ao carregar trilhas:', error);
@@ -188,6 +194,9 @@ export const TrilhasPedagogicas = () => {
     trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredTrilhasDisciplinas = trilhasDisciplinas.filter((trilha) =>
+    trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredTrilhasAee = trilhasAee.filter((trilha) =>
     trilha.titulo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -299,7 +308,9 @@ export const TrilhasPedagogicas = () => {
                   ? 'Eixo BNCC'
                   : selectedTrilha.tipo === 'etapa' || selectedTrilha.tipo === 'ano_escolar'
                     ? 'Etapa'
-                    : 'Disciplina Transversal'}
+                    : selectedTrilha.tipo === 'aee'
+                      ? 'AEE'
+                      : 'Disciplina Transversal'}
               </span>
               <span>{atividadesTrilha.length} atividades</span>
             </div>
@@ -998,7 +1009,61 @@ Forneça uma sugestão detalhada e objetiva que o professor possa usar imediatam
               </div>
             )}
 
-            {filteredTrilhasEixo.length === 0 && filteredTrilhasEtapa.length === 0 && filteredTrilhasSeries.length === 0 && filteredTrilhasDisciplinas.length === 0 && (
+            {/* Trilhas AEE (Atendimento Educacional Especializado) */}
+            {filteredTrilhasAee.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Trilhas AEE</h2>
+                <p className="text-gray-600 mb-4">Atendimento Educacional Especializado — atividades marcadas como AEE</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {filteredTrilhasAee.map((trilha) => {
+                    const Icon = getTrilhaIcon(trilha.tipo, trilha.valor);
+                    return (
+                      <motion.div
+                        key={trilha.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-all"
+                        onClick={() => handleTrilhaClick(trilha)}
+                      >
+                        <div className="relative h-48 bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                          {trilha.thumbnail_url ? (
+                            <img
+                              src={resolvePublicAssetUrl(trilha.thumbnail_url) || ''}
+                              alt={trilha.titulo}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Icon className="w-16 h-16 text-white opacity-80" />
+                          )}
+                          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                            <span className="px-4 py-2 bg-white bg-opacity-90 text-gray-900 rounded-lg font-semibold">
+                              Ver trilha
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-lg text-gray-900 mb-1">{trilha.titulo}</h3>
+                          {trilha.descricao && (
+                            <p className="text-sm text-gray-600 line-clamp-2">{trilha.descricao}</p>
+                          )}
+                          <div className="mt-3 flex items-center justify-between">
+                            <span className="text-xs text-gray-500">{trilha.valor}</span>
+                            <ArrowRight className="w-5 h-5 text-[#044982]" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {filteredTrilhasEixo.length === 0 && filteredTrilhasEtapa.length === 0 && filteredTrilhasSeries.length === 0 && filteredTrilhasDisciplinas.length === 0 && filteredTrilhasAee.length === 0 && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma trilha encontrada</h3>
