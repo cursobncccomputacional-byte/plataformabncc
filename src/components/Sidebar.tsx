@@ -24,6 +24,7 @@ type PageType =
   | 'manage-bncc'
   | 'relatorios-menu'
   | 'relatorio-atividades'
+  | 'relatorio-aderencia-videos'
   | 'termo-referencia'
   | 'glossario'
   | 'politica-privacidade'
@@ -157,7 +158,7 @@ export const Sidebar = ({
   }, [currentPage]);
 
   useEffect(() => {
-    if (currentPage === 'relatorio-atividades') {
+    if (currentPage === 'relatorio-atividades' || currentPage === 'relatorio-aderencia-videos') {
       setRelatoriosMenuOpen(true);
     }
   }, [currentPage]);
@@ -208,6 +209,7 @@ export const Sidebar = ({
   // Submenu Relatórios (apenas root)
   const relatoriosSubMenuItems = useMemo(() => [
     { id: 'relatorio-atividades' as const, icon: Activity, label: 'Relatório de Atividades' },
+    { id: 'relatorio-aderencia-videos' as const, icon: Video, label: 'Aderência aos Vídeos' },
   ], []);
 
   // Submenu Gestão Interna (apenas root)
@@ -547,7 +549,7 @@ export const Sidebar = ({
                       onClick={() => setRelatoriosMenuOpen(!relatoriosMenuOpen)}
                       className={`
                         w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
-                        ${relatoriosMenuOpen || currentPage === 'relatorio-atividades'
+                        ${relatoriosMenuOpen || currentPage === 'relatorio-atividades' || currentPage === 'relatorio-aderencia-videos'
                           ? 'bg-white text-[#005a93] shadow-md' 
                           : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
                         }

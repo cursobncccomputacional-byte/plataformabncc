@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/LocalAuthContext';
 import { Activity, SchoolYear, BNCCAxis } from '../types/bncc';
 import { SecurePDFViewer } from '../components/SecurePDFViewer';
 import { activityLogger } from '../services/ActivityLogger';
+import { sessionService } from '../services/sessionService';
 import { ActivityDuration } from '../components/ActivityDuration';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
 import { apiService } from '../services/apiService';
@@ -345,7 +346,13 @@ export const Activities = () => {
     if (activity.bloqueada) return;
     if (url && user) {
       setSelectedPDF({ url, title: `${activity.title} — ${label}` });
-      activityLogger.logViewActivity(user.id, user.name, user.email, activity.id, activity.title);
+      activityLogger.logViewDocument(user.id, user.name, user.email, activity.id, activity.title);
+      sessionService.registerActivity({
+        usuario_id: user.id,
+        tipo_atividade: 'view_document',
+        recurso_id: activity.id,
+        recurso_titulo: activity.title,
+      });
     }
   };
 
@@ -353,7 +360,13 @@ export const Activities = () => {
     if (activity.bloqueada) return;
     if (activity.video_url && user) {
       setSelectedVideo({ url: activity.video_url, title: activity.title });
-      activityLogger.logViewActivity(user.id, user.name, user.email, activity.id, activity.title);
+      activityLogger.logViewVideo(user.id, user.name, user.email, activity.id, activity.title);
+      sessionService.registerActivity({
+        usuario_id: user.id,
+        tipo_atividade: 'view_video',
+        recurso_id: activity.id,
+        recurso_titulo: activity.title,
+      });
     }
   };
 

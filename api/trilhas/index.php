@@ -342,7 +342,15 @@ function atividades_por_criterios(PDO $pdo, array $criterios): array {
             $params[] = $disciplinaJson;
             $params[] = '%' . $valor . '%';
         } elseif ($tipo === 'aee') {
-            $conditions[] = "COALESCE(aee, 0) = 1";
+            // AEE: priorizar coluna booleana aee=1, mas também
+            // incluir atividades cujo anos_escolares contenham "AEE"/"aee"
+            // para compatibilidade com dados antigos/importados.
+            $hasAeeCol = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+            if ($hasAeeCol) {
+                $conditions[] = "(COALESCE(aee, 0) = 1 OR COALESCE(anos_escolares, '') LIKE '%AEE%' OR COALESCE(anos_escolares, '') LIKE '%\"aee\"%')";
+            } else {
+                $conditions[] = "(COALESCE(anos_escolares, '') LIKE '%AEE%' OR COALESCE(anos_escolares, '') LIKE '%\"aee\"%')";
+            }
         }
     }
     if (empty($conditions)) {
@@ -414,11 +422,41 @@ try {
             $criterios = array_filter($criterios, function ($c) {
                 return !empty($c['tipo']) && isset($c['valor']) && trim((string)$c['valor']) !== '';
             });
+
+            // Trilha especial AEE: forçar uso do critério "aee" independente do que estiver salvo
+            $isTrilhaAee =
+                isset($trilha['id'], $trilha['valor']) &&
+                mb_strtolower((string)$trilha['id'], 'UTF-8') === 'trilha-aee' &&
+                mb_strtoupper((string)$trilha['valor'], 'UTF-8') === 'AEE';
+            if ($isTrilhaAee) {
+                $criterios = [[
+                    'tipo' => 'aee',
+                    'valor' => 'AEE',
+                ]];
+            }
             
             // Buscar atividades: por critérios de agrupamento (AND) ou por tipo+valor (retrocompatível)
             $atividades = [];
             if (!empty($criterios)) {
                 $atividades = atividades_por_criterios($pdo, $criterios);
+            } elseif ($trilha['tipo'] === 'ano_escolar') {
+                // Compatibilidade: trilhas antigas onde tipo=ano_escolar e valor (ex.: "1º Ano", "AEE")
+                // mas criterios_agrupamento ainda não foram preenchidos.
+                $valorTrilha = (string)($trilha['valor'] ?? '');
+                if (mb_strtoupper($valorTrilha, 'UTF-8') === 'AEE') {
+                    // Trilha especial AEE: usar coluna booleana aee (todas as atividades marcadas como AEE)
+                    $syntheticCriteria = [[
+                        'tipo' => 'aee',
+                        'valor' => 'AEE',
+                    ]];
+                } else {
+                    // Demais trilhas por série (1º ao 9º ano): buscar por ano_escolar
+                    $syntheticCriteria = [[
+                        'tipo' => 'ano_escolar',
+                        'valor' => $valorTrilha,
+                    ]];
+                }
+                $atividades = atividades_por_criterios($pdo, $syntheticCriteria);
             } elseif ($trilha['tipo'] === 'eixo_bncc') {
                 // Buscar atividades que têm este eixo BNCC no array JSON
                 // Mapear nome do eixo para ID (caso as atividades tenham IDs)

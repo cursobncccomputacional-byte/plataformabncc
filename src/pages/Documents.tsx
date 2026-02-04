@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/LocalAuthContext';
 import { Activity } from '../types/bncc';
 import { SecurePDFViewer } from '../components/SecurePDFViewer';
 import { activityLogger } from '../services/ActivityLogger';
+import { sessionService } from '../services/sessionService';
 import { resolvePublicAssetUrl } from '../utils/assetUrl';
 
 export const Documents = () => {
@@ -48,8 +49,14 @@ export const Documents = () => {
       link.click();
       document.body.removeChild(link);
       
-      // Log do download
+      // Log do download (local e backend para relatório de aderência)
       activityLogger.logDownload(user.id, user.name, user.email, 'document', activity.id, activity.title);
+      sessionService.registerActivity({
+        usuario_id: user.id,
+        tipo_atividade: 'download',
+        recurso_id: activity.id,
+        recurso_titulo: activity.title,
+      });
     }
   };
 

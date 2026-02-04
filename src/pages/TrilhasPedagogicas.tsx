@@ -7,6 +7,7 @@ import { resolvePublicAssetUrl } from '../utils/assetUrl';
 import { renderMarkdown } from '../utils/markdownRenderer';
 import { ActivityDuration } from '../components/ActivityDuration';
 import { SecurePDFViewer } from '../components/SecurePDFViewer';
+import { sessionService } from '../services/sessionService';
 
 interface Trilha {
   id: string;
@@ -409,6 +410,14 @@ export const TrilhasPedagogicas = () => {
                             e.stopPropagation();
                             if (atividade.bloqueada || !atividade.video_url) return;
                             setSelectedVideo({ url: atividade.video_url, title: atividade.nome_atividade });
+                            if (user) {
+                              sessionService.registerActivity({
+                                usuario_id: user.id,
+                                tipo_atividade: 'view_video',
+                                recurso_id: atividade.id,
+                                recurso_titulo: atividade.nome_atividade,
+                              });
+                            }
                             if (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches) {
                               setVideoPlayerReady(true);
                             }

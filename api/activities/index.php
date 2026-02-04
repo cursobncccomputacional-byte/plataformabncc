@@ -643,14 +643,22 @@ try {
             $etapa = $etapasArray[0];
         }
         $etapasJson = !empty($etapasArray) ? json_encode($etapasArray, JSON_UNESCAPED_UNICODE) : null;
-        // Para Educação Infantil (não AEE), anos_escolares = []. Para AEE ou outras etapas, usar o que o usuário enviou.
+        // Para Educação Infantil (não AEE), anos_escolares = [].
+        // Para AEE ou outras etapas, usar o que o usuário enviou; se for AEE+Educação Infantil sem séries marcadas,
+        // gravar explicitamente "Educação Infantil" em anos_escolares para facilitar relatórios e trilhas.
         $userAnosEscolares = isset($data['anos_escolares']) && is_array($data['anos_escolares'])
             ? array_values(array_filter($data['anos_escolares'], function ($v) { return trim((string)$v) !== ''; }))
             : [];
         if ($etapa === 'Educação Infantil' && !$aee) {
-            $anosEscolares = '[]'; // Educação Infantil (não AEE): sem séries
+            // Educação Infantil "geral": não há sub-séries, manter array vazio
+            $anosEscolares = '[]';
         } elseif (!empty($userAnosEscolares)) {
-            $anosEscolares = json_encode($userAnosEscolares, JSON_UNESCAPED_UNICODE); // Respeitar séries selecionadas (inclui AEE)
+            // Respeitar séries selecionadas pelo usuário (inclui AEE)
+            $anosEscolares = json_encode($userAnosEscolares, JSON_UNESCAPED_UNICODE);
+        } elseif ($etapa === 'Educação Infantil' && $aee) {
+            // Caso especial: AEE para Educação Infantil sem séries marcadas
+            // Registrar explicitamente a etapa para futuras consultas/relatórios
+            $anosEscolares = json_encode(['Educação Infantil'], JSON_UNESCAPED_UNICODE);
         } else {
             $anosEscolares = '[]';
         }
@@ -882,10 +890,19 @@ try {
             }
         }
         if (isset($data['anos_escolares'])) {
+            $anosPutArray = is_array($data['anos_escolares'])
+                ? array_values(array_filter($data['anos_escolares'], function ($v) { return trim((string)$v) !== ''; }))
+                : [];
+            $etapaPut = isset($data['etapa']) ? (string)$data['etapa'] : '';
+            $isAeePut = !empty($data['aee']);
+            // Caso especial: AEE + Educação Infantil sem séries marcadas → gravar "Educação Infantil"
+            if ($etapaPut === 'Educação Infantil' && $isAeePut && empty($anosPutArray)) {
+                $anosPutArray = ['Educação Infantil'];
+            }
             $updates[] = "anos_escolares = ?";
-            $params[] = is_array($data['anos_escolares']) 
-                ? json_encode($data['anos_escolares'], JSON_UNESCAPED_UNICODE) 
-                : null;
+            $params[] = !empty($anosPutArray)
+                ? json_encode($anosPutArray, JSON_UNESCAPED_UNICODE)
+                : '[]';
         }
         if (isset($data['eixos_bncc'])) {
             $updates[] = "eixos_bncc = ?";
@@ -957,6 +974,13 @@ try {
             if ($hasBloqueadaCol) {
                 $updates[] = "bloqueada = ?";
                 $params[] = !empty($data['bloqueada']) ? 1 : 0;
+            }
+        }
+        if (array_key_exists('aee', $data)) {
+            $hasAeeColPut = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+            if ($hasAeeColPut) {
+                $updates[] = "aee = ?";
+                $params[] = !empty($data['aee']) ? 1 : 0;
             }
         }
 

@@ -106,9 +106,11 @@ try {
         $duracao = isset($data['duracao_video']) ? (int)$data['duracao_video'] : 0;
         $thumb = isset($data['thumbnail_url']) ? trim((string)$data['thumbnail_url']) : null;
         $ordem = isset($data['ordem']) ? (int)$data['ordem'] : 0;
+        $linksUteis = isset($data['links_uteis']) && is_array($data['links_uteis']) ? json_encode($data['links_uteis']) : null;
+        $pdfsDownload = isset($data['pdfs_download']) && is_array($data['pdfs_download']) ? json_encode($data['pdfs_download']) : null;
 
-        if ($id === '' || $aulaId === '' || $titulo === '' || $videoUrl === '') {
-            json_response_av(400, ['error' => true, 'message' => 'Campos obrigatórios: id, aula_id, titulo, video_url']);
+        if ($aulaId === '' || $titulo === '' || $videoUrl === '') {
+            json_response_av(400, ['error' => true, 'message' => 'Campos obrigatórios: aula_id, titulo, video_url']);
         }
 
         // Aula existe?
@@ -118,20 +120,30 @@ try {
             json_response_av(404, ['error' => true, 'message' => 'Aula não encontrada']);
         }
 
+        // Se id não foi enviado ou está vazio, gerar um único (evita 409 por ID duplicado)
+        if ($id === '') {
+            $id = $aulaId . '-parte-' . bin2hex(random_bytes(8));
+        }
+
         // ID único?
         $check = $pdo->prepare("SELECT id FROM aula_videos WHERE id = ?");
         $check->execute([$id]);
         if ($check->fetch()) {
-            json_response_av(409, ['error' => true, 'message' => 'Vídeo com este ID já existe']);
+            // Colisão improvável: gerar novo id e tentar novamente
+            $id = $aulaId . '-parte-' . bin2hex(random_bytes(8));
+            $check->execute([$id]);
+            if ($check->fetch()) {
+                json_response_av(409, ['error' => true, 'message' => 'Vídeo com este ID já existe. Tente novamente.']);
+            }
         }
 
         $stmt = $pdo->prepare("
-            INSERT INTO aula_videos (id, aula_id, titulo, descricao, video_url, duracao_video, thumbnail_url, ordem, ativo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO aula_videos (id, aula_id, titulo, descricao, video_url, duracao_video, thumbnail_url, ordem, ativo, links_uteis, pdfs_download)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         ");
-        $stmt->execute([$id, $aulaId, $titulo, $descricao, $videoUrl, $duracao, $thumb, $ordem]);
+        $stmt->execute([$id, $aulaId, $titulo, $descricao, $videoUrl, $duracao, $thumb, $ordem, $linksUteis, $pdfsDownload]);
 
-        json_response_av(201, ['error' => false, 'message' => 'Vídeo criado com sucesso']);
+        json_response_av(201, ['error' => false, 'message' => 'Vídeo criado com sucesso', 'id' => $id]);
     }
 
     if ($method === 'PUT') {
@@ -177,6 +189,14 @@ try {
         if (isset($data['ativo'])) {
             $updates[] = "ativo = ?";
             $params[] = (int)$data['ativo'];
+        }
+        if (array_key_exists('links_uteis', $data)) {
+            $updates[] = "links_uteis = ?";
+            $params[] = is_array($data['links_uteis']) ? json_encode($data['links_uteis']) : ($data['links_uteis'] ?? null);
+        }
+        if (array_key_exists('pdfs_download', $data)) {
+            $updates[] = "pdfs_download = ?";
+            $params[] = is_array($data['pdfs_download']) ? json_encode($data['pdfs_download']) : ($data['pdfs_download'] ?? null);
         }
 
         if (!$updates) {

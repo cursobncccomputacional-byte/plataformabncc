@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useEADAuth } from '../contexts/EADAuthContext';
 import { eadApiService } from '../services/eadApiService';
 import { Course } from '../types/ead';
+import { formatDurationFromMinutes } from '../utils/formatDuration';
 
 export const Home = () => {
   const { isAuthenticated } = useEADAuth();
@@ -414,7 +415,7 @@ export const Home = () => {
                     <div className="text-lg font-semibold text-[#044982] leading-snug line-clamp-2">{c.title}</div>
                     <div className="mt-2 text-sm text-gray-600 line-clamp-2">{c.description || 'Curso prático com foco em aplicação.'}</div>
                     <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                      <span>{Math.floor((c.total_duration || 0) / 60)}h</span>
+                      <span>{formatDurationFromMinutes(c.total_duration)}</span>
                       <span>{(c.enrolled_count || 0) as any} inscritos</span>
                     </div>
                   </div>
@@ -626,7 +627,7 @@ export const Home = () => {
                       {c.description || 'Curso prático com foco em aplicação.'}
                     </div>
                     <div className="mt-4 flex items-center justify-between text-xs text-gray-500 mb-4">
-                      <span>{Math.floor((c.total_duration || 0) / 60)}h</span>
+                      <span>{formatDurationFromMinutes(c.total_duration)}</span>
                       <span>{(c.enrolled_count || 0) as any} inscritos</span>
                     </div>
                     <button

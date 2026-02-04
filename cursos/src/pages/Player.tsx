@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Play, Pause, CheckCircle, Lock, Clock, BookOpen, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Play, Pause, CheckCircle, Lock, Clock, BookOpen, ChevronRight, FileQuestion, Link2, FileDown } from 'lucide-react';
 import { eadApiService } from '../services/eadApiService';
-import { Course, Lesson } from '../types/ead';
+import { Course, Lesson, ContentItem } from '../types/ead';
 
 type VideoType = 'youtube' | 'vimeo' | 'drive' | 'direct' | 'unknown';
 
@@ -93,6 +93,62 @@ export const Player = () => {
   const [lessonProgress, setLessonProgress] = useState<{ [key: string]: { watched: number; completed: boolean } }>({});
   const videoInfo = getEmbedUrl(currentLesson?.video_url || '');
   const isDirectVideo = !!currentLesson?.video_url && videoInfo.type === 'direct' && !!videoInfo.embedUrl;
+  const isAvaliacao = !!lessonId && lessonId.startsWith('avaliacao-');
+
+  type PerguntaAv = { id: number; ordem: number; enunciado: string; opcoes: Record<string, string>; resposta_correta: string };
+  const [avaliacaoPerguntas, setAvaliacaoPerguntas] = useState<PerguntaAv[]>([]);
+  const [avaliacaoLoading, setAvaliacaoLoading] = useState(false);
+  const [avaliacaoRespostas, setAvaliacaoRespostas] = useState<Record<number, string>>({});
+  const [avaliacaoEnviada, setAvaliacaoEnviada] = useState(false);
+  const [avaliacaoPontos, setAvaliacaoPontos] = useState<number | null>(null);
+
+  // Estrutura agrupada: Módulo → Aula → (vídeos + avaliação quando M1, aulas 1-10)
+  const { groupedByModuleAula, allContentItems } = useMemo(() => {
+    const sorted = [...lessons].sort((a, b) => {
+      if (a.module !== b.module) return a.module === 'I' ? -1 : 1;
+      const aOrd = (a as any).aula_ordem ?? 0;
+      const bOrd = (b as any).aula_ordem ?? 0;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      return a.order_index - b.order_index;
+    });
+    type AulaGroup = { aula_id: string; aula_titulo: string; aula_ordem: number; items: ContentItem[] };
+    type ModuloGroup = { moduloLabel: string; module: 'I' | 'II'; aulas: AulaGroup[] };
+    const byMod: Record<string, Record<string, Lesson[]>> = { I: {}, II: {} };
+    for (const l of sorted) {
+      const aid = (l as any).aula_id || `legacy-${(l as any).aula_ordem ?? l.order_index}`;
+      const mod = l.module || 'I';
+      if (!byMod[mod][aid]) byMod[mod][aid] = [];
+      byMod[mod][aid].push(l);
+    }
+    const grouped: ModuloGroup[] = [];
+    const flat: ContentItem[] = [];
+    (['I', 'II'] as const).forEach((mod) => {
+      const aulas = Object.entries(byMod[mod] || {})
+        .map(([aula_id, less]) => {
+          const first = less[0] as any;
+          const aula_ordem = first?.aula_ordem ?? 0;
+          const aula_titulo = first?.aula_titulo || first?.title?.replace(/\s*\.?\s*$/, '') || 'Aula';
+          const items: ContentItem[] = less.map((lesson) => ({ type: 'video', lesson }));
+          // Incluir avaliação para as primeiras 10 aulas do Módulo I (ordem 0 a 9 no cadastro = Aula 01 a 10)
+          const isM1Aulas1to10 = mod === 'I' && aula_ordem >= 0 && aula_ordem <= 9;
+          if (isM1Aulas1to10) {
+            items.push({
+              type: 'avaliacao',
+              aula_id,
+              aula_titulo,
+              id: `avaliacao-${aula_id}`,
+            });
+          }
+          less.forEach((l) => flat.push({ type: 'video', lesson: l }));
+          if (isM1Aulas1to10) flat.push({ type: 'avaliacao', aula_id, aula_titulo, id: `avaliacao-${aula_id}` });
+          return { aula_id, aula_titulo, aula_ordem, items };
+        })
+        .sort((x, y) => x.aula_ordem - y.aula_ordem);
+      const moduloLabel = mod === 'I' ? 'Módulo I' : 'Módulo II';
+      grouped.push({ moduloLabel, module: mod, aulas });
+    });
+    return { groupedByModuleAula: grouped, allContentItems: flat };
+  }, [lessons]);
 
   useEffect(() => {
     if (courseId && lessonId) {
@@ -105,6 +161,26 @@ export const Player = () => {
       loadAllProgress();
     }
   }, [courseId]);
+
+  useEffect(() => {
+    if (isAvaliacao && lessonId) {
+      const aulaId = lessonId.replace(/^avaliacao-/, '');
+      setAvaliacaoPerguntas([]);
+      setAvaliacaoRespostas({});
+      setAvaliacaoEnviada(false);
+      setAvaliacaoPontos(null);
+      setAvaliacaoLoading(true);
+      eadApiService
+        .getAvaliacao(aulaId)
+        .then((r) => {
+          if (!r.error && r.perguntas) {
+            setAvaliacaoPerguntas(r.perguntas as PerguntaAv[]);
+          }
+        })
+        .catch(() => setAvaliacaoPerguntas([]))
+        .finally(() => setAvaliacaoLoading(false));
+    }
+  }, [isAvaliacao, lessonId]);
 
   useEffect(() => {
     if (currentLesson && isDirectVideo && videoRef.current) {
@@ -157,12 +233,53 @@ export const Player = () => {
           if (a.module !== b.module) {
             return a.module === 'I' ? -1 : 1;
           }
+          const aOrd = (a as any).aula_ordem ?? 0;
+          const bOrd = (b as any).aula_ordem ?? 0;
+          if (aOrd !== bOrd) return aOrd - bOrd;
           return a.order_index - b.order_index;
         });
         setLessons(sortedLessons);
-        const lesson = sortedLessons.find((l: Lesson) => l.id === lessonId);
-        if (lesson) {
-          setCurrentLesson(lesson);
+        // Pode ser um vídeo ou uma avaliação (id começando com "avaliacao-")
+        if (lessonId?.startsWith('avaliacao-')) {
+          const aulaId = lessonId.replace(/^avaliacao-/, '');
+          const aulaNum = aulaId.match(/aula-0?(\d+)$/)?.[1] || '';
+          setCurrentLesson({
+            id: lessonId,
+            title: `Avaliação - Aula ${aulaNum}`,
+            description: null,
+            video_url: null,
+            video_duration: 0,
+            thumbnail_url: null,
+            order_index: -1,
+            is_preview: false,
+            module: 'I',
+            resources: [],
+            aula_id: aulaId,
+            aula_titulo: `Aula ${aulaNum}`,
+          } as Lesson);
+        } else {
+          let lesson = sortedLessons.find((l: Lesson) => l.id === lessonId);
+          // Se não achou por id, pode ser que lessonId seja um aula_id (link antigo ou entrada por aula)
+          if (!lesson && lessonId) {
+            const firstVideoOfAula = sortedLessons.find((l: any) => l.aula_id === lessonId);
+            if (firstVideoOfAula) {
+              setLoading(false);
+              navigate(`/curso/${courseId}/aula/${firstVideoOfAula.id}`, { replace: true });
+              return;
+            }
+          }
+          if (lesson) {
+            setCurrentLesson(lesson);
+            // Se este vídeo não tem URL mas existe outro no curso com URL, redirecionar para o primeiro disponível
+            if (!lesson.video_url?.trim() && sortedLessons.length > 0) {
+              const firstWithUrl = sortedLessons.find((l: any) => l.video_url?.trim());
+              if (firstWithUrl && firstWithUrl.id !== lesson.id) {
+                setLoading(false);
+                navigate(`/curso/${courseId}/aula/${firstWithUrl.id}`, { replace: true });
+                return;
+              }
+            }
+          }
         }
       }
     } catch (error) {
@@ -231,11 +348,10 @@ export const Player = () => {
   };
 
   const nextLesson = () => {
-    if (!lessons || !currentLesson) return;
-    const currentIndex = lessons.findIndex(l => l.id === currentLesson.id);
-    if (currentIndex < lessons.length - 1) {
-      navigate(`/curso/${courseId}/aula/${lessons[currentIndex + 1].id}`);
-    }
+    if (currentIndex < 0 || currentIndex >= allContentItems.length - 1) return;
+    const next = allContentItems[currentIndex + 1];
+    const nextId = next.type === 'video' ? next.lesson.id : next.id;
+    navigate(`/curso/${courseId}/aula/${nextId}`);
   };
 
   const getLessonStatus = (lesson: Lesson) => {
@@ -244,6 +360,13 @@ export const Player = () => {
     if (progress?.watched > 0) return 'started';
     if (lesson.is_preview) return 'preview';
     return 'locked';
+  };
+
+  const getItemStatus = (item: ContentItem): 'completed' | 'started' | 'preview' | 'locked' => {
+    if (item.type === 'avaliacao') {
+      return lessonProgress[item.id]?.completed ? 'completed' : 'locked';
+    }
+    return getLessonStatus(item.lesson);
   };
 
   if (loading) {
@@ -265,13 +388,12 @@ export const Player = () => {
     );
   }
 
-  const allLessons = [...lessons].sort((a, b) => {
-    if (a.module !== b.module) {
-      return a.module === 'I' ? -1 : 1;
-    }
-    return a.order_index - b.order_index;
-  });
-  const currentIndex = allLessons.findIndex(l => l.id === lessonId);
+  const currentIndex = allContentItems.findIndex(
+    (item) => (item.type === 'video' ? item.lesson.id : item.id) === lessonId
+  );
+  const currentItem = lessonId
+    ? allContentItems.find((item) => (item.type === 'video' ? item.lesson.id : item.id) === lessonId)
+    : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] via-[#1a1a2e] to-[#0a0a0a] text-white">
@@ -290,7 +412,7 @@ export const Player = () => {
             </Link>
             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-lg">
               <span className="text-sm text-gray-300">
-                {currentIndex + 1} / {allLessons.length}
+                {currentIndex >= 0 ? currentIndex + 1 : 0} / {allContentItems.length}
               </span>
             </div>
           </div>
@@ -301,7 +423,121 @@ export const Player = () => {
         {/* Video Player - Lado Esquerdo */}
         <div className="flex-1 flex flex-col bg-black">
           <div className="flex-1 flex items-center justify-center relative group">
-            {currentLesson.video_url ? (
+            {isAvaliacao ? (
+              <div className="w-full max-w-2xl p-8 overflow-y-auto max-h-[calc(100vh-120px)]">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#044982]/20 text-[#044982] mb-6">
+                  <FileQuestion className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">
+                  {avaliacaoPerguntas.length > 0
+                    ? (currentLesson?.aula_titulo === 'Aula 01'
+                        ? 'Avaliação – Aula 01: Introdução e Contextualização da BNCC Computacional'
+                        : `Avaliação – ${currentLesson?.aula_titulo || 'Aula'}`)
+                    : 'Avaliação da Aula'}
+                </h2>
+
+                {avaliacaoLoading ? (
+                  <p className="text-gray-400">Carregando avaliação...</p>
+                ) : avaliacaoEnviada && avaliacaoPontos !== null ? (
+                  <div className="text-left space-y-4">
+                    <p className="text-lg text-gray-300">
+                      Você acertou <strong className="text-white">{avaliacaoPontos}</strong> de{' '}
+                      <strong className="text-white">{avaliacaoPerguntas.length}</strong> questões (
+                      {avaliacaoPerguntas.length ? Math.round((avaliacaoPontos / avaliacaoPerguntas.length) * 100) : 0}%).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (courseId && lessonId?.startsWith('avaliacao-')) {
+                          try {
+                            await eadApiService.updateProgress(courseId, lessonId, 0, 0, true);
+                            setLessonProgress((prev) => ({ ...prev, [lessonId]: { watched: 0, completed: true } }));
+                          } catch (e) {
+                            console.error('Erro ao marcar avaliação:', e);
+                          }
+                        }
+                        nextLesson();
+                      }}
+                      className="px-6 py-3 bg-gradient-to-r from-[#044982] to-[#005a93] text-white rounded-lg font-semibold hover:opacity-90 transition"
+                    >
+                      Continuar para o próximo
+                    </button>
+                  </div>
+                ) : avaliacaoPerguntas.length > 0 ? (
+                  <form
+                    className="text-left space-y-6"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      let acertos = 0;
+                      avaliacaoPerguntas.forEach((p) => {
+                        if (avaliacaoRespostas[p.id] === p.resposta_correta) acertos++;
+                      });
+                      setAvaliacaoPontos(acertos);
+                      setAvaliacaoEnviada(true);
+                    }}
+                  >
+                    {avaliacaoPerguntas.map((p, idx) => (
+                      <div key={p.id} className="rounded-xl bg-white/5 border border-white/10 p-4">
+                        <p className="font-medium text-white mb-3">
+                          {idx + 1}. {p.enunciado}
+                        </p>
+                        <div className="space-y-2">
+                          {(['A', 'B', 'C', 'D'] as const).map((letra) => (
+                            <label
+                              key={letra}
+                              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${
+                                avaliacaoRespostas[p.id] === letra ? 'bg-[#044982]/30 border border-[#044982]' : 'hover:bg-white/5'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`pergunta-${p.id}`}
+                                value={letra}
+                                checked={avaliacaoRespostas[p.id] === letra}
+                                onChange={() => setAvaliacaoRespostas((prev) => ({ ...prev, [p.id]: letra }))}
+                                className="w-4 h-4 text-[#044982]"
+                              />
+                              <span className="text-gray-300">
+                                ({letra}) {p.opcoes[letra]}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="submit"
+                      className="w-full px-6 py-3 bg-gradient-to-r from-[#044982] to-[#005a93] text-white rounded-lg font-semibold hover:opacity-90 transition"
+                    >
+                      Enviar respostas
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <p className="text-gray-400 mb-6">
+                      Esta avaliação corresponde ao conteúdo assistido. Em breve você poderá responder às perguntas aqui.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (courseId && lessonId?.startsWith('avaliacao-')) {
+                          try {
+                            await eadApiService.updateProgress(courseId, lessonId, 0, 0, true);
+                            setLessonProgress((prev) => ({ ...prev, [lessonId]: { watched: 0, completed: true } }));
+                          } catch (e) {
+                            console.error('Erro ao marcar avaliação:', e);
+                          }
+                        }
+                        nextLesson();
+                      }}
+                      className="px-6 py-3 bg-gradient-to-r from-[#044982] to-[#005a93] text-white rounded-lg font-semibold hover:opacity-90 transition"
+                    >
+                      Continuar para o próximo
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : currentLesson.video_url ? (
               videoInfo.type === 'direct' && videoInfo.embedUrl ? (
                 <div className="relative w-full h-full">
                   <video
@@ -336,47 +572,137 @@ export const Player = () => {
                 </div>
               )
             ) : (
-              <div className="text-center">
-                <p className="text-xl mb-4">Vídeo não disponível</p>
-                <p className="text-gray-400">{currentLesson.title}</p>
+              <div className="text-center p-8 max-w-md mx-auto">
+                <p className="text-xl mb-2">Vídeo não disponível</p>
+                <p className="text-gray-400 mb-4">{currentLesson?.title}</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Este item ainda não tem link de vídeo. Cadastre a URL na gestão do curso (Formação Continuada) ou escolha outro vídeo na lista ao lado.
+                </p>
+                {(() => {
+                  const aulaId = (currentLesson as any)?.aula_id;
+                  const firstInAulaWithUrl = aulaId && lessons.find((l: any) => l.aula_id === aulaId && l.video_url?.trim());
+                  const firstInCourseWithUrl = lessons.find((l: any) => l.video_url?.trim());
+                  if (firstInAulaWithUrl) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/curso/${courseId}/aula/${firstInAulaWithUrl.id}`)}
+                        className="px-4 py-2 bg-[#044982]/80 text-white rounded-lg hover:bg-[#044982] transition text-sm"
+                      >
+                        Abrir primeiro vídeo desta aula
+                      </button>
+                    );
+                  }
+                  if (firstInCourseWithUrl) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/curso/${courseId}/aula/${firstInCourseWithUrl.id}`)}
+                        className="px-4 py-2 bg-[#044982]/80 text-white rounded-lg hover:bg-[#044982] transition text-sm"
+                      >
+                        Ir para o primeiro vídeo disponível do curso
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
           </div>
 
-          {/* Lesson Info - Abaixo do Player */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentLesson.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl border-t border-white/10 p-6"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="px-3 py-1 bg-[#044982]/20 text-[#044982] rounded-lg text-sm font-bold border border-[#044982]/30">
-                      {currentLesson.module === 'I' ? 'Módulo I' : 'Módulo II'}
-                    </span>
-                    {currentLesson.is_preview && (
-                      <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-xs font-semibold border border-green-500/30">
-                        Preview
+          {/* Lesson Info - Abaixo do Player (oculto na tela de avaliação) */}
+          {!isAvaliacao && currentLesson && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentLesson.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl border-t border-white/10 p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="px-3 py-1 bg-[#044982]/20 text-[#044982] rounded-lg text-sm font-bold border border-[#044982]/30">
+                        {currentLesson.module === 'I' ? 'Módulo I' : 'Módulo II'}
                       </span>
+                      {currentLesson.is_preview && (
+                        <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-xs font-semibold border border-green-500/30">
+                          Preview
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-bold mb-2">{currentLesson.title}</h2>
+                    {currentLesson.description && (
+                      <p className="text-gray-400 leading-relaxed">{currentLesson.description}</p>
                     )}
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-bold mb-2">{currentLesson.title}</h2>
-                  {currentLesson.description && (
-                    <p className="text-gray-400 leading-relaxed">{currentLesson.description}</p>
-                  )}
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Clock className="w-4 h-4" />
+                    <span>{formatDuration(currentLesson.video_duration)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Clock className="w-4 h-4" />
-                  <span>{formatDuration(currentLesson.video_duration)}</span>
-                </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
+                {/* Links úteis e PDFs para download */}
+                {(() => {
+                  const links = (currentLesson as any).links_uteis as { label: string; url: string }[] | undefined;
+                  const pdfs = (currentLesson as any).pdfs_download as { label: string; url: string }[] | undefined;
+                  const hasLinks = Array.isArray(links) && links.length > 0;
+                  const hasPdfs = Array.isArray(pdfs) && pdfs.length > 0;
+                  if (!hasLinks && !hasPdfs) return null;
+                  return (
+                    <div className="mt-6 pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {hasLinks && (
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-semibold text-[#044982] mb-2">
+                            <Link2 className="w-4 h-4" />
+                            Links úteis
+                          </div>
+                          <ul className="space-y-1">
+                            {links!.map((item, i) => (
+                              <li key={i}>
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-300 hover:text-blue-200 hover:underline truncate block"
+                                >
+                                  {item.label || item.url}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {hasPdfs && (
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-semibold text-[#044982] mb-2">
+                            <FileDown className="w-4 h-4" />
+                            Materiais para download
+                          </div>
+                          <ul className="space-y-1">
+                            {pdfs!.map((item, i) => (
+                              <li key={i}>
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className="inline-flex items-center gap-1 text-sm text-blue-300 hover:text-blue-200 hover:underline"
+                                >
+                                  {item.label || 'PDF'}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
 
         {/* Sidebar - Conteúdo do Curso - Lado Direito */}
@@ -389,41 +715,61 @@ export const Player = () => {
           </div>
           
           <div className="p-4">
-            {(() => {
-              const moduleI = lessons.filter(l => l.module === 'I');
-              const moduleII = lessons.filter(l => l.module === 'II');
-              let lessonCounter = 0;
-
+            {groupedByModuleAula.map((mod) => {
+              const isModI = mod.module === 'I';
+              const accent = isModI ? '#044982' : '#005a93';
+              const totalInMod = mod.aulas.reduce((s, a) => s + a.items.length, 0);
+              const completedInMod = mod.aulas.reduce(
+                (s, a) =>
+                  s +
+                  a.items.filter((it) =>
+                    it.type === 'video' ? lessonProgress[it.lesson.id]?.completed : lessonProgress[it.id]?.completed
+                  ).length,
+                0
+              );
               return (
-                <>
-                  {/* Módulo I */}
-                  {moduleI.length > 0 && (
-                    <div className="mb-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-1 h-6 bg-gradient-to-b from-[#044982] to-[#005a93] rounded-full"></div>
-                          <h4 className="font-bold text-[#044982]">Módulo I</h4>
-                        </div>
+                <div key={mod.module} className={isModI ? 'mb-6' : ''}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-1 h-6 rounded-full"
+                        style={{ background: `linear-gradient(to bottom, ${accent}, ${accent}99)` }}
+                      />
+                      <h4 className="font-bold" style={{ color: accent }}>
+                        {mod.moduloLabel}
+                      </h4>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {completedInMod} / {totalInMod} concluídas
+                    </span>
+                  </div>
+                  {mod.aulas.map((aula) => {
+                    const videoCount = aula.items.filter((i) => i.type === 'video').length;
+                    const avaliacaoCount = aula.items.filter((i) => i.type === 'avaliacao').length;
+                    return (
+                    <div key={aula.aula_id} className="mb-4">
+                      <div className="flex items-center justify-between mb-2 pl-1">
+                        <span className="text-sm font-bold text-gray-300">{aula.aula_titulo}</span>
                         <span className="text-xs text-gray-500">
-                          {moduleI.filter(l => lessonProgress[l.id]?.completed).length} / {moduleI.length} concluídas
+                          {videoCount} vídeo{videoCount !== 1 ? 's' : ''}
+                          {avaliacaoCount > 0 ? ` · ${avaliacaoCount} avaliação` : ''}
                         </span>
                       </div>
-                      <div className="space-y-2">
-                        {moduleI.map((lesson) => {
-                          lessonCounter++;
-                          const isActive = lesson.id === lessonId;
-                          const status = getLessonStatus(lesson);
-                          const progress = lessonProgress[lesson.id];
-                          
+                      <div className="space-y-2 pl-2 border-l-2 border-white/10">
+                        {aula.items.map((item, idx) => {
+                          const id = item.type === 'video' ? item.lesson.id : item.id;
+                          const isActive = id === lessonId;
+                          const status = getItemStatus(item);
+                          const progress =
+                            item.type === 'video' ? lessonProgress[item.lesson.id] : lessonProgress[item.id];
+                          const title = item.type === 'video' ? item.lesson.title : `Avaliação - ${aula.aula_titulo}`;
+                          const duration =
+                            item.type === 'video' ? item.lesson.video_duration : 0;
                           return (
-                            <motion.div
-                              key={lesson.id}
-                              whileHover={{ x: 4 }}
-                              transition={{ duration: 0.2 }}
-                            >
+                            <motion.div key={id} whileHover={{ x: 4 }} transition={{ duration: 0.2 }}>
                               <Link
-                                to={`/curso/${courseId}/aula/${lesson.id}`}
-                                className={`block p-4 rounded-xl transition-all ${
+                                to={`/curso/${courseId}/aula/${id}`}
+                                className={`block p-3 rounded-xl transition-all ${
                                   isActive
                                     ? 'bg-gradient-to-r from-[#044982] to-[#005a93] text-white shadow-lg shadow-[#044982]/30'
                                     : status === 'completed'
@@ -433,44 +779,53 @@ export const Player = () => {
                                     : 'bg-white/5 border border-white/10 hover:bg-white/10'
                                 }`}
                               >
-                                <div className="flex items-center gap-4">
-                                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                                    isActive
-                                      ? 'bg-white/20 text-white'
-                                      : status === 'completed'
-                                      ? 'bg-green-500/20 text-green-400'
-                                      : 'bg-white/10 text-gray-400'
-                                  }`}>
-                                    {status === 'completed' ? (
-                                      <CheckCircle className="w-5 h-5" />
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
+                                      isActive
+                                        ? 'bg-white/20 text-white'
+                                        : status === 'completed'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'bg-white/10 text-gray-400'
+                                    }`}
+                                  >
+                                    {item.type === 'avaliacao' ? (
+                                      <FileQuestion className="w-4 h-4" />
+                                    ) : status === 'completed' ? (
+                                      <CheckCircle className="w-4 h-4" />
                                     ) : (
-                                      lessonCounter
+                                      idx + 1
                                     )}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className={`font-semibold text-sm mb-1 line-clamp-2 ${
-                                      isActive ? 'text-white' : 'text-gray-200'
-                                    }`}>
-                                      {lesson.title}
+                                    <p
+                                      className={`font-medium text-sm line-clamp-1 ${
+                                        isActive ? 'text-white' : 'text-gray-200'
+                                      }`}
+                                    >
+                                      {title}
                                     </p>
-                                    <div className="flex items-center gap-3 text-xs">
-                                      <span className={isActive ? 'text-white/70' : 'text-gray-500'}>
-                                        {formatDuration(lesson.video_duration)}
-                                      </span>
-                                      {progress && progress.watched > 0 && !progress.completed && (
-                                        <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                                          <div
-                                            className="h-full bg-[#044982] rounded-full"
-                                            style={{ width: `${(progress.watched / lesson.video_duration) * 100}%` }}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
+                                    {item.type === 'video' && (
+                                      <div className="flex items-center gap-2 text-xs mt-0.5">
+                                        <span className={isActive ? 'text-white/70' : 'text-gray-500'}>
+                                          {duration > 0 ? formatDuration(duration) : '—'}
+                                        </span>
+                                        {progress && progress.watched > 0 && !progress.completed && duration > 0 && (
+                                          <div className="flex-1 max-w-[80px] h-1 bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                              className="h-full rounded-full"
+                                              style={{
+                                                width: `${Math.min(100, (progress.watched / duration) * 100)}%`,
+                                                backgroundColor: accent,
+                                              }}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  {isActive && (
-                                    <ChevronRight className="w-5 h-5 text-white flex-shrink-0" />
-                                  )}
-                                  {status === 'locked' && !lesson.is_preview && (
+                                  {isActive && <ChevronRight className="w-4 h-4 text-white flex-shrink-0" />}
+                                  {status === 'locked' && item.type === 'video' && !item.lesson.is_preview && (
                                     <Lock className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                   )}
                                 </div>
@@ -480,96 +835,11 @@ export const Player = () => {
                         })}
                       </div>
                     </div>
-                  )}
-
-                  {/* Módulo II */}
-                  {moduleII.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-1 h-6 bg-gradient-to-b from-[#005a93] to-[#044982] rounded-full"></div>
-                          <h4 className="font-bold text-[#005a93]">Módulo II</h4>
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {moduleII.filter(l => lessonProgress[l.id]?.completed).length} / {moduleII.length} concluídas
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {moduleII.map((lesson) => {
-                          lessonCounter++;
-                          const isActive = lesson.id === lessonId;
-                          const status = getLessonStatus(lesson);
-                          const progress = lessonProgress[lesson.id];
-                          
-                          return (
-                            <motion.div
-                              key={lesson.id}
-                              whileHover={{ x: 4 }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              <Link
-                                to={`/curso/${courseId}/aula/${lesson.id}`}
-                                className={`block p-4 rounded-xl transition-all ${
-                                  isActive
-                                    ? 'bg-gradient-to-r from-[#005a93] to-[#044982] text-white shadow-lg shadow-[#005a93]/30'
-                                    : status === 'completed'
-                                    ? 'bg-green-500/10 border border-green-500/20 hover:bg-green-500/15'
-                                    : status === 'started'
-                                    ? 'bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/15'
-                                    : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                                }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                                    isActive
-                                      ? 'bg-white/20 text-white'
-                                      : status === 'completed'
-                                      ? 'bg-green-500/20 text-green-400'
-                                      : 'bg-white/10 text-gray-400'
-                                  }`}>
-                                    {status === 'completed' ? (
-                                      <CheckCircle className="w-5 h-5" />
-                                    ) : (
-                                      lessonCounter
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`font-semibold text-sm mb-1 line-clamp-2 ${
-                                      isActive ? 'text-white' : 'text-gray-200'
-                                    }`}>
-                                      {lesson.title}
-                                    </p>
-                                    <div className="flex items-center gap-3 text-xs">
-                                      <span className={isActive ? 'text-white/70' : 'text-gray-500'}>
-                                        {formatDuration(lesson.video_duration)}
-                                      </span>
-                                      {progress && progress.watched > 0 && !progress.completed && (
-                                        <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                                          <div
-                                            className="h-full bg-[#005a93] rounded-full"
-                                            style={{ width: `${(progress.watched / lesson.video_duration) * 100}%` }}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {isActive && (
-                                    <ChevronRight className="w-5 h-5 text-white flex-shrink-0" />
-                                  )}
-                                  {status === 'locked' && !lesson.is_preview && (
-                                    <Lock className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                  )}
-                                </div>
-                              </Link>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </>
+                    );
+                  })}
+                </div>
               );
-            })()}
+            })}
           </div>
         </div>
       </div>

@@ -116,6 +116,32 @@ try {
             ];
         }
 
+        // Incluir progresso de avaliações (avaliação ao final da aula - Módulo I)
+        try {
+            $stmtAv = $pdo->prepare("
+                SELECT aula_id, concluida_em FROM progresso_avaliacoes
+                WHERE usuario_id = ? AND curso_id = ?
+            ");
+            $stmtAv->execute([$userId, $courseId]);
+            while ($row = $stmtAv->fetch(PDO::FETCH_ASSOC)) {
+                $progressData[] = [
+                    'id' => 0,
+                    'user_id' => $userId,
+                    'course_id' => $courseId,
+                    'lesson_id' => 'avaliacao-' . $row['aula_id'],
+                    'watched_seconds' => 0,
+                    'total_seconds' => 0,
+                    'is_completed' => true,
+                    'completed_at' => $row['concluida_em'],
+                    'last_watched_at' => $row['concluida_em'],
+                    'lesson_title' => 'Avaliação',
+                    'order_index' => 0,
+                ];
+            }
+        } catch (PDOException $e) {
+            // Tabela progresso_avaliacoes pode não existir ainda
+        }
+
         json_response(200, [
             'error' => false,
             'progress' => $progressData,
@@ -133,6 +159,26 @@ try {
 
         if (!$courseId || !$lessonId) {
             json_response(400, ['error' => true, 'message' => 'course_id e lesson_id são obrigatórios']);
+        }
+
+        // Avaliação ao final da aula (lesson_id = "avaliacao-{aula_id}")
+        if (strpos($lessonId, 'avaliacao-') === 0) {
+            $aulaId = substr($lessonId, strlen('avaliacao-'));
+            if ($aulaId === '') {
+                json_response(400, ['error' => true, 'message' => 'aula_id inválido para avaliação']);
+            }
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO progresso_avaliacoes (usuario_id, curso_id, aula_id)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE concluida_em = NOW()
+                ");
+                $stmt->execute([$userId, $courseId, $aulaId]);
+            } catch (PDOException $e) {
+                error_log('progresso_avaliacoes: ' . $e->getMessage());
+                json_response(500, ['error' => true, 'message' => 'Erro ao registrar conclusão da avaliação']);
+            }
+            json_response(200, ['error' => false, 'message' => 'Avaliação marcada como concluída']);
         }
 
         // Verificar se já existe progresso

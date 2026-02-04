@@ -18,7 +18,7 @@ export interface Course {
 
 export interface Lesson {
   id: string;
-  course_id: string;
+  course_id?: string;
   title: string;
   description: string | null;
   video_url: string | null;
@@ -26,9 +26,23 @@ export interface Lesson {
   thumbnail_url: string | null;
   order_index: number;
   is_preview: boolean;
-  module: 'I' | 'II'; // Módulo I ou II
-  resources: any[]; // Mantido para compatibilidade, mas não será usado
+  module: 'I' | 'II';
+  resources: any[];
+  /** Agrupamento: id da aula (para sidebar por módulo → aula) */
+  aula_id?: string | null;
+  aula_titulo?: string | null;
+  aula_ordem?: number | null;
+  modulo_id?: string | null;
+  modulo_titulo?: string | null;
+  /** Links úteis e PDFs para download (opcional por vídeo) */
+  links_uteis?: { label: string; url: string }[];
+  pdfs_download?: { label: string; url: string }[];
 }
+
+/** Item do conteúdo: vídeo ou avaliação (virtual) */
+export type ContentItem = 
+  | { type: 'video'; lesson: Lesson }
+  | { type: 'avaliacao'; aula_id: string; aula_titulo: string; id: string };
 
 export interface Enrollment {
   id: number;

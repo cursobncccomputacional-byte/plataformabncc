@@ -509,6 +509,93 @@ try {
             ]);
             break;
 
+        case 'aderencia-atividades':
+            // Relatório de aderência às atividades (vídeos, documentos, downloads) - root ou admin
+            if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+                json_response(405, ['error' => true, 'message' => 'Método não permitido']);
+            }
+            if ($currentRole !== 'root' && $currentRole !== 'admin') {
+                json_response(403, ['error' => true, 'message' => 'Sem permissão para este relatório']);
+            }
+
+            $usuarioIdFiltroAd = $_GET['usuario_id'] ?? null;
+            $dataInicioAd = $_GET['data_inicio'] ?? null;
+            $dataFimAd = $_GET['data_fim'] ?? null;
+            $comDetalhes = isset($_GET['detalhes']) && $_GET['detalhes'] === '1';
+            $limiteDetalhes = (int)($_GET['limite_detalhes'] ?? 50);
+
+            $where = [];
+            $params = [];
+            if ($currentRole === 'admin') {
+                $where[] = "u.criado_por = ?";
+                $params[] = $currentUserId;
+            }
+            if ($usuarioIdFiltroAd) {
+                $where[] = "u.id = ?";
+                $params[] = $usuarioIdFiltroAd;
+            }
+            $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+
+            // Resumo por usuário: totais de view_activity, view_document, view_video, download
+            $stmt = $pdo->prepare("
+                SELECT 
+                    u.id as usuario_id,
+                    u.nome as usuario_nome,
+                    u.usuario as usuario_email,
+                    COUNT(DISTINCT s.id) as total_sessoes,
+                    COALESCE(SUM(s.tempo_sessao), 0) as tempo_total_segundos,
+                    COUNT(DISTINCT CASE WHEN a.tipo_atividade = 'view_activity' THEN a.id END) as total_view_activity,
+                    COUNT(DISTINCT CASE WHEN a.tipo_atividade = 'view_document' THEN a.id END) as total_view_document,
+                    COUNT(DISTINCT CASE WHEN a.tipo_atividade = 'view_video' THEN a.id END) as total_view_video,
+                    COUNT(DISTINCT CASE WHEN a.tipo_atividade = 'download' THEN a.id END) as total_download,
+                    MAX(s.data_login) as ultimo_login
+                FROM usuarios u
+                LEFT JOIN sessoes s ON u.id = s.usuario_id
+                LEFT JOIN atividades_sessao a ON s.id = a.sessao_id
+                {$whereClause}
+                GROUP BY u.id, u.nome, u.usuario
+                ORDER BY ultimo_login DESC
+            ");
+            $stmt->execute($params);
+            $resumo = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $relatorio = [];
+            foreach ($resumo as $row) {
+                $item = [
+                    'usuario_id' => $row['usuario_id'],
+                    'usuario_nome' => $row['usuario_nome'] ?? '',
+                    'usuario_email' => $row['usuario_email'] ?? '',
+                    'total_sessoes' => (int)$row['total_sessoes'],
+                    'tempo_total_segundos' => (int)($row['tempo_total_segundos'] ?? 0),
+                    'tempo_total_minutos' => round((int)($row['tempo_total_segundos'] ?? 0) / 60, 1),
+                    'total_view_activity' => (int)$row['total_view_activity'],
+                    'total_view_document' => (int)$row['total_view_document'],
+                    'total_view_video' => (int)$row['total_view_video'],
+                    'total_download' => (int)$row['total_download'],
+                    'ultimo_login' => $row['ultimo_login'] ?? null,
+                ];
+                if ($comDetalhes) {
+                    $stDet = $pdo->prepare("
+                        SELECT tipo_atividade, recurso_id, recurso_titulo, data_atividade
+                        FROM atividades_sessao a
+                        INNER JOIN sessoes s ON a.sessao_id = s.id
+                        WHERE s.usuario_id = ?
+                        ORDER BY a.data_atividade DESC
+                        LIMIT ?
+                    ");
+                    $stDet->execute([$row['usuario_id'], $limiteDetalhes]);
+                    $item['detalhes'] = $stDet->fetchAll(PDO::FETCH_ASSOC);
+                }
+                $relatorio[] = $item;
+            }
+
+            json_response(200, [
+                'error' => false,
+                'relatorio' => $relatorio,
+                'total_linhas' => count($relatorio),
+            ]);
+            break;
+
         default:
             json_response(400, ['error' => true, 'message' => 'Ação não especificada']);
     }

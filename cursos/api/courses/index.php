@@ -114,13 +114,20 @@ try {
                     av.duracao_video,
                     av.thumbnail_url,
                     av.ordem,
+                    av.aula_id,
+                    av.links_uteis,
+                    av.pdfs_download,
+                    a.titulo AS aula_titulo,
+                    a.ordem AS aula_ordem,
+                    m.id AS modulo_id,
+                    m.titulo_modulo,
                     m.ordem AS modulo_ordem
                 FROM aula_videos av
                 INNER JOIN aulas a ON a.id = av.aula_id
                 INNER JOIN modulos m ON m.id = a.modulo_id
                 WHERE m.curso_id = ?
                   AND av.ativo = 1
-                ORDER BY m.ordem ASC, av.ordem ASC
+                ORDER BY m.ordem ASC, a.ordem ASC, av.ordem ASC
             ");
             $stmt->execute([$courseId]);
             $lessons = $stmt->fetchAll();
@@ -146,6 +153,13 @@ try {
             $lessons = $stmt->fetchAll();
         }
 
+        // Duração total: soma dos vídeos (segundos) → minutos para exibir em horas
+        $totalSegundosVideos = 0;
+        foreach ($lessons as $l) {
+            $totalSegundosVideos += (int)($l['duracao_video'] ?? 0);
+        }
+        $totalDurationMinutes = $totalSegundosVideos > 0 ? (int)round($totalSegundosVideos / 60) : (int)($course['duracao_total'] ?? 0);
+
         // Converter JSON strings para arrays e renomear campos para API
         $courseData = [
             'id' => $course['id'],
@@ -157,7 +171,7 @@ try {
             'instructor_bio' => $course['bio_instrutor'],
             'price' => (float)$course['preco'],
             'status' => $course['status'],
-            'total_duration' => (int)$course['duracao_total'],
+            'total_duration' => $totalDurationMinutes,
             'total_lessons' => (int)$course['total_aulas'],
             'enrolled_count' => (int)$course['alunos_inscritos'],
             'rating' => (float)$course['avaliacao'],
@@ -166,12 +180,12 @@ try {
         ];
 
         $lessonsData = [];
+        $orderIndex = 0;
         foreach ($lessons as $lesson) {
             // quando vem de aula_videos: modulo_ordem é numérico (0,1,2,...)
             $module = 'I';
             if (isset($lesson['modulo_ordem'])) {
                 $idx = (int)$lesson['modulo_ordem'] + 1;
-                // suporte básico para I e II (resto vira "I")
                 $module = $idx === 2 ? 'II' : 'I';
             } elseif (isset($lesson['modulo'])) {
                 $module = $lesson['modulo'] ?: 'I';
@@ -184,10 +198,17 @@ try {
                 'video_url' => $lesson['video_url'],
                 'video_duration' => (int)($lesson['duracao_video'] ?? 0),
                 'thumbnail_url' => $lesson['thumbnail_url'],
-                'order_index' => (int)($lesson['ordem'] ?? 0),
+                'order_index' => $orderIndex++,
                 'module' => $module,
                 'is_preview' => (bool)($lesson['eh_preview'] ?? 0),
                 'resources' => [],
+                'aula_id' => $lesson['aula_id'] ?? null,
+                'aula_titulo' => $lesson['aula_titulo'] ?? null,
+                'aula_ordem' => isset($lesson['aula_ordem']) ? (int)$lesson['aula_ordem'] : null,
+                'modulo_id' => $lesson['modulo_id'] ?? null,
+                'modulo_titulo' => $lesson['titulo_modulo'] ?? null,
+                'links_uteis' => isset($lesson['links_uteis']) ? (is_string($lesson['links_uteis']) ? json_decode($lesson['links_uteis'], true) : $lesson['links_uteis']) : [],
+                'pdfs_download' => isset($lesson['pdfs_download']) ? (is_string($lesson['pdfs_download']) ? json_decode($lesson['pdfs_download'], true) : $lesson['pdfs_download']) : [],
             ];
         }
 
@@ -203,10 +224,12 @@ try {
         $category = $_GET['category'] ?? null;
         $search = $_GET['search'] ?? null;
 
+        $subqueryDuration = ", (SELECT COALESCE(SUM(av.duracao_video), 0) FROM aula_videos av INNER JOIN aulas a ON a.id = av.aula_id INNER JOIN modulos m ON m.id = a.modulo_id WHERE m.curso_id = c.id AND av.ativo = 1) AS total_segundos_videos";
         if ($isPublicList) {
             $sql = "SELECT
                         c.*,
                         COUNT(DISTINCT i.id) as alunos_inscritos
+                        $subqueryDuration
                     FROM cursos c
                     LEFT JOIN inscricoes i ON i.curso_id = c.id
                     WHERE c.status = 'publicado'";
@@ -226,6 +249,7 @@ try {
                 $sql = "SELECT
                             c.*,
                             COUNT(DISTINCT i.id) as alunos_inscritos
+                            $subqueryDuration
                         FROM cursos c
                         LEFT JOIN inscricoes i ON i.curso_id = c.id
                         WHERE 1=1";
@@ -235,6 +259,7 @@ try {
                 $sql = "SELECT
                             c.*,
                             COUNT(DISTINCT i.id) as alunos_inscritos
+                            $subqueryDuration
                         FROM cursos c
                         INNER JOIN permissoes_cursos pc ON pc.curso_id = c.id
                         LEFT JOIN inscricoes i ON i.curso_id = c.id
@@ -264,6 +289,8 @@ try {
 
         $coursesData = [];
         foreach ($courses as $course) {
+            $totalSegundos = isset($course['total_segundos_videos']) ? (int)$course['total_segundos_videos'] : 0;
+            $totalDurationMinutes = $totalSegundos > 0 ? (int)round($totalSegundos / 60) : (int)($course['duracao_total'] ?? 0);
             $coursesData[] = [
                 'id' => $course['id'],
                 'titulo' => $course['titulo'], // Manter em português para compatibilidade
@@ -280,7 +307,7 @@ try {
                 'preco' => (float)$course['preco'],
                 'price' => (float)$course['preco'],
                 'status' => $course['status'],
-                'total_duration' => (int)$course['duracao_total'],
+                'total_duration' => $totalDurationMinutes,
                 'total_aulas' => (int)$course['total_aulas'],
                 'total_lessons' => (int)$course['total_aulas'],
                 'alunos_inscritos' => (int)$course['alunos_inscritos'],

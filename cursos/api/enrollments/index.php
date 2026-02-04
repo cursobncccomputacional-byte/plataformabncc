@@ -62,7 +62,7 @@ try {
             $targetUserId = $queryUserId;
         }
 
-        // Buscar cursos do usuário
+        // Buscar cursos do usuário (duração total = soma dos vídeos do curso, em minutos)
         $stmt = $pdo->prepare("
             SELECT 
                 i.*,
@@ -70,7 +70,11 @@ try {
                 c.thumbnail_url,
                 c.nome_instrutor,
                 c.total_aulas,
-                c.duracao_total
+                c.duracao_total,
+                (SELECT COALESCE(SUM(av.duracao_video), 0) FROM aula_videos av
+                 INNER JOIN aulas a ON a.id = av.aula_id
+                 INNER JOIN modulos m ON m.id = a.modulo_id
+                 WHERE m.curso_id = c.id AND av.ativo = 1) AS total_segundos_videos
             FROM inscricoes i
             INNER JOIN cursos c ON c.id = i.curso_id
             WHERE i.usuario_id = ?
@@ -81,6 +85,8 @@ try {
 
         $enrollmentsData = [];
         foreach ($enrollments as $enrollment) {
+            $totalSeg = (int)($enrollment['total_segundos_videos'] ?? 0);
+            $totalDurationMinutes = $totalSeg > 0 ? (int)round($totalSeg / 60) : (int)($enrollment['duracao_total'] ?? 0);
             $enrollmentsData[] = [
                 'id' => (int)$enrollment['id'],
                 'user_id' => $enrollment['usuario_id'],
@@ -93,7 +99,7 @@ try {
                 'thumbnail_url' => $enrollment['thumbnail_url'],
                 'instructor_name' => $enrollment['nome_instrutor'],
                 'total_lessons' => (int)$enrollment['total_aulas'],
-                'total_duration' => (int)$enrollment['duracao_total'],
+                'total_duration' => $totalDurationMinutes,
             ];
         }
 

@@ -173,6 +173,11 @@ class EADApiService {
     });
   }
 
+  /** Perguntas da avaliação ao final da aula */
+  async getAvaliacao(aulaId: string): Promise<ApiResponse> {
+    return this.request(`/avaliacao/index.php?aula_id=${encodeURIComponent(aulaId)}`);
+  }
+
   // ============================================
   // Métodos de Gestão de Usuários (Root apenas)
   // Usa a API principal do sistema

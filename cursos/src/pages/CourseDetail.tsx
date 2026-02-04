@@ -5,6 +5,7 @@ import { Clock, Users, Star, Play, CheckCircle, Lock } from 'lucide-react';
 import { eadApiService } from '../services/eadApiService';
 import { useEADAuth } from '../contexts/EADAuthContext';
 import { Course, Lesson } from '../types/ead';
+import { formatDurationFromMinutes } from '../utils/formatDuration';
 
 export const CourseDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -166,7 +167,7 @@ export const CourseDetail = () => {
               <div className="flex flex-wrap gap-4 mb-6 text-sm text-gray-600">
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  <span>{Math.floor(course.total_duration / 60)} horas</span>
+                  <span>{formatDurationFromMinutes(course.total_duration)}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Users className="w-4 h-4" />

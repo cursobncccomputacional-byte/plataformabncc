@@ -1846,6 +1846,145 @@ class ApiService {
   }
 
   /**
+   * Avaliação (prova) da aula: listar perguntas
+   */
+  async getAvaliacaoPerguntas(aulaId: string): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/avaliacao/index.php?aula_id=${encodeURIComponent(aulaId)}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: text?.substring(0, 100) || 'Erro' };
+      }
+      const data = await response.json();
+      return { error: !!data.error, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Criar pergunta da avaliação
+   */
+  async createAvaliacaoPergunta(payload: {
+    aula_id: string;
+    ordem: number;
+    enunciado: string;
+    opcao_a: string;
+    opcao_b: string;
+    opcao_c: string;
+    opcao_d: string;
+    resposta_correta: 'A' | 'B' | 'C' | 'D';
+  }): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/avaliacao/index.php`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: text?.substring(0, 100) || 'Erro' };
+      }
+      const data = await response.json();
+      return { error: !!data.error, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Atualizar pergunta da avaliação
+   */
+  async updateAvaliacaoPergunta(
+    id: number,
+    updates: Partial<{
+      ordem: number;
+      enunciado: string;
+      opcao_a: string;
+      opcao_b: string;
+      opcao_c: string;
+      opcao_d: string;
+      resposta_correta: string;
+    }>
+  ): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/avaliacao/index.php`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id, ...updates }),
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: text?.substring(0, 100) || 'Erro' };
+      }
+      const data = await response.json();
+      return { error: !!data.error, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
+   * Deletar pergunta da avaliação
+   */
+  async deleteAvaliacaoPergunta(id: number): Promise<ApiResponse> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+      const response = await fetch(`${cursosApiUrl}/avaliacao/index.php`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id }),
+      });
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: text?.substring(0, 100) || 'Erro' };
+      }
+      const data = await response.json();
+      return { error: !!data.error, ...data };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  }
+
+  /**
    * Criar aula
    */
   async createAula(aulaData: {
@@ -1979,6 +2118,63 @@ class ApiService {
     } catch (error) {
       return { error: true, message: error instanceof Error ? error.message : 'Erro desconhecido' };
     }
+  }
+
+  /**
+   * Relatório de aderência aos vídeos (Formação Continuada)
+   * Retorna por usuário/curso: % assistido, % concluído, vídeos concluídos, segundos assistidos.
+   * Apenas root ou can_manage_courses.
+   */
+  async getRelatorioAderenciaVideos(courseId?: string): Promise<ApiResponse & { relatorio?: any[]; total_linhas?: number }> {
+    const cursosApiUrl = 'https://cursos.novaedubncc.com.br/api';
+    const currentUser = await this.getCurrentUserForCursosApi();
+
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser && currentUser.id) {
+        headers['X-User-Id'] = String(currentUser.id);
+        headers['X-User-Role'] = String(currentUser.role || '');
+      }
+
+      const query = courseId ? `?course_id=${encodeURIComponent(courseId)}` : '';
+      const response = await fetch(`${cursosApiUrl}/reports/aderencia-videos.php${query}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        return { error: true, message: `Erro: ${text.substring(0, 100)}` };
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { error: true, message: data.message || 'Erro ao gerar relatório' };
+      }
+      return { error: false, relatorio: data.relatorio || [], total_linhas: data.total_linhas ?? 0 };
+    } catch (error) {
+      return { error: true, message: error instanceof Error ? error.message : 'Erro ao conectar com a API de cursos' };
+    }
+  }
+
+  /**
+   * Relatório de aderência às atividades da plataforma (vídeos, documentos, downloads)
+   * Dados de atividades_sessao (view_activity, view_document, view_video, download).
+   * Apenas root ou admin. API principal (sessions).
+   */
+  async getRelatorioAderenciaAtividades(params?: {
+    usuario_id?: string;
+    detalhes?: boolean;
+    limite_detalhes?: number;
+  }): Promise<ApiResponse & { relatorio?: any[]; total_linhas?: number }> {
+    const q = new URLSearchParams();
+    q.set('action', 'aderencia-atividades');
+    if (params?.usuario_id) q.set('usuario_id', params.usuario_id);
+    if (params?.detalhes) q.set('detalhes', '1');
+    if (params?.limite_detalhes != null) q.set('limite_detalhes', String(params.limite_detalhes));
+    return this.request(`/sessions/index.php?${q.toString()}`);
   }
 
   /**

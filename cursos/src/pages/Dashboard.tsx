@@ -5,6 +5,7 @@ import { Play, Clock, CheckCircle, LogOut, Lock, Sparkles, TrendingUp, BookOpen 
 import { eadApiService } from '../services/eadApiService';
 import { useEADAuth } from '../contexts/EADAuthContext';
 import { Course, Enrollment } from '../types/ead';
+import { formatDurationFromMinutes } from '../utils/formatDuration';
 
 export const Dashboard = () => {
   const { user, logout, isRoot } = useEADAuth();
@@ -151,7 +152,7 @@ export const Dashboard = () => {
                     <Clock className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <div className="text-3xl font-bold text-white">{Math.floor(totalHours / 60)}h</div>
+                    <div className="text-3xl font-bold text-white">{formatDurationFromMinutes(totalHours)}</div>
                     <div className="text-sm text-gray-400">Total de Horas</div>
                   </div>
                 </div>
@@ -286,7 +287,7 @@ export const Dashboard = () => {
                         <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
                           <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg">
                             <Clock className="w-4 h-4" />
-                            <span>{enrollment.total_duration ? Math.floor(enrollment.total_duration / 60) : 0}h</span>
+                            <span>{formatDurationFromMinutes(enrollment.total_duration)}</span>
                           </div>
                           <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg">
                             <CheckCircle className="w-4 h-4" />

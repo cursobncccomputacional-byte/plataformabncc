@@ -5,6 +5,7 @@ import { Clock, Users, Star, Search, ChevronLeft, ChevronRight, Play, Lock, Spar
 import { eadApiService } from '../services/eadApiService';
 import { Course } from '../types/ead';
 import { useEADAuth } from '../contexts/EADAuthContext';
+import { formatDurationFromMinutes } from '../utils/formatDuration';
 
 export const Courses = () => {
   const [searchParams] = useSearchParams();
@@ -296,7 +297,7 @@ export const Courses = () => {
                             <div className="flex items-center gap-4 text-xs text-gray-400 mb-3">
                               <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg">
                                 <Clock className="w-3.5 h-3.5" />
-                                <span>{Math.floor(course.total_duration / 60)}h</span>
+                                <span>{formatDurationFromMinutes(course.total_duration)}</span>
                               </div>
                               <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg">
                                 <Users className="w-3.5 h-3.5" />
@@ -387,7 +388,7 @@ export const Courses = () => {
                       <div className="flex items-center gap-3 text-xs text-gray-400 mb-2">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          <span>{Math.floor(course.total_duration / 60)}h</span>
+                          <span>{formatDurationFromMinutes(course.total_duration)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Users className="w-3 h-3" />

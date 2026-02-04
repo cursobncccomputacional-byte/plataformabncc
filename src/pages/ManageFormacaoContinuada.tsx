@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Edit, Trash2, X, Save, ChevronRight, ChevronDown, Video, BookOpen, FolderOpen } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Save, ChevronRight, ChevronDown, Video, BookOpen, FolderOpen, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 import { ToastNotification } from '../components/ToastNotification';
@@ -33,6 +33,8 @@ interface Aula {
   total_videos?: number;
 }
 
+type LinkOuPdf = { label: string; url: string };
+
 interface AulaVideo {
   id: string;
   aula_id: string;
@@ -42,6 +44,17 @@ interface AulaVideo {
   duracao_video: number;
   thumbnail_url?: string;
   ordem: number;
+  links_uteis?: LinkOuPdf[] | string;
+  pdfs_download?: LinkOuPdf[] | string;
+}
+
+/** Pergunta da avaliação (prova) ao final da aula */
+interface PerguntaAvaliacao {
+  id: number;
+  ordem: number;
+  enunciado: string;
+  opcoes: { A: string; B: string; C: string; D: string };
+  resposta_correta: string;
 }
 
 export const ManageFormacaoContinuada = () => {
@@ -99,6 +112,21 @@ export const ManageFormacaoContinuada = () => {
     duracao_video: 0,
     thumbnail_url: '',
     ordem: 0,
+    links_uteis: [] as LinkOuPdf[],
+    pdfs_download: [] as LinkOuPdf[],
+  });
+  const [showAvaliacaoModal, setShowAvaliacaoModal] = useState(false);
+  const [avaliacaoPerguntas, setAvaliacaoPerguntas] = useState<PerguntaAvaliacao[]>([]);
+  const [showPerguntaModal, setShowPerguntaModal] = useState(false);
+  const [editingPergunta, setEditingPergunta] = useState<PerguntaAvaliacao | null>(null);
+  const [perguntaFormData, setPerguntaFormData] = useState({
+    enunciado: '',
+    opcao_a: '',
+    opcao_b: '',
+    opcao_c: '',
+    opcao_d: '',
+    resposta_correta: 'A' as 'A' | 'B' | 'C' | 'D',
+    ordem: 1,
   });
 
   useEffect(() => {
@@ -146,17 +174,13 @@ export const ManageFormacaoContinuada = () => {
   };
 
   const generateNextAulaVideoId = () => {
-    if (!selectedAula) return 'parte-001';
-    const base = selectedAula.id;
-    const max = (aulaVideos || []).reduce((acc, v) => {
-      const id = String(v.id || '').toLowerCase();
-      const m = id.match(/-parte-(\d+)$/);
-      if (!m) return acc;
-      const n = parseInt(m[1], 10);
-      return Number.isFinite(n) ? Math.max(acc, n) : acc;
-    }, 0);
-    const next = max + 1;
-    return `${base}-parte-${String(next).padStart(3, '0')}`;
+    // ID único para evitar 409 (já existe) quando o banco tem vídeos com formato diferente
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `parte-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    }
+    const base = selectedAula?.id || 'aula';
+    const suffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    return `${base}-parte-${suffix}`;
   };
 
   useEffect(() => {
@@ -367,6 +391,16 @@ export const ManageFormacaoContinuada = () => {
       return;
     }
 
+    const parseLinks = (v: AulaVideo['links_uteis']): LinkOuPdf[] => {
+      if (!v) return [];
+      if (Array.isArray(v)) return v as LinkOuPdf[];
+      try {
+        const arr = typeof v === 'string' ? JSON.parse(v) : v;
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    };
     if (video) {
       setEditingAulaVideo(video);
       setAulaVideoFormData({
@@ -377,6 +411,8 @@ export const ManageFormacaoContinuada = () => {
         duracao_video: video.duracao_video || 0,
         thumbnail_url: video.thumbnail_url || '',
         ordem: video.ordem || 0,
+        links_uteis: parseLinks(video.links_uteis),
+        pdfs_download: parseLinks(video.pdfs_download),
       });
       setAulaThumbMode('url');
       setAulaThumbnailFile(null);
@@ -390,6 +426,8 @@ export const ManageFormacaoContinuada = () => {
         duracao_video: 0,
         thumbnail_url: '',
         ordem: aulaVideos.length + 1,
+        links_uteis: [],
+        pdfs_download: [],
       });
       setAulaThumbMode('upload');
       setAulaThumbnailFile(null);
@@ -412,15 +450,21 @@ export const ManageFormacaoContinuada = () => {
       return;
     }
 
+    const linksUteis = (aulaVideoFormData.links_uteis || []).filter((l) => l.label?.trim() && l.url?.trim());
+    const pdfsDownload = (aulaVideoFormData.pdfs_download || []).filter((p) => p.label?.trim() && p.url?.trim());
+    const payload = {
+      ...aulaVideoFormData,
+      links_uteis: linksUteis,
+      pdfs_download: pdfsDownload,
+      ...(editingAulaVideo ? {} : { aula_id: selectedAula.id }),
+    };
+
     try {
       let response;
       if (editingAulaVideo) {
-        response = await apiService.updateAulaVideo(aulaVideoFormData.id, aulaVideoFormData as any);
+        response = await apiService.updateAulaVideo(aulaVideoFormData.id, payload as any);
       } else {
-        response = await apiService.createAulaVideo({
-          ...aulaVideoFormData,
-          aula_id: selectedAula.id,
-        } as any);
+        response = await apiService.createAulaVideo(payload as any);
       }
 
       if (response.error) {
@@ -464,6 +508,134 @@ export const ManageFormacaoContinuada = () => {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao remover vídeo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAvaliacaoPerguntas = async (aulaId: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.getAvaliacaoPerguntas(aulaId);
+      if (response.error) {
+        setAvaliacaoPerguntas([]);
+      } else {
+        const list = (response as { perguntas?: PerguntaAvaliacao[] }).perguntas || [];
+        setAvaliacaoPerguntas(list);
+      }
+    } catch {
+      setAvaliacaoPerguntas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenAvaliacaoModal = async () => {
+    if (!selectedAula) return;
+    setShowAvaliacaoModal(true);
+    await loadAvaliacaoPerguntas(selectedAula.id);
+  };
+
+  const handleOpenPerguntaModal = (pergunta?: PerguntaAvaliacao) => {
+    if (pergunta) {
+      setEditingPergunta(pergunta);
+      setPerguntaFormData({
+        enunciado: pergunta.enunciado,
+        opcao_a: pergunta.opcoes?.A ?? '',
+        opcao_b: pergunta.opcoes?.B ?? '',
+        opcao_c: pergunta.opcoes?.C ?? '',
+        opcao_d: pergunta.opcoes?.D ?? '',
+        resposta_correta: (pergunta.resposta_correta || 'A') as 'A' | 'B' | 'C' | 'D',
+        ordem: pergunta.ordem ?? 0,
+      });
+    } else {
+      setEditingPergunta(null);
+      setPerguntaFormData({
+        enunciado: '',
+        opcao_a: '',
+        opcao_b: '',
+        opcao_c: '',
+        opcao_d: '',
+        resposta_correta: 'A',
+        ordem: avaliacaoPerguntas.length + 1,
+      });
+    }
+    setShowPerguntaModal(true);
+  };
+
+  const handleSubmitPergunta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAula) return;
+    if (!perguntaFormData.enunciado.trim() || !perguntaFormData.opcao_a.trim() || !perguntaFormData.opcao_b.trim() || !perguntaFormData.opcao_c.trim() || !perguntaFormData.opcao_d.trim()) {
+      setError('Enunciado e as quatro opções são obrigatórios.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      if (editingPergunta) {
+        const response = await apiService.updateAvaliacaoPergunta(editingPergunta.id, {
+          ordem: perguntaFormData.ordem,
+          enunciado: perguntaFormData.enunciado.trim(),
+          opcao_a: perguntaFormData.opcao_a.trim(),
+          opcao_b: perguntaFormData.opcao_b.trim(),
+          opcao_c: perguntaFormData.opcao_c.trim(),
+          opcao_d: perguntaFormData.opcao_d.trim(),
+          resposta_correta: perguntaFormData.resposta_correta,
+        });
+        if (response.error) {
+          setError(response.message || 'Erro ao atualizar pergunta');
+        } else {
+          setSuccess('Pergunta atualizada!');
+          setShowPerguntaModal(false);
+          await loadAvaliacaoPerguntas(selectedAula.id);
+          setTimeout(() => setSuccess(null), 3000);
+        }
+      } else {
+        const response = await apiService.createAvaliacaoPergunta({
+          aula_id: selectedAula.id,
+          ordem: perguntaFormData.ordem,
+          enunciado: perguntaFormData.enunciado.trim(),
+          opcao_a: perguntaFormData.opcao_a.trim(),
+          opcao_b: perguntaFormData.opcao_b.trim(),
+          opcao_c: perguntaFormData.opcao_c.trim(),
+          opcao_d: perguntaFormData.opcao_d.trim(),
+          resposta_correta: perguntaFormData.resposta_correta,
+        });
+        if (response.error) {
+          setError(response.message || 'Erro ao criar pergunta');
+        } else {
+          setSuccess('Pergunta criada!');
+          setShowPerguntaModal(false);
+          await loadAvaliacaoPerguntas(selectedAula.id);
+          setTimeout(() => setSuccess(null), 3000);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar pergunta');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePergunta = async (id: number) => {
+    if (!confirm('Remover esta pergunta da avaliação?')) return;
+    if (!selectedAula) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.deleteAvaliacaoPergunta(id);
+      if (response.error) {
+        setError(response.message || 'Erro ao remover pergunta');
+      } else {
+        setSuccess('Pergunta removida!');
+        await loadAvaliacaoPerguntas(selectedAula.id);
+        setTimeout(() => setSuccess(null), 3000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao remover pergunta');
     } finally {
       setLoading(false);
     }
@@ -1027,13 +1199,23 @@ export const ManageFormacaoContinuada = () => {
               Vídeos
             </h2>
             {selectedAula && (
-              <button
-                onClick={() => handleOpenAulaVideoModal()}
-                className="flex items-center gap-1 text-sm bg-[#044982] text-white px-3 py-1 rounded hover:bg-[#005a93] transition"
-              >
-                <Plus className="w-4 h-4" />
-                Novo
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleOpenAvaliacaoModal()}
+                  className="flex items-center gap-1 text-sm bg-amber-600 text-white px-3 py-1 rounded hover:bg-amber-700 transition"
+                  title="Prova ao final da aula"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  Avaliação
+                </button>
+                <button
+                  onClick={() => handleOpenAulaVideoModal()}
+                  className="flex items-center gap-1 text-sm bg-[#044982] text-white px-3 py-1 rounded hover:bg-[#005a93] transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  Novo
+                </button>
+              </div>
             )}
           </div>
 
@@ -1469,6 +1651,120 @@ export const ManageFormacaoContinuada = () => {
                 </div>
               </div>
 
+              {/* Links úteis */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Links úteis</label>
+                <p className="text-xs text-gray-500 mb-2">Adicione links de apoio (sites, vídeos, etc.) para esta vídeo-aula.</p>
+                {aulaVideoFormData.links_uteis.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={item.label}
+                      onChange={(e) => {
+                        const next = [...aulaVideoFormData.links_uteis];
+                        next[idx] = { ...next[idx], label: e.target.value };
+                        setAulaVideoFormData({ ...aulaVideoFormData, links_uteis: next });
+                      }}
+                      placeholder="Texto do link"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    />
+                    <input
+                      type="url"
+                      value={item.url}
+                      onChange={(e) => {
+                        const next = [...aulaVideoFormData.links_uteis];
+                        next[idx] = { ...next[idx], url: e.target.value };
+                        setAulaVideoFormData({ ...aulaVideoFormData, links_uteis: next });
+                      }}
+                      placeholder="https://..."
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAulaVideoFormData({
+                          ...aulaVideoFormData,
+                          links_uteis: aulaVideoFormData.links_uteis.filter((_, i) => i !== idx),
+                        })
+                      }
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      title="Remover"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAulaVideoFormData({
+                      ...aulaVideoFormData,
+                      links_uteis: [...aulaVideoFormData.links_uteis, { label: '', url: '' }],
+                    })
+                  }
+                  className="text-sm text-[#044982] hover:underline"
+                >
+                  + Adicionar link
+                </button>
+              </div>
+
+              {/* PDFs para download */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PDFs para download</label>
+                <p className="text-xs text-gray-500 mb-2">Adicione links de PDFs para o aluno baixar (ex.: material complementar).</p>
+                {aulaVideoFormData.pdfs_download.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={item.label}
+                      onChange={(e) => {
+                        const next = [...aulaVideoFormData.pdfs_download];
+                        next[idx] = { ...next[idx], label: e.target.value };
+                        setAulaVideoFormData({ ...aulaVideoFormData, pdfs_download: next });
+                      }}
+                      placeholder="Nome do arquivo/PDF"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    />
+                    <input
+                      type="url"
+                      value={item.url}
+                      onChange={(e) => {
+                        const next = [...aulaVideoFormData.pdfs_download];
+                        next[idx] = { ...next[idx], url: e.target.value };
+                        setAulaVideoFormData({ ...aulaVideoFormData, pdfs_download: next });
+                      }}
+                      placeholder="https://... (URL do PDF)"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAulaVideoFormData({
+                          ...aulaVideoFormData,
+                          pdfs_download: aulaVideoFormData.pdfs_download.filter((_, i) => i !== idx),
+                        })
+                      }
+                      className="p-2 text-red-600 hover:bg-red-50 rounded"
+                      title="Remover"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAulaVideoFormData({
+                      ...aulaVideoFormData,
+                      pdfs_download: [...aulaVideoFormData.pdfs_download, { label: '', url: '' }],
+                    })
+                  }
+                  className="text-sm text-[#044982] hover:underline"
+                >
+                  + Adicionar PDF
+                </button>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Thumbnail do Vídeo</label>
 
@@ -1560,6 +1856,194 @@ export const ManageFormacaoContinuada = () => {
                   className="flex-1 px-4 py-2 bg-[#044982] text-white rounded-md hover:bg-[#005a93] transition disabled:opacity-50"
                 >
                   {loading ? 'Salvando...' : editingAulaVideo ? 'Atualizar' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Avaliação (prova da aula) */}
+      {showAvaliacaoModal && selectedAula && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-[#044982] flex items-center gap-2">
+                <ClipboardList className="w-6 h-6" />
+                Prova – {selectedAula.titulo}
+              </h2>
+              <button onClick={() => setShowAvaliacaoModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Perguntas de múltipla escolha (A, B, C, D) exibidas ao aluno ao final desta aula.
+            </p>
+            <div className="flex justify-end mb-3">
+              <button
+                type="button"
+                onClick={() => handleOpenPerguntaModal()}
+                className="flex items-center gap-1 text-sm bg-[#044982] text-white px-3 py-2 rounded hover:bg-[#005a93] transition"
+              >
+                <Plus className="w-4 h-4" />
+                Nova pergunta
+              </button>
+            </div>
+            {loading && avaliacaoPerguntas.length === 0 ? (
+              <div className="text-center py-6 text-gray-500">Carregando...</div>
+            ) : avaliacaoPerguntas.length === 0 ? (
+              <div className="text-center py-6 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+                Nenhuma pergunta. Clique em &quot;Nova pergunta&quot; para criar.
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {avaliacaoPerguntas.map((p) => (
+                  <li
+                    key={p.id}
+                    className="p-3 rounded-lg border border-gray-200 hover:border-gray-300 flex items-start justify-between gap-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-medium text-gray-400">#{p.ordem}</span>
+                      <p className="text-gray-900 mt-0.5 line-clamp-2">{p.enunciado}</p>
+                      <p className="text-xs text-gray-500 mt-1">Resposta correta: {p.resposta_correta}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPerguntaModal(p)}
+                        className="text-blue-600 hover:text-blue-900 p-1"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePergunta(p.id)}
+                        className="text-red-600 hover:text-red-900 p-1"
+                        title="Remover"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nova/Editar Pergunta da Avaliação */}
+      {showPerguntaModal && selectedAula && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-[#044982]">
+                {editingPergunta ? 'Editar pergunta' : 'Nova pergunta'}
+              </h2>
+              <button
+                onClick={() => setShowPerguntaModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitPergunta} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={perguntaFormData.ordem}
+                  onChange={(e) =>
+                    setPerguntaFormData({ ...perguntaFormData, ordem: parseInt(e.target.value) || 1 })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Enunciado *</label>
+                <textarea
+                  required
+                  value={perguntaFormData.enunciado}
+                  onChange={(e) => setPerguntaFormData({ ...perguntaFormData, enunciado: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                  placeholder="Texto da questão..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opção A *</label>
+                <input
+                  type="text"
+                  required
+                  value={perguntaFormData.opcao_a}
+                  onChange={(e) => setPerguntaFormData({ ...perguntaFormData, opcao_a: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opção B *</label>
+                <input
+                  type="text"
+                  required
+                  value={perguntaFormData.opcao_b}
+                  onChange={(e) => setPerguntaFormData({ ...perguntaFormData, opcao_b: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opção C *</label>
+                <input
+                  type="text"
+                  required
+                  value={perguntaFormData.opcao_c}
+                  onChange={(e) => setPerguntaFormData({ ...perguntaFormData, opcao_c: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opção D *</label>
+                <input
+                  type="text"
+                  required
+                  value={perguntaFormData.opcao_d}
+                  onChange={(e) => setPerguntaFormData({ ...perguntaFormData, opcao_d: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Resposta correta *</label>
+                <select
+                  value={perguntaFormData.resposta_correta}
+                  onChange={(e) =>
+                    setPerguntaFormData({
+                      ...perguntaFormData,
+                      resposta_correta: e.target.value as 'A' | 'B' | 'C' | 'D',
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#044982]"
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowPerguntaModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-[#044982] text-white rounded-md hover:bg-[#005a93] transition disabled:opacity-50"
+                >
+                  {loading ? 'Salvando...' : editingPergunta ? 'Atualizar' : 'Criar'}
                 </button>
               </div>
             </form>
