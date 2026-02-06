@@ -238,7 +238,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Converter formato da API para formato Activity
             const activities: Activity[] = apiResponse.activities.map((a: any) => ({
               id: a.id,
-              title: a.title,
+              title: a.title || a.nome_atividade || a.nome || a.titulo || `Atividade ${a.id}`,
               description: a.description || 'Sem descrição',
               type: a.type,
               schoolYears: a.schoolYears || [],

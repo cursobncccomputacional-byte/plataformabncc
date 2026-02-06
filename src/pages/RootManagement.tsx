@@ -14,6 +14,7 @@ import { ManageTrilhas } from './ManageTrilhas';
 import { ManageAdminPackages } from './ManageAdminPackages';
 import { SessionManagement } from './SessionManagement';
 import { PlanoAula } from './PlanoAula';
+import { Projetos } from './Projetos';
 import { BnccDigital } from './BnccDigital';
 import { ManageBncc } from './ManageBncc';
 import { RelatorioAtividades } from './RelatorioAtividades';
@@ -35,7 +36,7 @@ export const RootManagement = () => {
   const { user, getAllUsers, createUser, changePassword, deleteUser, toggleUserStatus } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades' | 'relatorio-aderencia-videos' | 'demandas' | 'termo-referencia' | 'glossario' | 'cae' | 'politica-privacidade'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades' | 'relatorio-aderencia-videos' | 'demandas' | 'projetos' | 'termo-referencia' | 'glossario' | 'cae' | 'politica-privacidade'>('users');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -594,6 +595,7 @@ export const RootManagement = () => {
           {currentPage === 'relatorio-atividades' && <RelatorioAtividades />}
           {currentPage === 'relatorio-aderencia-videos' && <RelatorioAderenciaVideos />}
           {currentPage === 'demandas' && <ManageDemandas />}
+          {currentPage === 'projetos' && <Projetos />}
           {currentPage === 'termo-referencia' && <TermoReferencia />}
           {currentPage === 'glossario' && <Glossario />}
           {currentPage === 'cae' && <CAE />}

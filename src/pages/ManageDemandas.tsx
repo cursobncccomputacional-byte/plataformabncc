@@ -931,6 +931,7 @@ export const ManageDemandas = () => {
                     <td className="py-3 px-4">
                       {d.data_conclusao ? (
                         <span className="text-green-600 text-sm">
+                          Concluído em{' '}
                           {(() => {
                             const raw = d.data_conclusao.replace(' ', 'T');
                             const asUtc = raw.includes('Z') ? raw : raw + 'Z';

@@ -215,6 +215,7 @@ export const Sidebar = ({
   // Submenu Gestão Interna (apenas root)
   const gestaoInternaSubMenuItems = useMemo(() => [
     { id: 'demandas' as const, icon: ClipboardList, label: 'Demandas' },
+    { id: 'projetos' as const, icon: ClipboardList, label: 'Projetos' },
   ], []);
 
   // Menu para Root
@@ -257,6 +258,7 @@ export const Sidebar = ({
     if (isAdmin) {
       items.push({ id: 'admin-menu' as const, icon: Settings, label: 'Painel Administrativo', isParent: true });
       items.push({ id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Comput', isParent: true });
+      items.push({ id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' });
       items.push({ id: 'glossario' as const, icon: BookOpen, label: 'Glossário BNCC' });
       items.push({ id: 'formacao-continuada-cursos' as const, icon: GraduationCap, label: 'Formação Continuada' });
       items.push({ id: 'cae' as const, icon: Newspaper, label: 'CAE' });

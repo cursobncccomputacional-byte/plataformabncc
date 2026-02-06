@@ -653,7 +653,127 @@ class ApiService {
   }
 
   /**
-   * Deletar atividade (requer can_manage_activities)
+   * Planos de Aula
+   */
+  async getLessonPlans(filters?: { atividade_id?: string }): Promise<ApiResponse & { planos?: any[] }> {
+    const params = new URLSearchParams();
+    if (filters?.atividade_id) params.append('atividade_id', filters.atividade_id);
+    const query = params.toString();
+    return this.request(`/planos-aula/index.php${query ? '?' + query : ''}`);
+  }
+
+  async getLessonPlan(id: number): Promise<ApiResponse & { plano?: any }> {
+    return this.request(`/planos-aula/index.php?id=${encodeURIComponent(String(id))}`);
+  }
+
+  async createLessonPlan(data: {
+    atividade_id: string;
+    titulo: string;
+    descricao?: string;
+    pdf_url: string;
+    thumb_url?: string;
+  }): Promise<ApiResponse & { plano?: any }> {
+    // Obter usuário atual para enviar nos headers (compatível com requireAuth)
+    const currentUser = await this.getCurrentUser();
+
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return this.request('/planos-aula/index.php', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLessonPlan(
+    id: number,
+    updates: Partial<{
+      atividade_id: string;
+      titulo: string;
+      descricao: string;
+      pdf_url: string;
+      thumb_url: string;
+    }>
+  ): Promise<ApiResponse & { plano?: any }> {
+    const currentUser = await this.getCurrentUser();
+
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return this.request('/planos-aula/index.php', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ id, ...updates }),
+    });
+  }
+
+  async deleteLessonPlan(id: number): Promise<ApiResponse> {
+    const currentUser = await this.getCurrentUser();
+
+    const headers: HeadersInit = {};
+    if (currentUser && !currentUser.error && currentUser.user) {
+      headers['X-User-Id'] = currentUser.user.id;
+      headers['X-User-Role'] = currentUser.user.role || '';
+    } else if (currentUser && !currentUser.error && (currentUser as any).data) {
+      headers['X-User-Id'] = (currentUser as any).data.id;
+      headers['X-User-Role'] = (currentUser as any).data.role || '';
+    } else {
+      try {
+        const savedUser = localStorage.getItem('plataforma-bncc-user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          headers['X-User-Id'] = user.id;
+          headers['X-User-Role'] = user.role || '';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return this.request('/planos-aula/index.php', {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({ id }),
+    });
+  }
+
+  /**
+   * Upload de imagem (thumbnail)
    */
   /**
    * Upload de imagem (thumbnail)
