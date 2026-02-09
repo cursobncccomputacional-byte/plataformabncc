@@ -923,7 +923,11 @@ export const ManageDemandas = () => {
                         >
                           <Calendar className="w-4 h-4" />
                           {d.data_prevista
-                            ? new Date(d.data_prevista).toLocaleDateString('pt-BR')
+                            ? (() => {
+                                const [year, month, day] = d.data_prevista.slice(0, 10).split('-').map(Number);
+                                const localDate = new Date(year, (month || 1) - 1, day || 1);
+                                return localDate.toLocaleDateString('pt-BR');
+                              })()
                             : '—'}
                         </button>
                       )}
@@ -934,8 +938,10 @@ export const ManageDemandas = () => {
                           Concluído em{' '}
                           {(() => {
                             const raw = d.data_conclusao.replace(' ', 'T');
-                            const asUtc = raw.includes('Z') ? raw : raw + 'Z';
-                            return new Date(asUtc).toLocaleString('pt-BR', {
+                            // Tratar data_conclusao como UTC vinda do servidor
+                            const asUtc = raw.includes('Z') ? raw : `${raw}Z`;
+                            const localDate = new Date(asUtc);
+                            return localDate.toLocaleString('pt-BR', {
                               day: '2-digit',
                               month: '2-digit',
                               year: 'numeric',

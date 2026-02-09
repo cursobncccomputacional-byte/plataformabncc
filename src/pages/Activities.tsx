@@ -273,6 +273,7 @@ export const Activities = () => {
             thumbnail_url: act.thumbnail_url,
             etapa: act.etapa,
             bloqueada: act.bloqueada === true,
+            aee: act.aee === true,
           };
         });
         setAllActivities(activities);
@@ -311,6 +312,7 @@ export const Activities = () => {
     });
 
   const isEmpty = allActivities.length === 0;
+  const isProfessorView = user?.role === 'professor';
 
   // Filtrar atividades
   let filteredActivities = allActivities;
@@ -340,6 +342,31 @@ export const Activities = () => {
       activity.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
+  }
+
+  // Para perfil professor/teste_professor, não mostrar atividades bloqueadas
+  if (isProfessorView) {
+    filteredActivities = filteredActivities.filter(activity => !activity.bloqueada);
+  }
+
+  // Para perfil teste_professor, atividades AEE (especiais) devem aparecer por último
+  if (user?.role === 'teste_professor') {
+    const isAeeActivity = (activity: Activity) => {
+      if (activity.aee === true) return true;
+      const etapa = (activity as any).etapa as string | undefined;
+      const years = activity.schoolYears || [];
+      return (
+        etapa === 'AEE' ||
+        years.includes('aee') ||
+        years.includes('AEE')
+      );
+    };
+    filteredActivities = [...filteredActivities].sort((a, b) => {
+      const aAee = isAeeActivity(a) ? 1 : 0;
+      const bAee = isAeeActivity(b) ? 1 : 0;
+      if (aAee !== bAee) return aAee - bAee; // AEE depois
+      return 0;
+    });
   }
 
   const handleViewPDF = (activity: Activity, url: string, label: string) => {

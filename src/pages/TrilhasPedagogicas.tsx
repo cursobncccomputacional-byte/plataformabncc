@@ -34,6 +34,8 @@ interface Atividade {
   document_url?: string | null;
   anos_escolares?: string[];
   bloqueada?: boolean;
+  /** Atividade de Atendimento Educacional Especializado (AEE) - vem da API */
+  aee?: boolean;
 }
 
 const svgPlaceholderDataUri = (title: string) => {
@@ -81,8 +83,41 @@ export const TrilhasPedagogicas = () => {
 
   // Ordenar atividades: desbloqueadas primeiro, bloqueadas por último
   const atividadesTrilhaOrdenadas = useMemo(
-    () => [...atividadesTrilha].sort((a, b) => (a.bloqueada ? 1 : 0) - (b.bloqueada ? 1 : 0)),
-    [atividadesTrilha]
+    () => {
+      const isProfessorView = user?.role === 'professor';
+      const isTesteProfessor = user?.role === 'teste_professor';
+      let list = [...atividadesTrilha];
+      // Para professor, não mostrar atividades bloqueadas dentro das trilhas
+      if (isProfessorView) {
+        list = list.filter((a) => !a.bloqueada);
+      }
+      return list.sort((a, b) => {
+        // Primeiro, desbloqueadas antes de bloqueadas
+        const aBlocked = a.bloqueada ? 1 : 0;
+        const bBlocked = b.bloqueada ? 1 : 0;
+        if (aBlocked !== bBlocked) return aBlocked - bBlocked;
+
+        // Para teste_professor, atividades AEE devem ficar por último
+        if (isTesteProfessor) {
+          const isAee = (atv: Atividade) => {
+            if (atv.aee === true) return true;
+            const etapa = atv.etapa || '';
+            const anos = atv.anos_escolares || [];
+            return (
+              etapa === 'AEE' ||
+              anos.includes('AEE') ||
+              anos.includes('aee')
+            );
+          };
+          const aAee = isAee(a) ? 1 : 0;
+          const bAee = isAee(b) ? 1 : 0;
+          if (aAee !== bAee) return aAee - bAee;
+        }
+
+        return 0;
+      });
+    },
+    [atividadesTrilha, user?.role]
   );
 
   useEffect(() => {

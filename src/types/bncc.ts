@@ -54,6 +54,8 @@ export interface Activity {
   created_at: string;
   /** Atividade bloqueada: aparece na lista mas não pode ser acessada (vídeo/PDF) */
   bloqueada?: boolean;
+  /** Atividade de Atendimento Educacional Especializado (AEE) */
+  aee?: boolean;
 }
 
 export interface VideoCourse {
