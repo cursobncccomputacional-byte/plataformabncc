@@ -437,6 +437,8 @@ try {
             
             // Buscar atividades: por critérios de agrupamento (AND) ou por tipo+valor (retrocompatível)
             $atividades = [];
+            $hasAeeColAtividades = $pdo->query("SHOW COLUMNS FROM atividades LIKE 'aee'")->rowCount() > 0;
+            $colAeeSelect = $hasAeeColAtividades ? ', COALESCE(aee, 0) as aee' : '';
             if (!empty($criterios)) {
                 $atividades = atividades_por_criterios($pdo, $criterios);
             } elseif ($trilha['tipo'] === 'ano_escolar') {
@@ -474,7 +476,7 @@ try {
                     $stmtAtiv = $pdo->prepare("
                         SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                         COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                         FROM atividades 
                         WHERE (
                             JSON_CONTAINS(COALESCE(eixos_bncc, '[]'), ?) 
@@ -490,7 +492,7 @@ try {
                     $stmtAtiv = $pdo->prepare("
                         SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                         COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                         FROM atividades 
                         WHERE JSON_CONTAINS(COALESCE(eixos_bncc, '[]'), ?)
                         ORDER BY COALESCE(criado_em, data_criacao) DESC
@@ -548,7 +550,7 @@ try {
                     $stmtAtiv = $pdo->prepare("
                         SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                         COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                        material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                         FROM atividades 
                         WHERE (" . implode(' OR ', $conds) . ")
                         ORDER BY COALESCE(criado_em, data_criacao) DESC
@@ -580,7 +582,7 @@ try {
                         $stmtAtiv = $pdo->prepare("
                             SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                             COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                             FROM atividades 
                             WHERE (
                                 etapa = ?
@@ -608,7 +610,7 @@ try {
                         $stmtAtiv = $pdo->prepare("
                             SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                             COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                            material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                             FROM atividades 
                             WHERE (
                                 etapa = ?
@@ -624,7 +626,7 @@ try {
                             $stmtAtiv = $pdo->prepare("
                                 SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                                 COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                                material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                                material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                                 FROM atividades 
                                 WHERE etapa = ? OR JSON_CONTAINS(COALESCE(etapas, '[]'), ?) = 1
                                 ORDER BY COALESCE(criado_em, data_criacao) DESC
@@ -634,7 +636,7 @@ try {
                             $stmtAtiv = $pdo->prepare("
                                 SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                                 COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                                material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                                material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                                 FROM atividades 
                                 WHERE etapa = ?
                                 ORDER BY COALESCE(criado_em, data_criacao) DESC
@@ -652,7 +654,7 @@ try {
                 $stmtAtiv = $pdo->prepare("
                     SELECT id, nome_atividade, descricao, tipo, etapa, anos_escolares, eixos_bncc, thumbnail_url, video_url, duracao,
                     COALESCE(pdf_estrutura_pedagogica_url, url_documento) as pdf_estrutura_pedagogica_url,
-                    material_apoio_url, COALESCE(bloqueada, 0) as bloqueada
+                    material_apoio_url, COALESCE(bloqueada, 0) as bloqueada{$colAeeSelect}
                     FROM atividades 
                     WHERE (
                         (IF(JSON_VALID(disciplinas_transversais), JSON_CONTAINS(disciplinas_transversais, ?), 0) = 1)
@@ -713,6 +715,19 @@ try {
                 $tipoNormalized = (strpos($tipoLower, 'desplugada') !== false)
                     ? 'Desplugada'
                     : ((strpos($tipoLower, 'plugada') !== false) ? 'Plugada' : 'Desplugada');
+                // AEE: coluna aee quando existir; senão inferir por etapa ou anos_escolares (para filtro no front)
+                $aeeFromCol = (int)($atividade['aee'] ?? 0) === 1;
+                $etapaStr = trim((string)($atividade['etapa'] ?? ''));
+                $aeeFromEtapa = (strtoupper($etapaStr) === 'AEE');
+                $aeeFromAnos = false;
+                foreach ($anosEscolares as $ano) {
+                    if (strtolower(trim((string)$ano)) === 'aee') {
+                        $aeeFromAnos = true;
+                        break;
+                    }
+                }
+                $isAee = $aeeFromCol || $aeeFromEtapa || $aeeFromAnos;
+
                 $atividadesData[] = [
                     'id' => $atividade['id'],
                     'nome_atividade' => $atividade['nome_atividade'] ?? '',
@@ -728,7 +743,7 @@ try {
                     'pedagogical_pdf_url' => $atividade['pdf_estrutura_pedagogica_url'] ?? null,
                     'document_url' => $atividade['pdf_estrutura_pedagogica_url'] ?? null,
                     'bloqueada' => (int)($atividade['bloqueada'] ?? 0) === 1,
-                    'aee' => (int)($atividade['aee'] ?? 0) === 1,
+                    'aee' => $isAee,
                 ];
             }
             

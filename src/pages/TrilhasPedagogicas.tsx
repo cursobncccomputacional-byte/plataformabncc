@@ -80,16 +80,31 @@ export const TrilhasPedagogicas = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [videoPlayerReady, setVideoPlayerReady] = useState(false);
   const [selectedPDF, setSelectedPDF] = useState<{ url: string; title: string } | null>(null);
+  /** Para professor/teste_professor: flag para exibir atividades AEE nas trilhas (exceto na trilha AEE). Padrão: ocultas */
+  const [showAeeActivities, setShowAeeActivities] = useState(false);
 
-  // Ordenar atividades: desbloqueadas primeiro, bloqueadas por último
+  const isAeeAtividade = (atv: Atividade) => {
+    if (atv.aee === true || (atv as { aee?: unknown }).aee === 1 || (atv as { aee?: unknown }).aee === 'true') return true;
+    const etapa = String(atv.etapa || '').trim();
+    if (etapa.toUpperCase() === 'AEE') return true;
+    const anos = atv.anos_escolares || [];
+    return anos.some((a) => String(a).toLowerCase() === 'aee');
+  };
+
+  // Ordenar atividades: desbloqueadas primeiro, bloqueadas por último; para professor/teste_professor ocultar AEE fora da trilha AEE se flag desligado
   const atividadesTrilhaOrdenadas = useMemo(
     () => {
       const isProfessorView = user?.role === 'professor';
       const isTesteProfessor = user?.role === 'teste_professor';
+      const isTrilhaAee = selectedTrilha?.tipo === 'aee';
       let list = [...atividadesTrilha];
       // Para professor, não mostrar atividades bloqueadas dentro das trilhas
       if (isProfessorView) {
         list = list.filter((a) => !a.bloqueada);
+      }
+      // Para professor/teste_professor: fora da trilha AEE, ocultar atividades AEE a menos que o flag esteja marcado
+      if ((isProfessorView || isTesteProfessor) && !isTrilhaAee && !showAeeActivities) {
+        list = list.filter((a) => !isAeeAtividade(a));
       }
       return list.sort((a, b) => {
         // Primeiro, desbloqueadas antes de bloqueadas
@@ -97,27 +112,19 @@ export const TrilhasPedagogicas = () => {
         const bBlocked = b.bloqueada ? 1 : 0;
         if (aBlocked !== bBlocked) return aBlocked - bBlocked;
 
-        // Para teste_professor, atividades AEE devem ficar por último
-        if (isTesteProfessor) {
-          const isAee = (atv: Atividade) => {
-            if (atv.aee === true) return true;
-            const etapa = atv.etapa || '';
-            const anos = atv.anos_escolares || [];
-            return (
-              etapa === 'AEE' ||
-              anos.includes('AEE') ||
-              anos.includes('aee')
-            );
-          };
-          const aAee = isAee(a) ? 1 : 0;
-          const bAee = isAee(b) ? 1 : 0;
-          if (aAee !== bAee) return aAee - bAee;
+        // Com flag "Exibir atividades AEE" marcado: AEE primeiro; sem flag (teste_professor): AEE por último
+        if (isProfessorView || isTesteProfessor) {
+          const aAee = isAeeAtividade(a) ? 1 : 0;
+          const bAee = isAeeAtividade(b) ? 1 : 0;
+          if (aAee !== bAee) {
+            return showAeeActivities ? bAee - aAee : aAee - bAee; // com flag: AEE primeiro; sem: AEE por último
+          }
         }
 
         return 0;
       });
     },
-    [atividadesTrilha, user?.role]
+    [atividadesTrilha, user?.role, selectedTrilha?.tipo, showAeeActivities]
   );
 
   useEffect(() => {
@@ -348,8 +355,22 @@ export const TrilhasPedagogicas = () => {
                       ? 'AEE'
                       : 'Disciplina Transversal'}
               </span>
-              <span>{atividadesTrilha.length} atividades</span>
+              <span>{atividadesTrilhaOrdenadas.length} atividades</span>
             </div>
+            {/* Exibir atividades AEE - embaixo, perto do total de atividades exibidas; na trilha AEE as AEE sempre aparecem */}
+            {(user?.role === 'professor' || user?.role === 'teste_professor') && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showAeeActivities}
+                    onChange={(e) => setShowAeeActivities(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-[#005a93] focus:ring-[#005a93]"
+                  />
+                  <span className="text-sm font-medium text-gray-800">Exibir atividades AEE (Atendimento Educacional Especializado)</span>
+                </label>
+              </div>
+            )}
           </motion.div>
 
           {loadingAtividades ? (
@@ -357,11 +378,15 @@ export const TrilhasPedagogicas = () => {
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#044982]"></div>
               <p className="mt-2 text-gray-600">Carregando atividades...</p>
             </div>
-          ) : atividadesTrilha.length === 0 ? (
+          ) : atividadesTrilhaOrdenadas.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhuma atividade encontrada</h3>
-              <p className="text-gray-600">Esta trilha ainda não possui atividades cadastradas.</p>
+              <p className="text-gray-600">
+                {atividadesTrilha.length === 0
+                  ? 'Esta trilha ainda não possui atividades cadastradas.'
+                  : 'Marque "Exibir atividades AEE" acima para ver todas as atividades desta trilha.'}
+              </p>
             </div>
           ) : (selectedVideo || selectedPDF) ? (
             <div className="flex items-center justify-center py-16 text-gray-500 text-sm">

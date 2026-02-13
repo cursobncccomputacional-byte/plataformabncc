@@ -57,6 +57,8 @@ export const Activities = () => {
   const [selectedVideo, setSelectedVideo] = useState<{ url: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  /** Para perfil professor: flag para exibir ou ocultar atividades AEE (padrão: ocultas) */
+  const [showAeeActivities, setShowAeeActivities] = useState(false);
 
   const [userPermissions, setUserPermissions] = useState<{
     can_manage_activities: boolean;
@@ -233,6 +235,11 @@ export const Activities = () => {
             
             schoolYearsArray = etapaToIds[act.etapa] || [];
           }
+          // Garantir que atividades AEE tenham 'aee' em schoolYears (para filtro por Etapa AEE)
+          const isAee = act.aee === true || act.etapa === 'AEE' || (Array.isArray(act.anos_escolares) && act.anos_escolares.some((a: string) => String(a).toLowerCase() === 'aee'));
+          if (isAee && !schoolYearsArray.includes('aee')) {
+            schoolYearsArray = [...schoolYearsArray, 'aee'];
+          }
           
           // Mapear nomes de eixos para IDs (caso venham como "Pensamento Computacional" ao invés de "pensamento-computacional")
           let axisIdsArray = Array.isArray(act.eixos_bncc) ? act.eixos_bncc : [];
@@ -344,28 +351,40 @@ export const Activities = () => {
     );
   }
 
-  // Para perfil professor/teste_professor, não mostrar atividades bloqueadas
+  // Para perfil professor, não mostrar atividades bloqueadas
   if (isProfessorView) {
     filteredActivities = filteredActivities.filter(activity => !activity.bloqueada);
   }
 
-  // Para perfil teste_professor, atividades AEE (especiais) devem aparecer por último
-  if (user?.role === 'teste_professor') {
-    const isAeeActivity = (activity: Activity) => {
-      if (activity.aee === true) return true;
-      const etapa = (activity as any).etapa as string | undefined;
-      const years = activity.schoolYears || [];
-      return (
-        etapa === 'AEE' ||
-        years.includes('aee') ||
-        years.includes('AEE')
-      );
-    };
+  const isAeeActivity = (activity: Activity) => {
+    if (activity.aee === true) return true;
+    const etapa = (activity as any).etapa as string | undefined;
+    const years = activity.schoolYears || [];
+    return (
+      etapa === 'AEE' ||
+      years.includes('aee') ||
+      years.includes('AEE')
+    );
+  };
+
+  // Para perfil professor: ocultar atividades AEE a menos que o flag esteja marcado (ou que tenha filtrado por Etapa AEE)
+  if (user?.role === 'professor' && !showAeeActivities && selectedYear !== 'aee') {
+    filteredActivities = filteredActivities.filter(activity => !isAeeActivity(activity));
+  }
+
+  // Quando o flag "Exibir atividades AEE" está marcado, AEE aparecem primeiro; senão (só teste_professor) AEE por último
+  if (user?.role === 'professor' && showAeeActivities) {
     filteredActivities = [...filteredActivities].sort((a, b) => {
       const aAee = isAeeActivity(a) ? 1 : 0;
       const bAee = isAeeActivity(b) ? 1 : 0;
-      if (aAee !== bAee) return aAee - bAee; // AEE depois
-      return 0;
+      return bAee - aAee; // AEE primeiro
+    });
+  }
+  if (user?.role === 'teste_professor') {
+    filteredActivities = [...filteredActivities].sort((a, b) => {
+      const aAee = isAeeActivity(a) ? 1 : 0;
+      const bAee = isAeeActivity(b) ? 1 : 0;
+      return showAeeActivities ? bAee - aAee : aAee - bAee; // com flag: AEE primeiro; sem flag: AEE por último
     });
   }
 
@@ -594,7 +613,7 @@ export const Activities = () => {
             <h2 className="text-base sm:text-lg font-semibold text-gray-900">Filtros</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Busca */}
             <div className="sm:col-span-2 lg:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -665,6 +684,21 @@ export const Activities = () => {
                 ))}
               </select>
             </div>
+
+            {/* Exibir atividades AEE - apenas para perfil professor */}
+            {user?.role === 'professor' && (
+              <div className="flex flex-col justify-end">
+                <label className="inline-flex items-center gap-2 cursor-pointer py-2.5 sm:py-2">
+                  <input
+                    type="checkbox"
+                    checked={showAeeActivities}
+                    onChange={(e) => setShowAeeActivities(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-[#005a93] focus:ring-[#005a93]"
+                  />
+                  <span className="text-sm font-medium text-gray-800">Exibir atividades AEE</span>
+                </label>
+              </div>
+            )}
           </div>
         </motion.div>
 
