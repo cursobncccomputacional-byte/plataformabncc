@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Funcionalidades da Plataforma BNCC — Por Perfil</title>
+  <style>
+    :root {
+      --color-primary: #044982;
+      --color-primary-light: #e8eef5;
+      --color-brand-green: #047857;
+      --color-brand-green-light: #d1fae5;
+      --color-text: #1e293b;
+      --color-muted: #64748b;
+      --color-border: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: var(--color-text);
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem;
+      background: #fff;
+    }
+    @media print {
+      @page { margin: 1.2cm 1.4cm; }
+      body { padding: 0; margin: 0; font-size: 10pt; line-height: 1.45; max-width: none; }
+      .no-print { display: none !important; }
+      h1, h2, h3 { page-break-after: avoid; }
+      .profile-section { page-break-inside: avoid; }
+      .resumo-box { page-break-inside: avoid; }
+      table { page-break-inside: avoid; }
+      .header { padding: 0.5rem 0.75rem 0.75rem; margin-bottom: 0.75rem; }
+      .header h1 { font-size: 1.35rem; }
+      .intro { padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; }
+      .profile-section { margin-bottom: 1rem; padding: 0.75rem 1rem 1rem; }
+      .profile-section h2 { margin: -0.75rem -1rem 0.6rem -1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+      h3 { margin: 0.75rem 0 0.35rem 0; padding-bottom: 0.2rem; }
+      ul { margin: 0 0 0.5rem 0; }
+      ul li { margin-bottom: 0.25rem; }
+      .resumo-box { margin-top: 0.6rem; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+      .table-wrapper { margin: 0.75rem 0; }
+      table { margin: 0.5rem 0; font-size: 0.85rem; }
+      th, td { padding: 0.35rem 0.5rem; }
+      .footnotes { margin-top: 0.5rem; padding: 0.5rem 0.75rem; }
+      .footer-note { margin-top: 1rem; padding-top: 0.5rem; }
+      h2.resumo-title { margin: 1rem 0 0.5rem 0; }
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem 1rem;
+      background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-brand-green-light) 50%, #fff 100%);
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      border-top: 3px solid var(--color-brand-green);
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin: 0 0 0.4rem 0;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .header h1 .doc-icon { flex-shrink: 0; }
+    .header .subtitle {
+      font-size: 0.95rem;
+      color: var(--color-muted);
+      font-weight: 500;
+    }
+    .intro {
+      font-size: 0.9rem;
+      color: var(--color-muted);
+      margin-bottom: 1rem;
+      padding: 0.6rem 0.9rem;
+      background: #f8fafc;
+      border-radius: 6px;
+      border-left: 4px solid var(--color-brand-green);
+    }
+    .profile-section {
+      margin-bottom: 1.25rem;
+      padding: 1rem 1.25rem;
+      background: #fafbfc;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+    }
+    .profile-section h2 {
+      margin: -1rem -1.25rem 0.75rem -1.25rem;
+      padding: 0.6rem 1.25rem;
+      background: linear-gradient(90deg, var(--color-primary) 0%, #065a8c 100%);
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      border-radius: 6px 6px 0 0;
+      border: none;
+      border-left: 4px solid var(--color-brand-green);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .profile-section h2 .section-icon { flex-shrink: 0; opacity: 0.95; }
+    .profile-section h2 .num { opacity: 0.9; font-weight: 500; }
+    .profile-section > p:first-of-type { margin-top: 0; }
+    h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--color-primary);
+      margin: 0.9rem 0 0.35rem 0;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    h3 .h3-icon { flex-shrink: 0; color: var(--color-brand-green); }
+    h3:first-of-type { margin-top: 0.5rem; }
+    p { margin: 0 0 0.5rem 0; }
+    ul {
+      margin: 0 0 0.6rem 0;
+      padding-left: 1.35rem;
+    }
+    ul li {
+      margin-bottom: 0.3rem;
+      padding-left: 0.2rem;
+    }
+    .role-badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .role-root { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+    .role-admin { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .role-professor { background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; }
+    .resumo-box {
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.9rem;
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-left: 4px solid var(--color-brand-green);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .resumo-box .resumo-icon { flex-shrink: 0; margin-top: 0.1rem; color: var(--color-brand-green); }
+    .resumo-box strong { color: var(--color-primary); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.75rem 0;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    th, td {
+      border: 1px solid var(--color-border);
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+    }
+    th {
+      background: linear-gradient(180deg, var(--color-primary) 0%, #065a8c 100%);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    th:first-child { border-left: 3px solid var(--color-brand-green); }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    tbody tr:hover { background: #f1f5f9; }
+    @media print { tbody tr:hover { background: inherit; } }
+    td.center { text-align: center; font-weight: 500; }
+    td.center:first-child { font-weight: 400; text-align: left; }
+    .table-wrapper { margin: 1rem 0; }
+    .table-caption {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 0.35rem;
+    }
+    .footnotes {
+      margin-top: 0.6rem;
+      padding: 0.6rem 0.9rem;
+      background: #f1f5f9;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      color: var(--color-muted);
+      line-height: 1.5;
+    }
+    .footnotes p { margin: 0.25rem 0; }
+    .footer-note {
+      margin-top: 1.25rem;
+      padding-top: 0.75rem;
+      border-top: 2px solid var(--color-border);
+      border-top-color: var(--color-brand-green);
+      font-size: 0.8rem;
+      color: var(--color-muted);
+      text-align: center;
+    }
+    strong { font-weight: 600; }
+    h2.resumo-title {
+      background: transparent;
+      color: var(--color-primary);
+      margin: 1.25rem 0 0.6rem 0;
+      padding: 0 0 0.35rem 0;
+      border-bottom: 2px solid var(--color-primary);
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    h2.resumo-title .title-icon { color: var(--color-brand-green); }
+    .icon-16 { width: 16px; height: 16px; }
+    .icon-18 { width: 18px; height: 18px; }
+    .icon-20 { width: 20px; height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="margin-bottom:1rem;font-size:0.9rem;color:#6b7280;">
+    Para gerar o PDF: abra este arquivo no navegador e use <strong>Imprimir (Ctrl+P)</strong> → <strong>Salvar como PDF</strong>.
+  </div>
+
+  <header class="header">
+    <h1>
+      <svg class="doc-icon icon-20" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+      Funcionalidades da Plataforma BNCC
+    </h1>
+    <p class="subtitle">Documento por perfil de acesso — Root, Administrador e Professor</p>
+  </header>
+
+  <p class="intro">
+    Este documento descreve, de forma objetiva, o que cada perfil de usuário pode fazer na plataforma. Destina-se a gestores, equipes pedagógicas e suporte.
+  </p>
+
+  <section class="profile-section">
+    <h2>
+      <svg class="section-icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span class="num">1.</span> Perfil Root (superadministrador)
+    </h2>
+    <p>
+      O <span class="role-badge role-root">Root</span> é o administrador máximo da plataforma. Acessa uma área exclusiva (Painel Root) e realiza a gestão global do sistema e dos conteúdos.
+    </p>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuários e acesso</h3>
+    <ul>
+      <li><strong>Gerenciar usuários</strong> — Ver todos os usuários (root, administradores, professores, alunos), criar, editar, ativar, inativar e excluir. Filtrar por perfil, status e escola; exportar lista em planilha.</li>
+      <li><strong>Atribuir acesso</strong> — Definir, por usuário (admin ou professor), quem pode gerenciar atividades e quem pode gerenciar cursos.</li>
+      <li><strong>Pacotes Admin</strong> — Definir, para cada administrador, limites de professores e alunos que pode criar, tipo de pacote (Básico, Intermediário, Premium, Ilimitado) e datas de contratação e expiração.</li>
+    </ul>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8"/><path d="M8 11h8"/></svg> Cursos e conteúdos</h3>
+    <ul>
+      <li><strong>Cursos</strong> — Gerenciar cursos da plataforma (cadastro, edição, exclusão).</li>
+      <li><strong>Atribuir Cursos</strong> — Definir quais cursos cada professor ou administrador pode acessar ou gerenciar.</li>
+      <li><strong>Plataforma (Atividades)</strong> — Cadastrar, editar e bloquear/desbloquear atividades BNCC (nome, descrição, tipo plugada/desplugada, etapa, anos, eixos, vídeo, PDF, material de apoio, atividades AEE, etc.).</li>
+      <li><strong>Formação Continuada</strong> — Gerenciar a oferta de formação continuada (trilhas/cursos).</li>
+      <li><strong>Trilhas</strong> — Gerenciar trilhas pedagógicas (cadastro, edição, ordem das atividades nas trilhas).</li>
+    </ul>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> BNCC e referências</h3>
+    <ul>
+      <li><strong>BNCC Computacional Digital — Cadastro</strong> — Consultar e manter o cadastro de habilidades curriculares da BNCC (eixos, etapas, descrições, exemplos, materiais).</li>
+      <li><strong>Consulta</strong> — Acesso à mesma área de consulta às habilidades que professores e administradores utilizam.</li>
+    </ul>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Relatórios e acompanhamento</h3>
+    <ul>
+      <li><strong>Relatório de Atividades</strong> — Relatório de uso das atividades na plataforma (apenas root).</li>
+      <li><strong>Aderência aos Vídeos</strong> — Relatório de aderência aos vídeos.</li>
+    </ul>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Gestão interna</h3>
+    <ul>
+      <li><strong>Sessões</strong> — Ver sessões de login (quem entrou, quando, tempo de uso, atividades acessadas).</li>
+      <li><strong>Demandas</strong> — Gestão de demandas internas (atribuição a usuários root, controle da semana, etc.).</li>
+      <li><strong>Projetos</strong> — Gestão de projetos.</li>
+      <li><strong>Termo de Referência</strong>, <strong>Glossário</strong>, <strong>CAE</strong>, <strong>Política de Privacidade</strong> — Acesso a essas páginas de conteúdo e referência.</li>
+    </ul>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Plano de Aula</h3>
+    <ul>
+      <li><strong>Cadastrar, editar e remover</strong> planos de aula; ver lista em modo gestão; associar atividades aos planos.</li>
+    </ul>
+    <div class="resumo-box">
+      <svg class="resumo-icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+      <span><strong>Resumo:</strong> O Root cria e configura administradores, define permissões e pacotes, cadastra e organiza atividades, trilhas, cursos e habilidades BNCC, acompanha uso por relatórios e sessões e gerencia demandas e projetos internos.</span>
+    </div>
+  </section>
+
+  <section class="profile-section">
+    <h2>
+      <svg class="section-icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/></svg>
+      <span class="num">2.</span> Perfil Administrador
+    </h2>
+    <p>
+    O <span class="role-badge role-admin">Administrador</span> gerencia a sua rede (escola ou rede de escolas): os usuários que ele mesmo cria e os conteúdos que a plataforma disponibiliza para uso. Ele não altera conteúdos globais (atividades, trilhas, habilidades BNCC); isso é feito pelo Root.
+  </p>
+  <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21"/></svg> Painel Administrativo (submenu)</h3>
+  <ul>
+    <li><strong>Usuários</strong> — Criar professores, teste professor e alunos; editar e inativar esses usuários; trocar senha; ver estatísticas do pacote (quantos professores/alunos já criou e qual o limite). Não pode criar outro administrador nem root.</li>
+    <li><strong>Relatórios</strong> — Ver analytics dos usuários que gerencia (sessões, tempo na plataforma, atividades e documentos visualizados, vídeos acessados, último login). Filtrar por período e por usuário; exportar dados.</li>
+    <li><strong>Sessões</strong> — Ver sessões de login dos usuários que gerencia (quem entrou, quando, duração, atividades realizadas na sessão).</li>
+  </ul>
+  <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8"/><path d="M8 11h8"/></svg> Conteúdo e formação</h3>
+  <ul>
+    <li><strong>BNCC Computacional Digital</strong> — Consultar habilidades curriculares da BNCC (busca por etapa, eixo, texto). Não altera o cadastro.</li>
+    <li><strong>Plano de Aula</strong> — Visualizar planos de aula em formato de “cardápio” e utilizar no dia a dia. Não cadastra nem edita planos (apenas root).</li>
+    <li><strong>Glossário BNCC</strong> — Consultar termos e definições.</li>
+    <li><strong>Formação Continuada</strong> — Acessar o link para os cursos de formação (ex.: ambiente de cursos em outro subdomínio).</li>
+    <li><strong>CAE</strong> — Acessar documentos oficiais (BNCC, pareceres, resoluções) e links de referência.</li>
+  </ul>
+  <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Outros</h3>
+  <ul>
+    <li><strong>Política de Privacidade</strong> e <strong>Perfil</strong> — Visualizar e atualizar dados pessoais.</li>
+  </ul>
+  <div class="resumo-box">
+    <svg class="resumo-icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+    <span><strong>Resumo:</strong> O Administrador cria e gerencia professores e alunos dentro do seu pacote, acompanha uso por relatórios e sessões e consulta BNCC, planos de aula, glossário e formação, sem alterar o conteúdo global da plataforma.</span>
+  </div>
+  </section>
+
+  <section class="profile-section">
+    <h2>
+      <svg class="section-icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+      <span class="num">3.</span> Perfil Professor
+    </h2>
+    <p>
+      O <span class="role-badge role-professor">Professor</span> (incluindo o perfil Teste Professor, quando tratado de forma equivalente) utiliza a plataforma para planejar e dar aula: atividades BNCC, trilhas, planos de aula, consulta à BNCC e materiais. Ele não gerencia usuários nem altera cadastros de atividades ou trilhas.
+    </p>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/><path d="M12 7v10"/></svg> Atividades e trilhas</h3>
+    <ul>
+      <li><strong>Trilhas Pedagógicas</strong> — Ver trilhas (Mundo Digital, Anos Iniciais, Anos Finais, AEE, etc.); abrir atividades de cada trilha; baixar PDF e acessar vídeo das atividades liberadas; usar sugestão de plano com IA. Pode marcar “Exibir atividades AEE” nas trilhas (por padrão AEE ficam ocultas, exceto na trilha AEE).</li>
+    <li><strong>Atividades BNCC</strong> — Listar atividades por etapa, ano, eixo, tipo (plugada/desplugada); filtrar e, se houver permissão “Plataforma”, baixar PDF e acessar vídeo das atividades liberadas. Pode marcar “Exibir atividades AEE” (por padrão ficam ocultas para professor).</li>
+  </ul>
+  <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Planejamento e referência</h3>
+  <ul>
+    <li><strong>Plano de Aula</strong> — Visualizar planos em formato de “cardápio” e utilizar nas aulas. Não cadastra nem edita planos (apenas root).</li>
+      <li><strong>BNCC Computacional Digital</strong> — Consultar habilidades da BNCC (busca, filtros, detalhes).</li>
+      <li><strong>Glossário BNCC</strong> — Consultar termos.</li>
+      <li><strong>Formação Continuada</strong> — Acessar o link para cursos de formação.</li>
+      <li><strong>CAE</strong> — Acessar documentos oficiais e referências.</li>
+    </ul>
+    <h3><svg class="h3-icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Suporte e perfil</h3>
+    <ul>
+      <li><strong>Suporte técnico</strong> — Botão flutuante de assistente/ajuda (quando habilitado para professor).</li>
+      <li><strong>Política de Privacidade</strong> e <strong>Perfil</strong> — Consultar e atualizar dados pessoais.</li>
+    </ul>
+    <div class="resumo-box">
+      <svg class="resumo-icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+      <span><strong>Resumo:</strong> O Professor utiliza trilhas e atividades para dar aula, consulta BNCC e planos de aula, acessa formação e materiais (CAE, glossário) e atualiza o próprio perfil, sem gerenciar usuários nem cadastros globais.</span>
+    </div>
+  </section>
+
+  <h2 class="resumo-title">
+    <svg class="title-icon icon-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+    Resumo comparativo
+  </h2>
+  <div class="table-wrapper">
+    <p class="table-caption">Visão geral do que cada perfil pode fazer na plataforma.</p>
+  <table class="resumo-table">
+    <thead>
+      <tr>
+        <th>Área / Ação</th>
+        <th class="center">Root</th>
+        <th class="center">Administrador</th>
+        <th class="center">Professor</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Criar ou editar usuários</td><td class="center">Sim</td><td class="center">Sim *</td><td class="center">Não</td></tr>
+      <tr><td>Atribuir permissões (atividades/cursos)</td><td class="center">Sim</td><td class="center">Não</td><td class="center">Não</td></tr>
+      <tr><td>Definir pacotes (limites de administradores)</td><td class="center">Sim</td><td class="center">Não</td><td class="center">Não</td></tr>
+      <tr><td>Cadastrar ou editar atividades e trilhas</td><td class="center">Sim</td><td class="center">Não</td><td class="center">Não</td></tr>
+      <tr><td>Cadastrar ou editar planos de aula</td><td class="center">Sim</td><td class="center">Não</td><td class="center">Não</td></tr>
+      <tr><td>Cadastro BNCC (habilidades)</td><td class="center">Sim</td><td class="center">Não</td><td class="center">Não</td></tr>
+      <tr><td>Relatórios de atividades e vídeos</td><td class="center">Sim</td><td class="center">Não</td><td class="center">Não</td></tr>
+      <tr><td>Sessões (visualizar logins)</td><td class="center">Sim</td><td class="center">Sim **</td><td class="center">Não</td></tr>
+      <tr><td>Relatórios (analytics dos usuários gerenciados)</td><td class="center">—</td><td class="center">Sim</td><td class="center">Não</td></tr>
+      <tr><td>Consultar BNCC, planos de aula, glossário</td><td class="center">Sim</td><td class="center">Sim</td><td class="center">Sim</td></tr>
+      <tr><td>Usar trilhas e atividades (ver, PDF, vídeo)</td><td class="center">Sim</td><td class="center">Sim ***</td><td class="center">Sim ***</td></tr>
+      <tr><td>Formação Continuada e CAE</td><td class="center">Sim</td><td class="center">Sim</td><td class="center">Sim</td></tr>
+    </tbody>
+  </table>
+  <div class="footnotes">
+    <p><strong>*</strong> O administrador cria apenas professores, teste professor e alunos, dentro do limite do seu pacote.</p>
+    <p><strong>**</strong> O administrador vê sessões dos usuários que ele gerencia.</p>
+    <p><strong>***</strong> Conforme permissões e liberação das atividades (bloqueadas/desbloqueadas).</p>
+  </div>
+  </div>
+
+  <div class="footer-note">
+    Documento gerado a partir da documentação da Plataforma BNCC. Para obter o PDF, use Imprimir → Salvar como PDF no navegador.
+  </div>
+
+  <script>
+    // Opcional: esconder a dica de impressão ao imprimir já está no CSS .no-print
+  </script>
+</body>
+</html>

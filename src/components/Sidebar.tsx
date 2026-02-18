@@ -20,9 +20,11 @@ type PageType =
   | 'admin-packages'
   | 'sessions'
   | 'plano-aula'
+  | 'plano-aula-beta'
   | 'bncc-digital'
   | 'manage-bncc'
   | 'relatorios-menu'
+  | 'relatorio-dashboard'
   | 'relatorio-atividades'
   | 'relatorio-aderencia-videos'
   | 'termo-referencia'
@@ -134,7 +136,7 @@ export const Sidebar = ({
 
   // Expandir menu Relatórios quando navegar para relatório de atividades
   const [relatoriosMenuOpen, setRelatoriosMenuOpen] = useState(
-    currentPage === 'relatorio-atividades'
+    currentPage === 'relatorio-dashboard' || currentPage === 'relatorio-atividades'
   );
 
   // Expandir menu Painel Administrativo (admin)
@@ -158,7 +160,7 @@ export const Sidebar = ({
   }, [currentPage]);
 
   useEffect(() => {
-    if (currentPage === 'relatorio-atividades' || currentPage === 'relatorio-aderencia-videos') {
+    if (currentPage === 'relatorio-dashboard' || currentPage === 'relatorio-atividades' || currentPage === 'relatorio-aderencia-videos') {
       setRelatoriosMenuOpen(true);
     }
   }, [currentPage]);
@@ -206,7 +208,7 @@ export const Sidebar = ({
     return items;
   }, [isRoot]);
 
-  // Submenu Relatórios (apenas root)
+  // Submenu Relatórios (apenas root) — Dashboard oculto
   const relatoriosSubMenuItems = useMemo(() => [
     { id: 'relatorio-atividades' as const, icon: Activity, label: 'Relatório de Atividades' },
     { id: 'relatorio-aderencia-videos' as const, icon: Video, label: 'Aderência aos Vídeos' },
@@ -229,6 +231,7 @@ export const Sidebar = ({
     ...(showCursosMenu ? [{ id: 'cursos-menu' as const, icon: BookOpen, label: 'Cursos', isParent: true }] : []),
     { id: 'permissions' as const, icon: UserCheck, label: 'Atribuir Cursos' },
     { id: 'plano-aula' as const, icon: FileCheck, label: 'Plano de Aula' },
+    { id: 'plano-aula-beta' as const, icon: FileCheck, label: 'Plano de Aula Beta' },
     { id: 'bncc-menu' as const, icon: BookMarked, label: 'BNCC Computacional Digital', isParent: true },
     { id: 'relatorios-menu' as const, icon: BarChart2, label: 'Relatórios', isParent: true },
     { id: 'gestao-interna-menu' as const, icon: ClipboardList, label: 'Gestão Interna', isParent: true },
@@ -551,7 +554,7 @@ export const Sidebar = ({
                       onClick={() => setRelatoriosMenuOpen(!relatoriosMenuOpen)}
                       className={`
                         w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left
-                        ${relatoriosMenuOpen || currentPage === 'relatorio-atividades' || currentPage === 'relatorio-aderencia-videos'
+                        ${relatoriosMenuOpen || currentPage === 'relatorio-dashboard' || currentPage === 'relatorio-atividades' || currentPage === 'relatorio-aderencia-videos'
                           ? 'bg-white text-[#005a93] shadow-md' 
                           : 'hover:bg-white hover:bg-opacity-20 text-white text-opacity-90'
                         }

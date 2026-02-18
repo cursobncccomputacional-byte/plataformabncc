@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { X, Copy, BarChart3, Layers, Calendar, BookOpen, Cpu, Activity, FileSearch, RefreshCw } from 'lucide-react';
+import { X, Copy, BarChart3, Layers, BookOpen, Cpu, Activity, FileSearch, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/LocalAuthContext';
 import { apiService } from '../services/apiService';
 
@@ -171,11 +171,10 @@ export const RelatorioAtividades = () => {
     [allCurriculoHabilidades, usedHabilidadeIds]
   );
 
-  // Dashboard: agregar por etapa, ano, tipo e eixo (somente liberadas)
+  // Dashboard: agregar por etapa, tipo e eixo (somente liberadas)
   const dashboardStats = useMemo(() => {
     const total = atividadesLiberadas.length;
     const porEtapa: Record<string, number> = {};
-    const porAno: Record<string, number> = {};
     const porTipo: Record<string, number> = {};
     const porEixo: Record<string, number> = {};
 
@@ -185,18 +184,6 @@ export const RelatorioAtividades = () => {
 
       const tipo = (row.tipo ?? 'Não informado').toString().trim();
       porTipo[tipo] = (porTipo[tipo] ?? 0) + 1;
-
-      const anos = row.anos_escolares ?? [];
-      if (Array.isArray(anos) && anos.length > 0) {
-        for (const ano of anos) {
-          const a = String(ano).trim();
-          if (a) {
-            porAno[a] = (porAno[a] ?? 0) + 1;
-          }
-        }
-      } else {
-        porAno['Sem ano'] = (porAno['Sem ano'] ?? 0) + 1;
-      }
 
       const eixos = row.eixos_bncc ?? [];
       const eixosArr = Array.isArray(eixos) ? eixos : [];
@@ -210,7 +197,7 @@ export const RelatorioAtividades = () => {
       }
     }
 
-    return { total, porEtapa, porAno, porTipo, porEixo };
+    return { total, porEtapa, porTipo, porEixo };
   }, [atividadesLiberadas]);
 
   const formatEixos = (eixos: string[] | number[] | undefined): string => {
@@ -408,44 +395,6 @@ export const RelatorioAtividades = () => {
                   </div>
                 </div>
               ))}
-          </div>
-
-          {/* Por ano escolar */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5">
-            <div className="flex items-center gap-2 mb-4 text-gray-800 font-medium">
-              <Calendar className="h-5 w-5" style={{ color: '#005a93' }} />
-              <span>Por ano escolar</span>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(dashboardStats.porAno)
-                .sort(([a], [b]) => {
-                  const order = ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano', 'AEE', 'Sem ano'];
-                  const ia = order.indexOf(a);
-                  const ib = order.indexOf(b);
-                  if (ia !== -1 && ib !== -1) return ia - ib;
-                  if (ia !== -1) return -1;
-                  if (ib !== -1) return 1;
-                  return a.localeCompare(b);
-                })
-                .map(([ano, count]) => {
-                  const maxCount = Math.max(...Object.values(dashboardStats.porAno), 1);
-                  const pct = (count / maxCount) * 100;
-                  return (
-                    <div key={ano} className="flex-1 min-w-[80px] max-w-[140px]">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span className="truncate" title={ano}>{ano}</span>
-                        <span className="font-semibold text-gray-800">{count}</span>
-                      </div>
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${pct}%`, backgroundColor: '#005a93' }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
           </div>
 
           {/* Por tipo (Plugada / Desplugada) + Por eixo BNCC */}

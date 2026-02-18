@@ -14,9 +14,11 @@ import { ManageTrilhas } from './ManageTrilhas';
 import { ManageAdminPackages } from './ManageAdminPackages';
 import { SessionManagement } from './SessionManagement';
 import { PlanoAula } from './PlanoAula';
+import { PlanoAulaBeta } from './PlanoAulaBeta';
 import { Projetos } from './Projetos';
 import { BnccDigital } from './BnccDigital';
 import { ManageBncc } from './ManageBncc';
+import { RelatorioDashboard } from './RelatorioDashboard';
 import { RelatorioAtividades } from './RelatorioAtividades';
 import { RelatorioAderenciaVideos } from './RelatorioAderenciaVideos';
 import { TermoReferencia } from './TermoReferencia';
@@ -36,7 +38,7 @@ export const RootManagement = () => {
   const { user, getAllUsers, createUser, changePassword, deleteUser, toggleUserStatus } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'bncc-digital' | 'manage-bncc' | 'relatorio-atividades' | 'relatorio-aderencia-videos' | 'demandas' | 'projetos' | 'termo-referencia' | 'glossario' | 'cae' | 'politica-privacidade'>('users');
+  const [currentPage, setCurrentPage] = useState<'users' | 'courses' | 'permissions' | 'assign-access' | 'plataforma' | 'formacao-continuada' | 'trilhas' | 'admin-packages' | 'sessions' | 'plano-aula' | 'plano-aula-beta' | 'bncc-digital' | 'manage-bncc' | 'relatorio-dashboard' | 'relatorio-atividades' | 'relatorio-aderencia-videos' | 'demandas' | 'projetos' | 'termo-referencia' | 'glossario' | 'cae' | 'politica-privacidade'>('users');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -590,8 +592,12 @@ export const RootManagement = () => {
           {currentPage === 'admin-packages' && <ManageAdminPackages />}
           {currentPage === 'sessions' && <SessionManagement />}
           {currentPage === 'plano-aula' && <PlanoAula />}
+          {currentPage === 'plano-aula-beta' && <PlanoAulaBeta />}
           {currentPage === 'bncc-digital' && <BnccDigital />}
           {currentPage === 'manage-bncc' && <ManageBncc />}
+          {currentPage === 'relatorio-dashboard' && (
+            <RelatorioDashboard onNavigate={(page) => setCurrentPage(page)} />
+          )}
           {currentPage === 'relatorio-atividades' && <RelatorioAtividades />}
           {currentPage === 'relatorio-aderencia-videos' && <RelatorioAderenciaVideos />}
           {currentPage === 'demandas' && <ManageDemandas />}

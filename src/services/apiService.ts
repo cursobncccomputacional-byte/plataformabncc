@@ -773,6 +773,52 @@ class ApiService {
   }
 
   /**
+   * Planos de Aula Beta (versão estruturada, apenas root)
+   */
+  async getLessonPlansBeta(filters?: { atividade_id?: string }): Promise<ApiResponse & { planos?: any[] }> {
+    const params = new URLSearchParams();
+    if (filters?.atividade_id) params.append('atividade_id', filters.atividade_id);
+    const query = params.toString();
+    return this.request(`/plano-aula-beta/index.php${query ? '?' + query : ''}`);
+  }
+
+  async createLessonPlanBeta(data: any): Promise<ApiResponse & { plano?: any }> {
+    // Reaproveita requireAuth no backend; aqui apenas envia JSON simples
+    return this.request('/plano-aula-beta/index.php', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLessonPlanBeta(id: number, updates: any): Promise<ApiResponse & { plano?: any }> {
+    return this.request('/plano-aula-beta/index.php', {
+      method: 'PATCH',
+      body: JSON.stringify({ id, ...updates }),
+    });
+  }
+
+  async deleteLessonPlanBeta(id: number): Promise<ApiResponse> {
+    return this.request('/plano-aula-beta/index.php', {
+      method: 'DELETE',
+      body: JSON.stringify({ id }),
+    });
+  }
+
+  /**
+   * Dashboard Andamento (dados manuais: meta e pendentes por etapa/tipo) - apenas root
+   */
+  async getDashboardAndamento(): Promise<ApiResponse & { items?: Array<{ etapa: string; tipo: string; meta: number; qte_pendente_gravacao: number; qte_pendente_edicao: number; qte_criadas: number; qte_gravadas: number; qte_editadas: number }> }> {
+    return this.request('/dashboard-andamento/index.php');
+  }
+
+  async saveDashboardAndamento(items: Array<{ etapa: string; tipo: string; meta: number; qte_pendente_gravacao: number; qte_pendente_edicao: number; qte_criadas: number; qte_gravadas: number; qte_editadas: number }>): Promise<ApiResponse> {
+    return this.request('/dashboard-andamento/index.php', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  }
+
+  /**
    * Upload de imagem (thumbnail)
    */
   /**
